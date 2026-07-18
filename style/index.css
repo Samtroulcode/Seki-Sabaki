@@ -1449,6 +1449,7 @@ header {
   }
   .ogs-matchmaking .ogs-inline-option input {
     width: auto;
+    accent-color: #0082F0;
   }
   .ogs-matchmaking-status {
     color: #8CDCDA;
