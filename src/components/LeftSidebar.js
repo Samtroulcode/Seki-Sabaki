@@ -116,7 +116,7 @@ export default class LeftSidebar extends Component {
         {},
 
         h(ToolBarButton, {
-          icon: './node_modules/@primer/octicons/build/svg/question-16.svg',
+          icon: './node_modules/@primer/octicons/build/svg/globe-16.svg',
           tooltip: t('Show OGS Panel'),
           checked: showOgsPanel,
           onClick: this.handleOgsPanelToggle,
