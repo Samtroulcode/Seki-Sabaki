@@ -37,8 +37,8 @@ permission:
     'npm run bundle': allow
     'npx playwright test*': ask
     'npm install*': ask
-    'git add*': allow
-    'git commit*': allow
+    'git add*': deny
+    'git commit*': deny
     'git push*': ask
     'rm *': deny
     'rm -r *': deny
@@ -76,6 +76,8 @@ Default workflow:
   with the task tool to create clean atomic commits. Provide it the task
   summary, verification evidence, and any known pre-existing changes. Never
   push.
+- Do not run `git add` or `git commit` yourself. All staging and commit creation
+  must be delegated to `git-committer`.
 
 Delegation guide:
 

@@ -1,5 +1,7 @@
 ---
-description: Maintains Seki-Sabaki README, docs guides, contributor guidance, and feature documentation when behavior or workflows change.
+description:
+  Maintains Seki-Sabaki README, docs guides, contributor guidance, and feature
+  documentation when behavior or workflows change.
 mode: subagent
 temperature: 0.2
 color: secondary
@@ -10,10 +12,12 @@ permission:
   webfetch: ask
   websearch: ask
   bash:
-    "*": ask
-    "git status*": allow
-    "git diff*": allow
-    "npm run format-check": ask
+    '*': ask
+    'git status*': allow
+    'git diff*': allow
+    'git add*': deny
+    'git commit*': deny
+    'npm run format-check': ask
 ---
 
 You are the documentation maintainer for Seki-Sabaki.

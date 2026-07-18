@@ -1,15 +1,20 @@
 ---
-description: Explores Seki-Sabaki source structure and existing patterns; use before implementation to locate relevant files, tests, docs, and compatibility constraints. Read-only.
+description:
+  Explores Seki-Sabaki source structure and existing patterns; use before
+  implementation to locate relevant files, tests, docs, and compatibility
+  constraints. Read-only.
 mode: subagent
 temperature: 0.1
 color: secondary
 permission:
   edit: deny
   bash:
-    "*": ask
-    "git status*": allow
-    "git diff*": allow
-    "git log*": allow
+    '*': ask
+    'git status*': allow
+    'git diff*': allow
+    'git log*': allow
+    'git add*': deny
+    'git commit*': deny
   webfetch: deny
   websearch: deny
   question: allow

@@ -59,8 +59,8 @@
       "npm install*": "ask",
       "npm run build*": "ask",
       "npm run dist*": "ask",
-      "git add*": "allow",
-      "git commit*": "allow",
+      "git add*": "deny",
+      "git commit*": "deny",
       "git push*": "ask",
       "rm *": "deny",
       "rm -r *": "deny",
@@ -93,6 +93,8 @@
           "git status*": "allow",
           "git diff*": "allow",
           "git log*": "allow",
+          "git add*": "deny",
+          "git commit*": "deny",
           "npm test": "ask",
           "npm run format-check": "ask"
         }
