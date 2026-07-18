@@ -4,6 +4,12 @@ import i18n from '../../i18n.js'
 
 const t = i18n.context('OgsPanel')
 
+const defaultMatchmakingOptions = {
+  boardSize: 19,
+  speed: 'rapid',
+  rankDiff: 3,
+}
+
 export default class OgsPanel extends Component {
   constructor(props) {
     super(props)
@@ -14,6 +20,8 @@ export default class OgsPanel extends Component {
       busy: false,
       error: null,
       connected: false,
+      socket: null,
+      matchmaking: {options: defaultMatchmakingOptions},
     }
 
     this.handleUsernameInput = (evt) => {
@@ -43,7 +51,13 @@ export default class OgsPanel extends Component {
       }
 
       if (result.ok) {
-        this.setState({username, user: result.user, connected: true})
+        this.setState({
+          username,
+          user: result.user,
+          socket: result.state?.socket || null,
+          matchmaking: result.state?.matchmaking || this.state.matchmaking,
+          connected: true,
+        })
       } else {
         this.setState({error: result.error?.message || t('OGS login failed.')})
       }
@@ -53,25 +67,54 @@ export default class OgsPanel extends Component {
 
     this.handleDisconnectButtonClick = async () => {
       await window.sabaki.ogs.logout()
-      this.setState({user: null, connected: false, error: null})
+      this.setState({user: null, connected: false, error: null, socket: null})
+    }
+
+    this.handleMatchmakingOptionChange = async (evt) => {
+      let {name, value} = evt.currentTarget
+      let nextOptions = {
+        ...this.state.matchmaking.options,
+        [name]: name === 'boardSize' || name === 'rankDiff' ? +value : value,
+      }
+
+      this.setState({
+        matchmaking: {...this.state.matchmaking, options: nextOptions},
+      })
+
+      try {
+        let state = await window.sabaki.ogs.setMatchmakingOptions(nextOptions)
+
+        this.setState({
+          matchmaking: state.matchmaking,
+          socket: state.socket,
+        })
+      } catch (err) {}
     }
   }
 
   async componentDidMount() {
-    let user = null
+    let state = null
 
     try {
-      user = await window.sabaki.ogs.getSession()
+      state = await window.sabaki.ogs.getState()
     } catch (err) {
       return
     }
 
-    if (user != null) {
-      this.setState({username: user.username || '', user, connected: true})
+    if (state?.user != null) {
+      this.setState({
+        username: state.user.username || '',
+        user: state.user,
+        socket: state.socket,
+        matchmaking: state.matchmaking,
+        connected: true,
+      })
     }
   }
 
-  render(props, {username, user, busy, error, connected}) {
+  render(props, {username, user, busy, error, connected, socket, matchmaking}) {
+    let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
+
     return h(
       'div',
       {class: 'ogs-panel'},
@@ -144,6 +187,68 @@ export default class OgsPanel extends Component {
               h('dd', {}, t('Online')),
               h('dt', {}, t('Rank')),
               h('dd', {}, user?.rank || t('Unknown')),
+              h('dt', {}, t('Socket')),
+              h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket)),
+            ),
+            h(
+              'section',
+              {class: 'ogs-matchmaking'},
+              h('h3', {}, t('Matchmaking')),
+              h(
+                'label',
+                {},
+                h('span', {}, t('Board size')),
+                h(
+                  'select',
+                  {
+                    name: 'boardSize',
+                    value: matchmakingOptions.boardSize,
+                    onChange: this.handleMatchmakingOptionChange,
+                  },
+                  [9, 13, 19].map((size) =>
+                    h('option', {value: size}, `${size}x${size}`),
+                  ),
+                ),
+              ),
+              h(
+                'label',
+                {},
+                h('span', {}, t('Speed')),
+                h(
+                  'select',
+                  {
+                    name: 'speed',
+                    value: matchmakingOptions.speed,
+                    onChange: this.handleMatchmakingOptionChange,
+                  },
+                  ['blitz', 'rapid', 'live'].map((speed) =>
+                    h('option', {value: speed}, speed),
+                  ),
+                ),
+              ),
+              h(
+                'label',
+                {},
+                h('span', {}, t('Rank range')),
+                h('input', {
+                  name: 'rankDiff',
+                  type: 'number',
+                  min: 0,
+                  max: 9,
+                  value: matchmakingOptions.rankDiff,
+                  onInput: this.handleMatchmakingOptionChange,
+                }),
+              ),
+              h('p', {}, t('Rules: Japanese. Time system: Byo-yomi.')),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  disabled: true,
+                  title: t('Automatch search will be wired in the next slice.'),
+                },
+                t('Find match'),
+              ),
             ),
             h(
               'button',
@@ -152,5 +257,20 @@ export default class OgsPanel extends Component {
             ),
           ),
     )
+  }
+}
+
+function getSocketLabel(socket) {
+  switch (socket?.status) {
+    case 'authentication-sent':
+      return t('Authentication sent')
+    case 'connected':
+      return t('Connected')
+    case 'connecting':
+      return t('Connecting')
+    case 'error':
+      return socket.error || t('Connection error')
+    default:
+      return t('Disconnected')
   }
 }

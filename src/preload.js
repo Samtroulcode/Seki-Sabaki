@@ -137,8 +137,11 @@ window.sabaki = {
   // OGS online integration. Auth/session data is owned by the main process.
   ogs: {
     getSession: () => ipcRenderer.invoke('ogs:getSession'),
+    getState: () => ipcRenderer.invoke('ogs:getState'),
     login: (username, password) =>
       ipcRenderer.invoke('ogs:login', {username, password}),
+    setMatchmakingOptions: (options) =>
+      ipcRenderer.invoke('ogs:setMatchmakingOptions', options),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 

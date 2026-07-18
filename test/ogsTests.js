@@ -19,6 +19,54 @@ function response({status = 200, body, setCookie = null}) {
   }
 }
 
+class FakeWebSocket {
+  static instances = []
+
+  constructor(url) {
+    this.url = url
+    this.sent = []
+    FakeWebSocket.instances.push(this)
+
+    setTimeout(() => this.onopen?.(), 0)
+  }
+
+  send(message) {
+    this.sent.push(message)
+  }
+
+  close() {
+    this.onclose?.()
+  }
+}
+
+class FailingWebSocket {
+  constructor() {
+    setTimeout(() => this.onerror?.(), 0)
+  }
+
+  close() {}
+}
+
+function loginFetch(url, options = {}) {
+  if (url.endsWith('/api/v1/ui/config')) {
+    return response({
+      body: {csrf_token: 'csrf'},
+      setCookie: 'csrftoken=csrf; Path=/',
+    })
+  }
+
+  return response({
+    body: {
+      user_jwt: 'jwt-token',
+      user: {
+        id: 7,
+        username: 'sente',
+        ratings: {overall: {rating: 1900}},
+      },
+    },
+  })
+}
+
 describe('OGS client', () => {
   it('converts OGS ratings to ranks', () => {
     assert.strictEqual(ratingToRank(100), '30k')
@@ -69,27 +117,12 @@ describe('OGS client', () => {
 
   it('logs in via CSRF protected OGS endpoints and exposes no token', async () => {
     let calls = []
+    FakeWebSocket.instances = []
     let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
       fetchImpl: async (url, options = {}) => {
         calls.push({url, options})
-
-        if (url.endsWith('/api/v1/ui/config')) {
-          return response({
-            body: {csrf_token: 'csrf'},
-            setCookie: 'csrftoken=csrf; Path=/',
-          })
-        }
-
-        return response({
-          body: {
-            user_jwt: 'jwt-token',
-            user: {
-              id: 7,
-              username: 'sente',
-              ratings: {overall: {rating: 1900}},
-            },
-          },
-        })
+        return loginFetch(url, options)
       },
     })
 
@@ -107,9 +140,80 @@ describe('OGS client', () => {
     })
     assert.deepStrictEqual(user, client.getSession())
     assert.strictEqual(user.jwtToken, undefined)
+    assert.strictEqual(client.getState().socket.status, 'authentication-sent')
+
+    let socket = FakeWebSocket.instances[0]
+    assert.strictEqual(socket.url, 'wss://beta.online-go.com/')
+    assert.strictEqual(JSON.parse(socket.sent[0])[0], 'authenticate')
+    assert.strictEqual(JSON.parse(socket.sent[0])[1].jwt, 'jwt-token')
 
     client.logout()
     assert.strictEqual(client.getSession(), null)
+    assert.strictEqual(client.getState().socket.status, 'disconnected')
+  })
+
+  it('does not keep a session after socket login failure', async () => {
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FailingWebSocket,
+    })
+
+    await assert.rejects(
+      () => client.login({username: 'sente', password: 'secret'}),
+      (err) => err instanceof OgsError && err.code === 'network',
+    )
+
+    assert.strictEqual(client.getSession(), null)
+    assert.strictEqual(client.getState().user, null)
+    assert.strictEqual(client.getState().socket.status, 'error')
+  })
+
+  it('clears an existing session before a failed relogin', async () => {
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    assert.notStrictEqual(client.getSession(), null)
+
+    client.socket.WebSocketImpl = FailingWebSocket
+
+    await assert.rejects(
+      () => client.login({username: 'sente', password: 'secret'}),
+      (err) => err instanceof OgsError && err.code === 'network',
+    )
+
+    assert.strictEqual(client.getSession(), null)
+    assert.strictEqual(client.getState().user, null)
+  })
+
+  it('sanitizes matchmaking options', () => {
+    let client = new OgsClient({webSocketImpl: FakeWebSocket})
+    let state = client.setMatchmakingOptions({
+      boardSize: 9,
+      speed: 'blitz',
+      rankDiff: 20,
+    })
+
+    assert.deepStrictEqual(state.matchmaking.options, {
+      boardSize: 9,
+      speed: 'blitz',
+      rankDiff: 9,
+      rules: 'japanese',
+      handicap: 'enabled',
+    })
+
+    assert.deepStrictEqual(
+      client.setMatchmakingOptions(null).matchmaking.options,
+      {
+        boardSize: 19,
+        speed: 'rapid',
+        rankDiff: 3,
+        rules: 'japanese',
+        handicap: 'enabled',
+      },
+    )
   })
 
   it('serializes IPC login errors without throwing raw errors', async () => {

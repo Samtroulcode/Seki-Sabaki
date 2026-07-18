@@ -1411,16 +1411,21 @@ header {
     font-weight: bold;
     letter-spacing: .08em;
   }
-  .ogs-login-form, .ogs-status {
+  .ogs-login-form,
+  .ogs-status,
+  .ogs-matchmaking {
     display: grid;
     align-content: start;
     gap: .8rem;
   }
-  .ogs-login-form label {
+  .ogs-login-form label,
+  .ogs-matchmaking label {
     display: grid;
     gap: .3rem;
   }
-  .ogs-login-form input {
+  .ogs-login-form input,
+  .ogs-matchmaking input,
+  .ogs-matchmaking select {
     width: 100%;
     box-sizing: border-box;
     background: #111;
@@ -1441,7 +1446,8 @@ header {
     background: #292A2D;
     color: #eee;
   }
-  .ogs-panel button:not(:disabled):hover, .ogs-panel button:not(:disabled):focus {
+  .ogs-panel button:not(:disabled):hover,
+  .ogs-panel button:not(:disabled):focus {
     background: #222;
   }
   .ogs-panel button:disabled {
@@ -1459,7 +1465,11 @@ header {
   .ogs-status dd {
     margin: 0;
     color: white;
-}
+  }
+  .ogs-matchmaking {
+    padding-top: .8rem;
+    border-top: 1px solid #292A2D;
+  }
 
 .tool-bar {
     display: grid;
