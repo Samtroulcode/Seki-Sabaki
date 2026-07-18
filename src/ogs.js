@@ -122,6 +122,31 @@ function getWebSocketUrl(serverUrl) {
   return url.toString()
 }
 
+function logOgsSocketMessage(direction, message) {
+  try {
+    let data = typeof message === 'string' ? JSON.parse(message) : message
+
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log(`[ogs:socket] ${direction} non-array message`)
+      return
+    }
+
+    let event = typeof data[0] === 'string' ? data[0] : typeof data[0]
+    let payload = data[1]
+    let payloadKeys =
+      payload != null && typeof payload === 'object' && !Array.isArray(payload)
+        ? Object.keys(payload).sort()
+        : []
+
+    console.log(
+      `[ogs:socket] ${direction}`,
+      JSON.stringify({event, payloadKeys, length: data.length}),
+    )
+  } catch (err) {
+    console.log(`[ogs:socket] ${direction} unparsable message`)
+  }
+}
+
 class OgsSocket {
   constructor({serverUrl, webSocketImpl = globalThis.WebSocket}) {
     this.serverUrl = serverUrl
@@ -150,7 +175,10 @@ class OgsSocket {
       throw new OgsError('socket-disconnected', 'OGS socket is disconnected.')
     }
 
-    this.socket.send(JSON.stringify(data == null ? [event] : [event, data]))
+    let message = JSON.stringify(data == null ? [event] : [event, data])
+
+    logOgsSocketMessage('send', message)
+    this.socket.send(message)
   }
 
   connect(jwtToken) {
@@ -215,6 +243,7 @@ class OgsSocket {
         if (this.socket !== socket) return
 
         try {
+          console.log('[ogs:socket] open')
           this.state = {status: 'connected', authenticated: false, error: null}
           this.send('authenticate', {
             jwt: jwtToken,
@@ -243,6 +272,7 @@ class OgsSocket {
       socket.onerror = () => {
         if (this.socket !== socket) return
 
+        console.log('[ogs:socket] error')
         this.state = {
           status: 'error',
           authenticated: false,
@@ -251,8 +281,16 @@ class OgsSocket {
         finish(() => reject(new OgsError('network', this.state.error)))
       }
 
-      socket.onclose = () => {
+      socket.onmessage = (evt) => {
         if (this.socket !== socket) return
+
+        logOgsSocketMessage('recv', evt?.data)
+      }
+
+      socket.onclose = (evt) => {
+        if (this.socket !== socket) return
+
+        console.log('[ogs:socket] close', JSON.stringify({code: evt?.code}))
 
         if (!settled && this.state.status === 'connecting') {
           this.state = {
