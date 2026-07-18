@@ -15,6 +15,28 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.engine-peer-list')).toBeVisible()
     await expect(page.locator('.gtp-console')).toBeVisible()
 
+    await page.evaluate(() => {
+      window.__ogsTestSession = null
+      window.sabaki.ogs = {
+        getSession: async () => window.__ogsTestSession,
+        login: async (username) => {
+          window.__ogsTestSession = {
+            id: '7',
+            username,
+            rank: '1d',
+            iconUrl: null,
+            online: true,
+          }
+
+          return {ok: true, user: window.__ogsTestSession}
+        },
+        logout: async () => {
+          window.__ogsTestSession = null
+          return true
+        },
+      }
+    })
+
     await page.getByTitle('Show OGS Panel').click()
 
     await expect(page.locator('.ogs-panel')).toBeVisible()
@@ -26,9 +48,12 @@ test.describe('OGS mock panel', () => {
     await page.locator('.ogs-login-form button[type="submit"]').click()
 
     await expect(page.locator('.ogs-status')).toBeVisible()
+    await expect(
+      page.locator('.ogs-login-form input[name="password"]'),
+    ).toHaveCount(0)
     await expect(page.locator('.ogs-status-username')).toHaveText('sekibot')
     await expect(page.locator('.ogs-status')).toContainText('Online')
-    await expect(page.locator('.ogs-status')).toContainText('12k')
+    await expect(page.locator('.ogs-status')).toContainText('1d')
 
     await page.getByTitle('Show OGS Panel').click()
 

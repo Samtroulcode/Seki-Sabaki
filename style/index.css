@@ -1426,6 +1426,15 @@ header {
     background: #111;
     color: #eee;
   }
+  .ogs-error {
+    color: #F25C3D;
+  }
+  .ogs-avatar {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    background: #111;
+  }
   .ogs-panel button {
     justify-self: start;
     padding: .35rem .7rem;

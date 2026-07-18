@@ -134,6 +134,14 @@ window.sabaki = {
     writeText: (t) => ipcRenderer.invoke('clipboard:writeText', t),
   },
 
+  // OGS online integration. Auth/session data is owned by the main process.
+  ogs: {
+    getSession: () => ipcRenderer.invoke('ogs:getSession'),
+    login: (username, password) =>
+      ipcRenderer.invoke('ogs:login', {username, password}),
+    logout: () => ipcRenderer.invoke('ogs:logout'),
+  },
+
   // File path helper for Electron 32+ (File.path was removed)
   getPathForFile: (file) => {
     if (webUtils && webUtils.getPathForFile) {

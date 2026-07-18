@@ -13,6 +13,7 @@ const i18n = require('./i18n')
 const setting = require('./setting')
 const updater = require('./updater')
 const {getOpenFileFromArgv} = require('./argv')
+const {setupOgsIpcHandlers} = require('./ogs')
 
 let windows = []
 let openfile = null
@@ -352,6 +353,8 @@ function setupIpcHandlers() {
       }
     }
   })
+
+  setupOgsIpcHandlers(ipcMain)
 }
 
 async function main() {

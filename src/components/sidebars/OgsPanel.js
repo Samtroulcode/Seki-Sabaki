@@ -10,6 +10,9 @@ export default class OgsPanel extends Component {
 
     this.state = {
       username: '',
+      user: null,
+      busy: false,
+      error: null,
       connected: false,
     }
 
@@ -17,26 +20,58 @@ export default class OgsPanel extends Component {
       this.setState({username: evt.currentTarget.value})
     }
 
-    this.handleSubmit = (evt) => {
+    this.handleSubmit = async (evt) => {
       evt.preventDefault()
 
       let username = this.state.username.trim()
+      let password = this.passwordInputElement?.value || ''
 
       if (username === '') return
+
+      this.setState({busy: true, error: null})
 
       if (this.passwordInputElement != null) {
         this.passwordInputElement.value = ''
       }
 
-      this.setState({username, connected: true})
+      let result
+
+      try {
+        result = await window.sabaki.ogs.login(username, password)
+      } catch (err) {
+        result = {ok: false, error: {message: t('Unable to connect to OGS.')}}
+      }
+
+      if (result.ok) {
+        this.setState({username, user: result.user, connected: true})
+      } else {
+        this.setState({error: result.error?.message || t('OGS login failed.')})
+      }
+
+      this.setState({busy: false})
     }
 
-    this.handleDisconnectButtonClick = () => {
-      this.setState({connected: false})
+    this.handleDisconnectButtonClick = async () => {
+      await window.sabaki.ogs.logout()
+      this.setState({user: null, connected: false, error: null})
     }
   }
 
-  render(props, {username, connected}) {
+  async componentDidMount() {
+    let user = null
+
+    try {
+      user = await window.sabaki.ogs.getSession()
+    } catch (err) {
+      return
+    }
+
+    if (user != null) {
+      this.setState({username: user.username || '', user, connected: true})
+    }
+  }
+
+  render(props, {username, user, busy, error, connected}) {
     return h(
       'div',
       {class: 'ogs-panel'},
@@ -45,8 +80,8 @@ export default class OgsPanel extends Component {
         'div',
         {class: 'ogs-panel-branding'},
         h('div', {class: 'ogs-panel-logo'}, 'OGS'),
-        h('h2', {}, t('Online Go Server')),
-        h('p', {}, t('Mock connection panel — no network request is made.')),
+        h('h2', {}, t('Online Go Server Beta')),
+        h('p', {}, t('Connect to beta.online-go.com.')),
       ),
 
       !connected
@@ -63,6 +98,7 @@ export default class OgsPanel extends Component {
                 type: 'text',
                 value: username,
                 autocomplete: 'off',
+                disabled: busy,
                 onInput: this.handleUsernameInput,
               }),
             ),
@@ -70,20 +106,22 @@ export default class OgsPanel extends Component {
             h(
               'label',
               {},
-              h('span', {}, t('Mock password — ignored')),
+              h('span', {}, t('Password')),
               h('input', {
                 ref: (el) => (this.passwordInputElement = el),
                 name: 'password',
                 type: 'password',
                 autocomplete: 'off',
-                placeholder: t('Do not use your OGS password'),
+                disabled: busy,
               }),
             ),
 
+            error != null && h('p', {class: 'ogs-error'}, error),
+
             h(
               'button',
-              {type: 'submit', disabled: username.trim() === ''},
-              t('Connect'),
+              {type: 'submit', disabled: busy || username.trim() === ''},
+              busy ? t('Connecting…') : t('Connect'),
             ),
           )
         : h(
@@ -91,15 +129,21 @@ export default class OgsPanel extends Component {
             {class: 'ogs-status'},
 
             h('h3', {}, t('Connected')),
+            user?.iconUrl != null &&
+              h('img', {class: 'ogs-avatar', src: user.iconUrl, alt: ''}),
             h(
               'dl',
               {},
               h('dt', {}, t('Username')),
-              h('dd', {class: 'ogs-status-username'}, username),
+              h(
+                'dd',
+                {class: 'ogs-status-username'},
+                user?.username || username,
+              ),
               h('dt', {}, t('Status')),
               h('dd', {}, t('Online')),
               h('dt', {}, t('Rank')),
-              h('dd', {}, '12k'),
+              h('dd', {}, user?.rank || t('Unknown')),
             ),
             h(
               'button',
