@@ -297,10 +297,253 @@ test.describe('OGS mock panel', () => {
       )
     })
 
+    await page.getByRole('button', {name: 'Disconnect game'}).click()
+    await page.waitForFunction(() => window.__sabaki.state.onlineGameId == null)
+
+    await page.evaluate(() => {
+      window.__sabaki.clickVertex([5, 5])
+    })
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__ogsPlayedMoves.length === 2 &&
+        sequence.length === 6 &&
+        sequence[5].B?.[0] === 'ff'
+      )
+    })
+
+    await page.locator('.ogs-active-games button').click()
+    await page.waitForFunction(() => window.__sabaki.state.onlineGameId === 42)
+
     await page.getByTitle('Show OGS Panel').click()
 
     await expect(page.locator('.ogs-panel')).toHaveCount(0)
     await expect(page.locator('.engine-peer-list')).toBeVisible()
     await expect(page.locator('.gtp-console')).toBeVisible()
+  })
+
+  test('ignores stale OGS move rejection after server confirmation', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Fixture Game',
+        board: {width: 19, height: 19},
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [],
+        moveCount: 0,
+        lastMove: null,
+        clock: null,
+        chat: [],
+      }
+
+      window.__ogsPlayError = null
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        playMove: async () =>
+          new Promise((resolve) => {
+            window.__resolveOgsMove = resolve
+          }),
+      }
+      window.__sabaki.showOgsPlayError = async (error) => {
+        window.__ogsPlayError = error
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.submitOgsMove([2, 2])
+    })
+
+    await page.waitForFunction(() => window.__sabaki.ogsPendingMove != null)
+
+    await page.evaluate(async () => {
+      window.__ogsTestState.onlineGame.moves.push({move: 'cc', moveNumber: 1})
+      window.__ogsTestState.onlineGame.moveCount = 1
+      window.__ogsTestState.onlineGame.lastMove = 'cc'
+      await window.__sabaki.applyOgsGameUpdate(window.__ogsTestState.onlineGame)
+      window.__resolveOgsMove({
+        ok: false,
+        error: {code: 'not-your-turn', message: 'Not your turn.'},
+        state: window.__ogsTestState,
+      })
+    })
+
+    await page.waitForFunction(
+      () => window.__sabaki.ogsSubmittingMove === false,
+    )
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__ogsPlayError == null &&
+        window.__sabaki.ogsPendingMove == null &&
+        window.__sabaki.state.onlineGameId === 42 &&
+        sequence.length === 2 &&
+        sequence[1].B?.[0] === 'cc'
+      )
+    })
+  })
+
+  test('ignores stale OGS move rejection when confirmation arrives during dialog', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Fixture Game',
+        board: {width: 19, height: 19},
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [],
+        moveCount: 0,
+        lastMove: null,
+        clock: null,
+        chat: [],
+      }
+
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        playMove: async () => ({
+          ok: false,
+          error: {code: 'not-your-turn', message: 'Not your turn.'},
+          state: {
+            onlineGame: {
+              ...onlineGame,
+              moves: [],
+              moveCount: 0,
+              lastMove: null,
+            },
+          },
+        }),
+      }
+      window.__sabaki.showOgsPlayError = async () =>
+        new Promise((resolve) => {
+          window.__resolveOgsDialog = resolve
+        })
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.submitOgsMove([2, 2])
+    })
+
+    await page.waitForFunction(() => window.__resolveOgsDialog != null)
+
+    await page.evaluate(async () => {
+      window.__ogsTestState.onlineGame.moves.push({move: 'cc', moveNumber: 1})
+      window.__ogsTestState.onlineGame.moveCount = 1
+      window.__ogsTestState.onlineGame.lastMove = 'cc'
+      await window.__sabaki.applyOgsGameUpdate(window.__ogsTestState.onlineGame)
+      window.__resolveOgsDialog()
+    })
+
+    await page.waitForFunction(
+      () => window.__sabaki.ogsSubmittingMove === false,
+    )
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__sabaki.ogsPendingMove == null &&
+        window.__sabaki.state.onlineGameId === 42 &&
+        sequence.length === 2 &&
+        sequence[1].B?.[0] === 'cc'
+      )
+    })
+  })
+
+  test('ignores stale OGS error state that already confirms pending move', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Fixture Game',
+        board: {width: 19, height: 19},
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [],
+        moveCount: 0,
+        lastMove: null,
+        clock: null,
+        chat: [],
+      }
+
+      window.__ogsPlayError = null
+      window.__sabaki.showOgsPlayError = async (error) => {
+        window.__ogsPlayError = error
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.ogsPendingMove = {
+        gameId: 42,
+        move: 'cc',
+        moveNumber: 1,
+      }
+      await window.__sabaki.makeMove([2, 2], {
+        player: 1,
+        allowOnlineLocal: true,
+        suppressWarnings: true,
+      })
+
+      await window.__sabaki.handleOgsGameError({
+        ...onlineGame,
+        status: 'error',
+        error: 'stale rejection',
+        moves: [{move: 'cc', moveNumber: 1}],
+        moveCount: 1,
+        lastMove: 'cc',
+      })
+    })
+
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__ogsPlayError == null &&
+        window.__sabaki.ogsPendingMove == null &&
+        sequence.length === 2 &&
+        sequence[1].B?.[0] === 'cc'
+      )
+    })
   })
 })

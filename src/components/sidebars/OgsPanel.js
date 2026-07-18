@@ -86,6 +86,7 @@ export default class OgsPanel extends Component {
     }
 
     this.handleDisconnectButtonClick = async () => {
+      sabaki.detachOgsGame()
       await window.sabaki.ogs.logout()
       this.setState({
         user: null,
@@ -138,6 +139,8 @@ export default class OgsPanel extends Component {
 
       if (result.ok) {
         this.setState({onlineGame: result.state.onlineGame})
+        sabaki.detachOgsGame(gameId)
+        this.syncedOnlineGameKey = null
       }
     }
 
@@ -202,7 +205,13 @@ export default class OgsPanel extends Component {
     if (this.syncingOnlineGame) return
 
     let key = getOnlineGameSyncKey(onlineGame)
-    if (key === this.syncedOnlineGameKey) return
+    if (
+      key === this.syncedOnlineGameKey &&
+      (sabaki.state.onlineGameId === onlineGame.gameId ||
+        (onlineGame.phase === 'finished' && sabaki.state.onlineGameId == null))
+    ) {
+      return
+    }
 
     let sameGame =
       this.syncedOnlineGameKey?.startsWith(`${onlineGame.gameId}:`) === true
@@ -224,6 +233,10 @@ export default class OgsPanel extends Component {
 
     if (loaded) this.syncedOnlineGameKey = key
     else this.declinedOnlineGameId = onlineGame.gameId
+
+    if (loaded && onlineGame.phase === 'finished') {
+      sabaki.detachOgsGame(onlineGame.gameId)
+    }
   }
 
   async updateMatchmakingOptions(options) {
@@ -409,7 +422,7 @@ function getOnlineGameSyncKey(onlineGame) {
     .map((move) => `${move.moveNumber}:${move.move}`)
     .join(',')
 
-  return `${onlineGame.gameId}:${onlineGame.handicap || 0}:${moves}`
+  return `${onlineGame.gameId}:${onlineGame.handicap || 0}:${onlineGame.phase || ''}:${moves}`
 }
 
 function AutomatchForm({

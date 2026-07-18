@@ -192,6 +192,7 @@ class Sabaki extends EventEmitter {
     this.history = []
     this.ogsPendingMove = null
     this.ogsSubmittingMove = false
+    this.ogsSubmissionId = 0
     this.recordHistory()
 
     // Bind state to settings
@@ -738,7 +739,25 @@ class Sabaki extends EventEmitter {
     })
     this.ogsPendingMove = null
     this.ogsSubmittingMove = false
+    this.ogsSubmissionId++
     this.goToEnd()
+    return true
+  }
+
+  detachOgsGame(gameId = null) {
+    if (
+      gameId != null &&
+      this.state.onlineGameId != null &&
+      this.state.onlineGameId !== gameId
+    ) {
+      return false
+    }
+
+    this.ogsPendingMove = null
+    this.ogsSubmittingMove = false
+    this.ogsSubmissionId++
+    this.setState({onlineGameId: null})
+
     return true
   }
 
@@ -1450,18 +1469,29 @@ class Sabaki extends EventEmitter {
 
   async submitOgsMove(vertex) {
     if (helper.vertexEquals(vertex, [-1, -1])) return this.submitOgsPass()
-    if (!(await this.beginOgsOptimisticSubmission())) return
+    let submissionId = await this.beginOgsOptimisticSubmission()
+    if (submissionId == null) return
+
+    let gameId = this.state.onlineGameId
 
     try {
-      let player = await this.getOgsOptimisticPlayer()
+      let player = await this.getOgsOptimisticPlayer(submissionId, gameId)
       if (player == null) return
 
+      if (
+        this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId
+      ) {
+        return
+      }
+
       let optimisticMove = sgf.stringifyVertex(vertex)
-      this.ogsPendingMove = {
-        gameId: this.state.onlineGameId,
+      let pendingMove = {
+        gameId,
         move: optimisticMove,
         moveNumber: this.getOgsLocalMoves().length + 1,
       }
+      this.ogsPendingMove = pendingMove
 
       let played = await this.makeMove(vertex, {
         player,
@@ -1473,29 +1503,59 @@ class Sabaki extends EventEmitter {
         return
       }
 
-      let result = await window.sabaki.ogs.playMove(
-        this.state.onlineGameId,
-        vertex,
-      )
+      if (
+        this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId ||
+        this.ogsPendingMove !== pendingMove
+      ) {
+        return
+      }
+
+      let result = await window.sabaki.ogs.playMove(gameId, vertex)
+      if (
+        this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId ||
+        this.ogsPendingMove !== pendingMove
+      ) {
+        return
+      }
+
       if (!result.ok)
-        await this.rejectOgsOptimisticMove(result.error, result.state)
+        await this.rejectOgsOptimisticMove(result.error, result.state, {
+          submissionId,
+          gameId,
+          pendingMove,
+        })
     } finally {
-      this.ogsSubmittingMove = false
+      if (this.ogsSubmissionId === submissionId) {
+        this.ogsSubmittingMove = false
+      }
     }
   }
 
   async submitOgsPass() {
-    if (!(await this.beginOgsOptimisticSubmission())) return
+    let submissionId = await this.beginOgsOptimisticSubmission()
+    if (submissionId == null) return
+
+    let gameId = this.state.onlineGameId
 
     try {
-      let player = await this.getOgsOptimisticPlayer()
+      let player = await this.getOgsOptimisticPlayer(submissionId, gameId)
       if (player == null) return
 
-      this.ogsPendingMove = {
-        gameId: this.state.onlineGameId,
+      if (
+        this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId
+      ) {
+        return
+      }
+
+      let pendingMove = {
+        gameId,
         move: '..',
         moveNumber: this.getOgsLocalMoves().length + 1,
       }
+      this.ogsPendingMove = pendingMove
 
       let played = await this.makeMove([-1, -1], {
         player,
@@ -1507,11 +1567,33 @@ class Sabaki extends EventEmitter {
         return
       }
 
-      let result = await window.sabaki.ogs.pass(this.state.onlineGameId)
+      if (
+        this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId ||
+        this.ogsPendingMove !== pendingMove
+      ) {
+        return
+      }
+
+      let result = await window.sabaki.ogs.pass(gameId)
+      if (
+        this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId ||
+        this.ogsPendingMove !== pendingMove
+      ) {
+        return
+      }
+
       if (!result.ok)
-        await this.rejectOgsOptimisticMove(result.error, result.state)
+        await this.rejectOgsOptimisticMove(result.error, result.state, {
+          submissionId,
+          gameId,
+          pendingMove,
+        })
     } finally {
-      this.ogsSubmittingMove = false
+      if (this.ogsSubmissionId === submissionId) {
+        this.ogsSubmittingMove = false
+      }
     }
   }
 
@@ -1547,16 +1629,24 @@ class Sabaki extends EventEmitter {
         code: 'move-pending',
         message: 'An OGS move is already pending.',
       })
-      return false
+      return null
     }
 
     this.ogsSubmittingMove = true
-    return true
+    return ++this.ogsSubmissionId
   }
 
-  async getOgsOptimisticPlayer() {
+  async getOgsOptimisticPlayer(submissionId = null, gameId = null) {
     let ogsState = await window.sabaki.ogs.getState()
     let onlineGame = ogsState?.onlineGame
+
+    if (
+      submissionId != null &&
+      (this.ogsSubmissionId !== submissionId ||
+        this.state.onlineGameId !== gameId)
+    ) {
+      return null
+    }
 
     if (this.ogsPendingMove != null || onlineGame?.pendingMove) {
       await this.showOgsPlayError({
@@ -1610,9 +1700,22 @@ class Sabaki extends EventEmitter {
     return userId === blackId ? 1 : -1
   }
 
-  async rejectOgsOptimisticMove(error, state = null) {
-    this.ogsPendingMove = null
+  isCurrentOgsSubmission({submissionId = null, gameId = null, pendingMove}) {
+    return (
+      (submissionId == null || this.ogsSubmissionId === submissionId) &&
+      (gameId == null || this.state.onlineGameId === gameId) &&
+      this.ogsPendingMove === pendingMove
+    )
+  }
+
+  async rejectOgsOptimisticMove(error, state = null, expected = null) {
+    if (expected != null && !this.isCurrentOgsSubmission(expected)) return false
+
     await this.showOgsPlayError(error)
+
+    if (expected != null && !this.isCurrentOgsSubmission(expected)) return false
+
+    this.ogsPendingMove = null
 
     let ogsState = state == null ? await window.sabaki.ogs.getState() : state
     let onlineGame = ogsState?.onlineGame
@@ -1622,6 +1725,8 @@ class Sabaki extends EventEmitter {
         clearHistory: false,
       })
     }
+
+    return true
   }
 
   async handleOgsGameError(onlineGame) {
@@ -1632,12 +1737,25 @@ class Sabaki extends EventEmitter {
       return false
     }
 
+    if (
+      onlineGame.board != null &&
+      Array.isArray(onlineGame.moves) &&
+      getOgsServerMoves(onlineGame).some((move) => this.isOgsPendingMove(move))
+    ) {
+      this.ogsPendingMove = null
+      return false
+    }
+
     await this.rejectOgsOptimisticMove(
       {
         code: 'ogs-game-error',
         message: onlineGame.error || 'OGS rejected the move.',
       },
       {onlineGame},
+      {
+        gameId: this.ogsPendingMove.gameId,
+        pendingMove: this.ogsPendingMove,
+      },
     )
 
     return true
