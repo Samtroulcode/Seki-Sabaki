@@ -1431,6 +1431,28 @@ header {
     background: #111;
     color: #eee;
   }
+  .ogs-matchmaking fieldset {
+    display: grid;
+    gap: .3rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .ogs-matchmaking legend {
+    padding: 0;
+    color: #aaa;
+  }
+  .ogs-matchmaking .ogs-inline-option {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+  }
+  .ogs-matchmaking .ogs-inline-option input {
+    width: auto;
+  }
+  .ogs-matchmaking-status {
+    color: #8CDCDA;
+  }
   .ogs-error {
     color: #F25C3D;
   }

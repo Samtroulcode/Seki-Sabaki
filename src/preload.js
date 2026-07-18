@@ -142,6 +142,8 @@ window.sabaki = {
       ipcRenderer.invoke('ogs:login', {username, password}),
     setMatchmakingOptions: (options) =>
       ipcRenderer.invoke('ogs:setMatchmakingOptions', options),
+    logMockAutomatchRequest: () =>
+      ipcRenderer.invoke('ogs:logMockAutomatchRequest'),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 

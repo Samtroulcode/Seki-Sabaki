@@ -3,12 +3,20 @@ const {randomUUID} = require('crypto')
 const DEFAULT_SERVER_URL = 'https://beta.online-go.com'
 const USER_AGENT = 'Seki-Sabaki/0.1'
 const DEFAULT_MATCHMAKING_OPTIONS = {
-  boardSize: 19,
-  speed: 'rapid',
-  rankDiff: 3,
-  rules: 'japanese',
-  handicap: 'enabled',
+  boardSizes: [19],
+  speeds: ['rapid'],
+  timeSystem: 'byoyomi',
+  lowerRankDiff: 3,
+  upperRankDiff: 3,
+  rules: {condition: 'required', value: 'japanese'},
+  handicap: {condition: 'preferred', value: 'enabled'},
 }
+const AUTOMATCH_BOARD_SIZES = [9, 13, 19]
+const AUTOMATCH_SPEEDS = ['blitz', 'rapid', 'live', 'correspondence']
+const AUTOMATCH_TIME_SYSTEMS = ['fischer', 'byoyomi']
+const AUTOMATCH_CONDITIONS = ['required', 'preferred', 'no-preference']
+const AUTOMATCH_RULES = ['chinese', 'aga', 'japanese', 'korean', 'ing', 'nz']
+const AUTOMATCH_HANDICAP_VALUES = ['enabled', 'disabled']
 
 class OgsError extends Error {
   constructor(code, message) {
@@ -109,6 +117,7 @@ function getInitialMatchmakingState() {
   return {
     status: 'idle',
     options: DEFAULT_MATCHMAKING_OPTIONS,
+    payload: null,
     error: null,
   }
 }
@@ -498,9 +507,26 @@ class OgsClient {
   setMatchmakingOptions(options) {
     this.matchmaking = {
       ...this.matchmaking,
+      status: 'idle',
       options: sanitizeMatchmakingOptions(options),
+      payload: null,
       error: null,
     }
+
+    return this.getState()
+  }
+
+  logMockAutomatchRequest() {
+    let payload = buildAutomatchPayload(this.matchmaking.options)
+
+    this.matchmaking = {
+      ...this.matchmaking,
+      status: 'mock-logged',
+      payload,
+      error: null,
+    }
+
+    console.log('[ogs:automatch] mock find_match', JSON.stringify(payload))
 
     return this.getState()
   }
@@ -509,22 +535,88 @@ class OgsClient {
 function sanitizeMatchmakingOptions(options = {}) {
   if (options == null || typeof options !== 'object') options = {}
 
-  let boardSize = [9, 13, 19].includes(options.boardSize)
-    ? options.boardSize
-    : DEFAULT_MATCHMAKING_OPTIONS.boardSize
-  let speed = ['blitz', 'rapid', 'live'].includes(options.speed)
-    ? options.speed
-    : DEFAULT_MATCHMAKING_OPTIONS.speed
-  let rankDiff = Number.isInteger(options.rankDiff)
-    ? Math.min(Math.max(options.rankDiff, 0), 9)
-    : DEFAULT_MATCHMAKING_OPTIONS.rankDiff
+  let boardSizes = sanitizeArrayOption(
+    options.boardSizes,
+    AUTOMATCH_BOARD_SIZES,
+    DEFAULT_MATCHMAKING_OPTIONS.boardSizes,
+  )
+  let speeds = sanitizeArrayOption(
+    options.speeds,
+    AUTOMATCH_SPEEDS,
+    DEFAULT_MATCHMAKING_OPTIONS.speeds,
+  )
+  let timeSystem = AUTOMATCH_TIME_SYSTEMS.includes(options.timeSystem)
+    ? options.timeSystem
+    : DEFAULT_MATCHMAKING_OPTIONS.timeSystem
+  let lowerRankDiff = sanitizeRankDiff(
+    options.lowerRankDiff,
+    DEFAULT_MATCHMAKING_OPTIONS.lowerRankDiff,
+  )
+  let upperRankDiff = sanitizeRankDiff(
+    options.upperRankDiff,
+    DEFAULT_MATCHMAKING_OPTIONS.upperRankDiff,
+  )
+  let rules = sanitizeConditionValue(
+    options.rules,
+    AUTOMATCH_RULES,
+    DEFAULT_MATCHMAKING_OPTIONS.rules,
+  )
+  let handicap = sanitizeConditionValue(
+    options.handicap,
+    AUTOMATCH_HANDICAP_VALUES,
+    DEFAULT_MATCHMAKING_OPTIONS.handicap,
+  )
 
   return {
-    boardSize,
-    speed,
-    rankDiff,
-    rules: 'japanese',
-    handicap: 'enabled',
+    boardSizes,
+    speeds,
+    timeSystem,
+    lowerRankDiff,
+    upperRankDiff,
+    rules,
+    handicap,
+  }
+}
+
+function sanitizeArrayOption(value, allowedValues, fallback) {
+  if (!Array.isArray(value)) return [...fallback]
+
+  let result = value.filter((item) => allowedValues.includes(item))
+  return result.length === 0 ? [...fallback] : [...new Set(result)]
+}
+
+function sanitizeRankDiff(value, fallback) {
+  return Number.isInteger(value) ? Math.min(Math.max(value, 0), 9) : fallback
+}
+
+function sanitizeConditionValue(value, allowedValues, fallback) {
+  if (value == null || typeof value !== 'object') return {...fallback}
+
+  return {
+    condition: AUTOMATCH_CONDITIONS.includes(value.condition)
+      ? value.condition
+      : fallback.condition,
+    value: allowedValues.includes(value.value) ? value.value : fallback.value,
+  }
+}
+
+function buildAutomatchPayload(options = {}, {uuid = randomUUID()} = {}) {
+  let sanitized = sanitizeMatchmakingOptions(options)
+
+  return {
+    uuid,
+    size_speed_options: sanitized.boardSizes.flatMap((boardSize) =>
+      sanitized.speeds.map((speed) => ({
+        size: `${boardSize}x${boardSize}`,
+        speed,
+        system: sanitized.timeSystem,
+      })),
+    ),
+    lower_rank_diff: sanitized.lowerRankDiff,
+    upper_rank_diff: sanitized.upperRankDiff,
+    rules: sanitized.rules,
+    handicap: sanitized.handicap,
+    timestamp: Date.now(),
   }
 }
 
@@ -561,6 +653,10 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
     client.setMatchmakingOptions(options),
   )
 
+  ipcMain.handle('ogs:logMockAutomatchRequest', () =>
+    client.logMockAutomatchRequest(),
+  )
+
   ipcMain.handle('ogs:login', async (evt, credentials) => {
     try {
       return {
@@ -582,6 +678,13 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
 module.exports = {
   DEFAULT_SERVER_URL,
   DEFAULT_MATCHMAKING_OPTIONS,
+  AUTOMATCH_BOARD_SIZES,
+  AUTOMATCH_SPEEDS,
+  AUTOMATCH_TIME_SYSTEMS,
+  AUTOMATCH_CONDITIONS,
+  AUTOMATCH_RULES,
+  AUTOMATCH_HANDICAP_VALUES,
+  buildAutomatchPayload,
   OgsClient,
   OgsError,
   OgsSocket,

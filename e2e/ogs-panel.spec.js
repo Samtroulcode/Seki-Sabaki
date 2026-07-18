@@ -26,7 +26,15 @@ test.describe('OGS mock panel', () => {
         },
         matchmaking: {
           status: 'idle',
-          options: {boardSize: 19, speed: 'rapid', rankDiff: 3},
+          options: {
+            boardSizes: [19],
+            speeds: ['rapid'],
+            timeSystem: 'byoyomi',
+            lowerRankDiff: 3,
+            upperRankDiff: 3,
+            rules: {condition: 'required', value: 'japanese'},
+            handicap: {condition: 'preferred', value: 'enabled'},
+          },
           error: null,
         },
       }
@@ -51,6 +59,10 @@ test.describe('OGS mock panel', () => {
         },
         setMatchmakingOptions: async (options) => {
           window.__ogsTestState.matchmaking.options = options
+          return window.__ogsTestState
+        },
+        logMockAutomatchRequest: async () => {
+          window.__ogsTestState.matchmaking.status = 'mock-logged'
           return window.__ogsTestState
         },
         logout: async () => {
@@ -83,13 +95,26 @@ test.describe('OGS mock panel', () => {
     )
     await expect(page.locator('.ogs-matchmaking')).toBeVisible()
     await page
-      .locator('.ogs-matchmaking select[name="boardSize"]')
-      .selectOption('9')
+      .locator('.ogs-matchmaking input[name="boardSizes"][value="9"]')
+      .check()
     await page
-      .locator('.ogs-matchmaking select[name="speed"]')
-      .selectOption('blitz')
-    await page.locator('.ogs-matchmaking input[name="rankDiff"]').fill('2')
-    await expect(page.locator('.ogs-matchmaking button')).toBeDisabled()
+      .locator('.ogs-matchmaking input[name="speeds"][value="blitz"]')
+      .check()
+    await page
+      .locator('.ogs-matchmaking select[name="timeSystem"]')
+      .selectOption('fischer')
+    await page.locator('.ogs-matchmaking input[name="lowerRankDiff"]').fill('2')
+    await page.locator('.ogs-matchmaking input[name="upperRankDiff"]').fill('4')
+    await page
+      .locator('.ogs-matchmaking select[name="rules.value"]')
+      .selectOption('chinese')
+    await page
+      .locator('.ogs-matchmaking select[name="handicap.value"]')
+      .selectOption('disabled')
+    await page.locator('.ogs-matchmaking button').click()
+    await expect(page.locator('.ogs-matchmaking')).toContainText(
+      'Automatch payload logged.',
+    )
 
     await page.getByTitle('Show OGS Panel').click()
 

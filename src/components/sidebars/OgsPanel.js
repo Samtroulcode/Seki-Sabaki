@@ -4,10 +4,20 @@ import i18n from '../../i18n.js'
 
 const t = i18n.context('OgsPanel')
 
+const boardSizes = [9, 13, 19]
+const speeds = ['blitz', 'rapid', 'live', 'correspondence']
+const timeSystems = ['byoyomi', 'fischer']
+const conditions = ['required', 'preferred', 'no-preference']
+const rules = ['japanese', 'chinese', 'aga', 'korean', 'ing', 'nz']
+const handicapValues = ['enabled', 'disabled']
 const defaultMatchmakingOptions = {
-  boardSize: 19,
-  speed: 'rapid',
-  rankDiff: 3,
+  boardSizes: [19],
+  speeds: ['rapid'],
+  timeSystem: 'byoyomi',
+  lowerRankDiff: 3,
+  upperRankDiff: 3,
+  rules: {condition: 'required', value: 'japanese'},
+  handicap: {condition: 'preferred', value: 'enabled'},
 }
 
 export default class OgsPanel extends Component {
@@ -72,17 +82,43 @@ export default class OgsPanel extends Component {
 
     this.handleMatchmakingOptionChange = async (evt) => {
       let {name, value} = evt.currentTarget
-      let nextOptions = {
+
+      await this.updateMatchmakingOptions({
         ...this.state.matchmaking.options,
-        [name]: name === 'boardSize' || name === 'rankDiff' ? +value : value,
-      }
-
-      this.setState({
-        matchmaking: {...this.state.matchmaking, options: nextOptions},
+        [name]: name.endsWith('RankDiff') ? +value : value,
       })
+    }
 
+    this.handleConditionOptionChange = async (evt) => {
+      let {name, value} = evt.currentTarget
+      let [group, key] = name.split('.')
+
+      await this.updateMatchmakingOptions({
+        ...this.state.matchmaking.options,
+        [group]: {
+          ...this.state.matchmaking.options[group],
+          [key]: value,
+        },
+      })
+    }
+
+    this.handleMultiOptionChange = async (evt) => {
+      let {name, value, checked} = evt.currentTarget
+      let current = this.state.matchmaking.options[name] || []
+      let parsedValue = name === 'boardSizes' ? +value : value
+      let next = checked
+        ? [...current, parsedValue]
+        : current.filter((item) => item !== parsedValue)
+
+      await this.updateMatchmakingOptions({
+        ...this.state.matchmaking.options,
+        [name]: next,
+      })
+    }
+
+    this.handleLogAutomatchButtonClick = async () => {
       try {
-        let state = await window.sabaki.ogs.setMatchmakingOptions(nextOptions)
+        let state = await window.sabaki.ogs.logMockAutomatchRequest()
 
         this.setState({
           matchmaking: state.matchmaking,
@@ -90,6 +126,21 @@ export default class OgsPanel extends Component {
         })
       } catch (err) {}
     }
+  }
+
+  async updateMatchmakingOptions(options) {
+    this.setState({
+      matchmaking: {...this.state.matchmaking, options},
+    })
+
+    try {
+      let state = await window.sabaki.ogs.setMatchmakingOptions(options)
+
+      this.setState({
+        matchmaking: state.matchmaking,
+        socket: state.socket,
+      })
+    } catch (err) {}
   }
 
   async componentDidMount() {
@@ -114,6 +165,7 @@ export default class OgsPanel extends Component {
 
   render(props, {username, user, busy, error, connected, socket, matchmaking}) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
+    let authenticated = socket?.status === 'authenticated'
 
     return h(
       'div',
@@ -190,66 +242,15 @@ export default class OgsPanel extends Component {
               h('dt', {}, t('Socket')),
               h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket)),
             ),
-            h(
-              'section',
-              {class: 'ogs-matchmaking'},
-              h('h3', {}, t('Matchmaking')),
-              h(
-                'label',
-                {},
-                h('span', {}, t('Board size')),
-                h(
-                  'select',
-                  {
-                    name: 'boardSize',
-                    value: matchmakingOptions.boardSize,
-                    onChange: this.handleMatchmakingOptionChange,
-                  },
-                  [9, 13, 19].map((size) =>
-                    h('option', {value: size}, `${size}x${size}`),
-                  ),
-                ),
-              ),
-              h(
-                'label',
-                {},
-                h('span', {}, t('Speed')),
-                h(
-                  'select',
-                  {
-                    name: 'speed',
-                    value: matchmakingOptions.speed,
-                    onChange: this.handleMatchmakingOptionChange,
-                  },
-                  ['blitz', 'rapid', 'live'].map((speed) =>
-                    h('option', {value: speed}, speed),
-                  ),
-                ),
-              ),
-              h(
-                'label',
-                {},
-                h('span', {}, t('Rank range')),
-                h('input', {
-                  name: 'rankDiff',
-                  type: 'number',
-                  min: 0,
-                  max: 9,
-                  value: matchmakingOptions.rankDiff,
-                  onInput: this.handleMatchmakingOptionChange,
-                }),
-              ),
-              h('p', {}, t('Rules: Japanese. Time system: Byo-yomi.')),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  disabled: true,
-                  title: t('Automatch search will be wired in the next slice.'),
-                },
-                t('Find match'),
-              ),
-            ),
+            h(AutomatchForm, {
+              options: matchmakingOptions,
+              status: matchmaking?.status,
+              authenticated,
+              onOptionChange: this.handleMatchmakingOptionChange,
+              onConditionChange: this.handleConditionOptionChange,
+              onMultiChange: this.handleMultiOptionChange,
+              onLogAutomatch: this.handleLogAutomatchButtonClick,
+            }),
             h(
               'button',
               {type: 'button', onClick: this.handleDisconnectButtonClick},
@@ -258,6 +259,167 @@ export default class OgsPanel extends Component {
           ),
     )
   }
+}
+
+function AutomatchForm({
+  options,
+  status,
+  authenticated,
+  onOptionChange,
+  onConditionChange,
+  onMultiChange,
+  onLogAutomatch,
+}) {
+  return h(
+    'section',
+    {class: 'ogs-matchmaking'},
+    h('h3', {}, t('Automatch')),
+    h('p', {}, t('Prepare an official OGS automatch payload.')),
+
+    h(CheckboxGroup, {
+      title: t('Board sizes'),
+      name: 'boardSizes',
+      values: boardSizes,
+      selected: options.boardSizes,
+      format: (size) => `${size}x${size}`,
+      onChange: onMultiChange,
+    }),
+
+    h(CheckboxGroup, {
+      title: t('Speeds'),
+      name: 'speeds',
+      values: speeds,
+      selected: options.speeds,
+      onChange: onMultiChange,
+    }),
+
+    h(SelectField, {
+      label: t('Time system'),
+      name: 'timeSystem',
+      value: options.timeSystem,
+      values: timeSystems,
+      onChange: onOptionChange,
+    }),
+
+    h(NumberField, {
+      label: t('Lower rank difference'),
+      name: 'lowerRankDiff',
+      value: options.lowerRankDiff,
+      onInput: onOptionChange,
+    }),
+
+    h(NumberField, {
+      label: t('Upper rank difference'),
+      name: 'upperRankDiff',
+      value: options.upperRankDiff,
+      onInput: onOptionChange,
+    }),
+
+    h(ConditionValueField, {
+      title: t('Rules'),
+      group: 'rules',
+      option: options.rules,
+      values: rules,
+      onChange: onConditionChange,
+    }),
+
+    h(ConditionValueField, {
+      title: t('Handicap'),
+      group: 'handicap',
+      option: options.handicap,
+      values: handicapValues,
+      onChange: onConditionChange,
+    }),
+
+    status === 'mock-logged' &&
+      h('p', {class: 'ogs-matchmaking-status'}, t('Automatch payload logged.')),
+
+    h(
+      'button',
+      {
+        type: 'button',
+        disabled: !authenticated,
+        title: !authenticated
+          ? t('OGS socket must be authenticated first.')
+          : t('Log the payload without sending it to OGS.'),
+        onClick: onLogAutomatch,
+      },
+      t('Log automatch request'),
+    ),
+  )
+}
+
+function CheckboxGroup({
+  title,
+  name,
+  values,
+  selected,
+  format = (x) => x,
+  onChange,
+}) {
+  return h(
+    'fieldset',
+    {},
+    h('legend', {}, title),
+    values.map((value) =>
+      h(
+        'label',
+        {class: 'ogs-inline-option'},
+        h('input', {
+          type: 'checkbox',
+          name,
+          value,
+          checked: selected.includes(value),
+          onChange,
+        }),
+        h('span', {}, format(value)),
+      ),
+    ),
+  )
+}
+
+function SelectField({label, name, value, values, onChange}) {
+  return h(
+    'label',
+    {},
+    h('span', {}, label),
+    h(
+      'select',
+      {name, value, onChange},
+      values.map((item) => h('option', {value: item}, item)),
+    ),
+  )
+}
+
+function NumberField({label, name, value, onInput}) {
+  return h(
+    'label',
+    {},
+    h('span', {}, label),
+    h('input', {name, type: 'number', min: 0, max: 9, value, onInput}),
+  )
+}
+
+function ConditionValueField({title, group, option, values, onChange}) {
+  return h(
+    'fieldset',
+    {},
+    h('legend', {}, title),
+    h(SelectField, {
+      label: t('Condition'),
+      name: `${group}.condition`,
+      value: option.condition,
+      values: conditions,
+      onChange,
+    }),
+    h(SelectField, {
+      label: t('Value'),
+      name: `${group}.value`,
+      value: option.value,
+      values,
+      onChange,
+    }),
+  )
 }
 
 function getSocketLabel(socket) {

@@ -241,29 +241,76 @@ describe('OGS client', () => {
   it('sanitizes matchmaking options', () => {
     let client = new OgsClient({webSocketImpl: FakeWebSocket})
     let state = client.setMatchmakingOptions({
-      boardSize: 9,
-      speed: 'blitz',
-      rankDiff: 20,
+      boardSizes: [9, 19, 99],
+      speeds: ['blitz', 'bad'],
+      timeSystem: 'fischer',
+      lowerRankDiff: 20,
+      upperRankDiff: 2,
+      rules: {condition: 'preferred', value: 'aga'},
+      handicap: {condition: 'required', value: 'disabled'},
     })
 
     assert.deepStrictEqual(state.matchmaking.options, {
-      boardSize: 9,
-      speed: 'blitz',
-      rankDiff: 9,
-      rules: 'japanese',
-      handicap: 'enabled',
+      boardSizes: [9, 19],
+      speeds: ['blitz'],
+      timeSystem: 'fischer',
+      lowerRankDiff: 9,
+      upperRankDiff: 2,
+      rules: {condition: 'preferred', value: 'aga'},
+      handicap: {condition: 'required', value: 'disabled'},
     })
 
     assert.deepStrictEqual(
       client.setMatchmakingOptions(null).matchmaking.options,
       {
-        boardSize: 19,
-        speed: 'rapid',
-        rankDiff: 3,
-        rules: 'japanese',
-        handicap: 'enabled',
+        boardSizes: [19],
+        speeds: ['rapid'],
+        timeSystem: 'byoyomi',
+        lowerRankDiff: 3,
+        upperRankDiff: 3,
+        rules: {condition: 'required', value: 'japanese'},
+        handicap: {condition: 'preferred', value: 'enabled'},
       },
     )
+  })
+
+  it('builds and logs an official automatch payload without sending it', () => {
+    let client = new OgsClient({webSocketImpl: FakeWebSocket})
+    client.setMatchmakingOptions({
+      boardSizes: [9, 13],
+      speeds: ['blitz', 'rapid'],
+      timeSystem: 'fischer',
+      lowerRankDiff: 1,
+      upperRankDiff: 2,
+      rules: {condition: 'required', value: 'chinese'},
+      handicap: {condition: 'preferred', value: 'enabled'},
+    })
+
+    let state = client.logMockAutomatchRequest()
+
+    assert.strictEqual(state.matchmaking.status, 'mock-logged')
+    assert.strictEqual(typeof state.matchmaking.payload.uuid, 'string')
+    assert.strictEqual(typeof state.matchmaking.payload.timestamp, 'number')
+    assert.deepStrictEqual(state.matchmaking.payload.size_speed_options, [
+      {size: '9x9', speed: 'blitz', system: 'fischer'},
+      {size: '9x9', speed: 'rapid', system: 'fischer'},
+      {size: '13x13', speed: 'blitz', system: 'fischer'},
+      {size: '13x13', speed: 'rapid', system: 'fischer'},
+    ])
+    assert.strictEqual(state.matchmaking.payload.lower_rank_diff, 1)
+    assert.strictEqual(state.matchmaking.payload.upper_rank_diff, 2)
+    assert.deepStrictEqual(state.matchmaking.payload.rules, {
+      condition: 'required',
+      value: 'chinese',
+    })
+    assert.deepStrictEqual(state.matchmaking.payload.handicap, {
+      condition: 'preferred',
+      value: 'enabled',
+    })
+
+    state = client.setMatchmakingOptions({boardSizes: [19]})
+    assert.strictEqual(state.matchmaking.status, 'idle')
+    assert.strictEqual(state.matchmaking.payload, null)
   })
 
   it('serializes IPC login errors without throwing raw errors', async () => {
