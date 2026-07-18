@@ -1,0 +1,155 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "seki-dev",
+  "share": "manual",
+  "snapshot": true,
+  "instructions": [
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "docs/guides/building-tests.md"
+  ],
+  "skills": {
+    "paths": [".opencode/skills"]
+  },
+  "watcher": {
+    "ignore": [
+      "node_modules/**",
+      "dist/**",
+      "bundle.js",
+      "bundle.js.map",
+      ".git/**",
+      "test/resources/engine-transcripts/**"
+    ]
+  },
+  "formatter": {
+    "prettier": {
+      "command": ["npx", "prettier", "--write", "$FILE"],
+      "extensions": [".js", ".html", ".md", ".json"]
+    }
+  },
+  "permission": {
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "edit": "ask",
+    "question": "allow",
+    "todowrite": "allow",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "skill": "allow",
+    "external_directory": "ask",
+    "doom_loop": "ask",
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git remote*": "allow",
+      "npm test": "allow",
+      "npm run format-check": "allow",
+      "npm run test:e2e:smoke": "allow",
+      "npm run bundle": "allow",
+      "npx playwright test*": "ask",
+      "npm install*": "ask",
+      "npm run build*": "ask",
+      "npm run dist*": "ask",
+      "git commit*": "ask",
+      "git push*": "ask",
+      "rm *": "deny",
+      "rm -r *": "deny",
+      "rm -rf *": "deny",
+      "git reset --hard*": "deny",
+      "git checkout -- *": "deny",
+      "git clean*": "deny",
+      "git push --force*": "deny",
+      "*&&*": "deny",
+      "*;*": "deny",
+      "*|*": "deny",
+      "*`*": "deny",
+      "*$(*": "deny"
+    },
+    "task": {
+      "*": "deny",
+      "repo-cartographer": "allow",
+      "sgf-gtp-specialist": "allow",
+      "electron-security-reviewer": "allow",
+      "preact-ui-specialist": "allow",
+      "ogs-integration-architect": "allow",
+      "test-verifier": "allow",
+      "code-reviewer": "allow",
+      "git-committer": "allow",
+      "docs-maintainer": "allow",
+      "packaging-release-guardian": "allow"
+    }
+  },
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "ask",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "npm test": "ask",
+          "npm run format-check": "ask",
+          "*&&*": "deny",
+          "*;*": "deny",
+          "*|*": "deny",
+          "*`*": "deny",
+          "*$(*": "deny"
+        }
+      }
+    }
+  },
+  "command": {
+    "dev-task": {
+      "description": "Explore, implement, verify, review",
+      "agent": "seki-dev",
+      "template": "Treat this as a full development task for Seki-Sabaki: $ARGUMENTS\n\nFollow the project pipeline from AGENTS.md. First gather code context, then ask blocking questions with the question tool if product or security decisions are unclear. Delegate focused research or review to relevant subagents through the task tool. Implement the smallest correct change, run the targeted verification, review the result, then call git-committer to create clean atomic commits. Do not push. Finish with commit hashes, changed files, and verification results."
+    },
+    "feature-online": {
+      "description": "Design OGS/online feature safely",
+      "agent": "seki-plan",
+      "template": "Plan an online/OGS feature for Seki-Sabaki: $ARGUMENTS\n\nDo not implement yet unless explicitly asked after the plan. Load the relevant skills, verify OGS/API assumptions from source material when needed, identify Electron security implications, propose a minimal vertical slice, list affected files, tests, and unresolved product questions. Use question tool for decisions that block a correct plan."
+    },
+    "verify": {
+      "description": "Choose and run targeted checks",
+      "agent": "test-verifier",
+      "subtask": true,
+      "template": "Select the smallest reliable verification matrix for the current change or request: $ARGUMENTS\n\nInspect the changed files and project scripts, run allowed checks when appropriate, and report exact commands, pass/fail status, and any remaining unverified risks."
+    },
+    "review": {
+      "description": "Strict code review",
+      "agent": "code-reviewer",
+      "subtask": true,
+      "template": "Review the current changes or target described here: $ARGUMENTS\n\nPrioritize bugs, regressions, security issues, missing tests, and hallucinated assumptions. Return findings first with file/line references. If no findings, say so and list residual risks."
+    },
+    "e2e-spec": {
+      "description": "Add Playwright Electron coverage",
+      "agent": "seki-dev",
+      "template": "Add or adjust Playwright Electron E2E coverage for: $ARGUMENTS\n\nUse existing e2e fixtures and helpers. Prefer deterministic app-state waits over sleeps. Delegate test strategy to test-verifier if scope is unclear. After verification and review, call git-committer to create clean atomic commits. Do not push."
+    },
+    "upstream-awareness": {
+      "description": "Compare with upstream-sensitive areas",
+      "agent": "repo-cartographer",
+      "subtask": true,
+      "template": "Map the upstream-sensitive code areas for: $ARGUMENTS\n\nIdentify files likely inherited from Sabaki upstream, local fork changes visible from git history if relevant, and risks when modifying them. Do not edit files."
+    }
+  },
+  "tool_output": {
+    "max_lines": 400,
+    "max_bytes": 20000
+  },
+  "compaction": {
+    "auto": true,
+    "prune": false,
+    "tail_turns": 6
+  }
+}
