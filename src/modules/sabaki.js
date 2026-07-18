@@ -18,6 +18,7 @@ import * as gametree from './gametree.js'
 import * as gobantransformer from './gobantransformer.js'
 import * as gtplogger from './gtplogger.js'
 import * as helper from './helper.js'
+import {buildOgsGameTree} from './ogsboard.js'
 import * as sound from './sound.js'
 
 deadstones.useFetch('./node_modules/@sabaki/deadstones/wasm/deadstones_bg.wasm')
@@ -56,6 +57,7 @@ class Sabaki extends EventEmitter {
       gameTrees: [emptyTree],
       gameCurrents: [{}],
       treePosition: emptyTree.root.id,
+      onlineGameId: null,
 
       // Bars
 
@@ -675,7 +677,7 @@ class Sabaki extends EventEmitter {
 
   async loadGameTrees(
     gameTrees,
-    {suppressAskForSave = false, clearHistory = true} = {},
+    {suppressAskForSave = false, clearHistory = true, onlineGameId = null} = {},
   ) {
     if (!suppressAskForSave && !(await this.askForSave())) return
 
@@ -692,6 +694,7 @@ class Sabaki extends EventEmitter {
         gameTrees,
         gameCurrents: gameTrees.map((_) => ({})),
         boardTransformation: '',
+        onlineGameId,
       })
 
       let [firstTree] = gameTrees
@@ -713,6 +716,26 @@ class Sabaki extends EventEmitter {
       await helper.wait(setting.get('gamechooser.show_delay'))
       this.openDrawer('gamechooser')
     }
+  }
+
+  async loadOgsGame(
+    onlineGame,
+    {suppressAskForSave = true, clearHistory = false} = {},
+  ) {
+    if (!suppressAskForSave && !(await this.askForSave())) return false
+
+    let tree = buildOgsGameTree(onlineGame, {
+      appName: this.appName,
+      version: this.version,
+    })
+
+    await this.loadGameTrees([tree], {
+      suppressAskForSave: true,
+      clearHistory,
+      onlineGameId: onlineGame?.gameId ?? null,
+    })
+    this.goToEnd()
+    return true
   }
 
   async saveFile(filename = null, confirmExtension = true) {
@@ -939,6 +962,8 @@ class Sabaki extends EventEmitter {
   // Playing
 
   clickVertex(vertex, {button = 0, ctrlKey = false, x = 0, y = 0} = {}) {
+    if (this.state.onlineGameId != null) return
+
     this.closeDrawer()
 
     let t = i18n.context('sabaki.play')
@@ -1188,6 +1213,8 @@ class Sabaki extends EventEmitter {
   }
 
   async makeMove(vertex, {player = null, generateEngineMove = false} = {}) {
+    if (this.state.onlineGameId != null) return
+
     if (!['play', 'autoplay', 'guess'].includes(this.state.mode)) {
       this.closeDrawer()
       this.setMode('play')
@@ -1305,6 +1332,8 @@ class Sabaki extends EventEmitter {
   }
 
   makePass() {
+    if (this.state.onlineGameId != null) return
+
     // Let an attached engine respond to the pass, as it does for a board click,
     // unless an engine-vs-engine game is already driving moves.
     this.makeMove([-1, -1], {
@@ -1313,6 +1342,8 @@ class Sabaki extends EventEmitter {
   }
 
   makeResign({player = null} = {}) {
+    if (this.state.onlineGameId != null) return
+
     let {gameTrees, gameIndex, treePosition} = this.state
     let {currentPlayer} = this.inferredState
     if (player == null) player = currentPlayer
@@ -1334,6 +1365,8 @@ class Sabaki extends EventEmitter {
   }
 
   useTool(tool, vertex, argument = null) {
+    if (this.state.onlineGameId != null) return
+
     let {gameTrees, gameIndex, treePosition} = this.state
     let {currentPlayer} = this.inferredState
     let tree = gameTrees[gameIndex]
@@ -2048,6 +2081,8 @@ class Sabaki extends EventEmitter {
   }
 
   async generateMove(syncerId, treePosition, {commit = () => true} = {}) {
+    if (this.state.onlineGameId != null) return
+
     let t = i18n.context('sabaki.engine')
     let sign = this.getPlayer(treePosition)
     let color = sign > 0 ? 'B' : 'W'

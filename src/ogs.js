@@ -129,8 +129,10 @@ function getInitialOnlineGameState() {
     error: null,
     gameName: null,
     board: null,
+    handicap: null,
     phase: null,
     players: null,
+    moves: [],
     moveCount: 0,
     lastMove: null,
     clock: null,
@@ -640,14 +642,17 @@ class OgsClient {
         break
 
       case 'move':
+        let move = sanitizeLiveMove(payload, this.onlineGame.moves.length + 1)
+        if (move == null) break
+
+        let moves = mergeMoves(this.onlineGame.moves, move)
+
         this.onlineGame = {
           ...this.onlineGame,
           status: 'connected',
-          moveCount: sanitizeMoveCount(
-            payload?.move_number,
-            this.onlineGame.moveCount + 1,
-          ),
-          lastMove: sanitizeMove(payload?.move),
+          moves,
+          moveCount: moves.length,
+          lastMove: move.move,
           error: null,
         }
         break
@@ -722,15 +727,60 @@ function sanitizeOptionalGameId(value) {
 function sanitizeGameData(data) {
   let width = sanitizeBoardSize(data?.width)
   let height = sanitizeBoardSize(data?.height)
-  let moves = Array.isArray(data?.moves) ? data.moves : []
+  let moves = sanitizeHistoricalMoves(data?.moves)
 
   return {
     gameName: sanitizeString(data?.game_name, 200),
     board: width == null || height == null ? null : {width, height},
+    handicap: sanitizeHandicap(data?.handicap),
     phase: sanitizeGamePhase(data?.phase),
     players: sanitizePlayers(data?.players),
+    moves,
     moveCount: moves.length,
+    lastMove: moves.at(-1)?.move || null,
   }
+}
+
+function sanitizeHistoricalMoves(value) {
+  if (!Array.isArray(value)) return []
+
+  return value.map(sanitizeHistoricalMove).filter((move) => move != null)
+}
+
+function sanitizeHistoricalMove(value, index) {
+  if (typeof value === 'string') {
+    let move = sanitizeMove(value)
+    return move == null ? null : {move, moveNumber: index + 1}
+  }
+
+  if (Array.isArray(value)) {
+    let move = sanitizeMove(value[0])
+    if (move == null) return null
+
+    return {
+      move,
+      moveNumber: sanitizeMoveCount(value[1], index + 1),
+    }
+  }
+
+  return sanitizeLiveMove(value, index + 1)
+}
+
+function sanitizeLiveMove(value, fallbackMoveNumber = null) {
+  let move = sanitizeMove(value?.move)
+  if (move == null) return null
+
+  return {
+    move,
+    moveNumber: sanitizeMoveCount(value?.move_number, fallbackMoveNumber),
+  }
+}
+
+function mergeMoves(moves, move) {
+  let result = moves.filter((item) => item.moveNumber !== move.moveNumber)
+  result.push(move)
+
+  return result.sort((a, b) => a.moveNumber - b.moveNumber)
 }
 
 function sanitizeGamePhase(value) {
@@ -742,6 +792,10 @@ function sanitizeGamePhase(value) {
 
 function sanitizeBoardSize(value) {
   return Number.isInteger(value) && value > 0 && value <= 25 ? value : null
+}
+
+function sanitizeHandicap(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 9 ? value : null
 }
 
 function sanitizePlayers(players) {
@@ -822,6 +876,7 @@ function cloneOnlineGameState(state) {
   return {
     ...state,
     board: state.board == null ? null : {...state.board},
+    handicap: state.handicap,
     players:
       state.players == null
         ? null
@@ -832,6 +887,7 @@ function cloneOnlineGameState(state) {
               state.players.white == null ? null : {...state.players.white},
           },
     clock: state.clock == null ? null : {...state.clock},
+    moves: state.moves.map((move) => ({...move})),
     chat: state.chat.map((line) => ({...line})),
   }
 }

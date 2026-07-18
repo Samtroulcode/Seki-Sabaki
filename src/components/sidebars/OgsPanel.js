@@ -1,6 +1,7 @@
 import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
+import sabaki from '../../modules/sabaki.js'
 
 const t = i18n.context('OgsPanel')
 
@@ -35,6 +36,10 @@ export default class OgsPanel extends Component {
       onlineGame: null,
       gameIdInput: '',
     }
+
+    this.syncedOnlineGameKey = null
+    this.declinedOnlineGameId = null
+    this.syncingOnlineGame = false
 
     this.handleUsernameInput = (evt) => {
       this.setState({username: evt.currentTarget.value})
@@ -103,6 +108,7 @@ export default class OgsPanel extends Component {
 
       try {
         let result = await window.sabaki.ogs.connectGame(gameId)
+        this.declinedOnlineGameId = null
 
         if (result.ok) {
           this.setState({
@@ -110,6 +116,7 @@ export default class OgsPanel extends Component {
             matchmaking: result.state.matchmaking,
             onlineGame: result.state.onlineGame,
           })
+          await this.syncOnlineGameToBoard(result.state.onlineGame)
         } else {
           this.setState({
             error: result.error?.message || t('Unable to connect to game.'),
@@ -182,6 +189,39 @@ export default class OgsPanel extends Component {
     }
   }
 
+  async syncOnlineGameToBoard(onlineGame) {
+    if (
+      onlineGame?.status !== 'connected' ||
+      onlineGame.board == null ||
+      !Array.isArray(onlineGame.moves)
+    ) {
+      return
+    }
+
+    if (this.declinedOnlineGameId === onlineGame.gameId) return
+    if (this.syncingOnlineGame) return
+
+    let key = getOnlineGameSyncKey(onlineGame)
+    if (key === this.syncedOnlineGameKey) return
+
+    let sameGame =
+      this.syncedOnlineGameKey?.startsWith(`${onlineGame.gameId}:`) === true
+    let loaded = false
+
+    this.syncingOnlineGame = true
+    try {
+      loaded = await sabaki.loadOgsGame(onlineGame, {
+        suppressAskForSave: sameGame,
+        clearHistory: !sameGame,
+      })
+    } finally {
+      this.syncingOnlineGame = false
+    }
+
+    if (loaded) this.syncedOnlineGameKey = key
+    else this.declinedOnlineGameId = onlineGame.gameId
+  }
+
   async updateMatchmakingOptions(options) {
     this.setState({
       matchmaking: {...this.state.matchmaking, options},
@@ -224,6 +264,7 @@ export default class OgsPanel extends Component {
         onlineGame: state.onlineGame,
         connected: true,
       })
+      await this.syncOnlineGameToBoard(state.onlineGame)
     }
   }
 
@@ -335,6 +376,14 @@ export default class OgsPanel extends Component {
           ),
     )
   }
+}
+
+function getOnlineGameSyncKey(onlineGame) {
+  let moves = onlineGame.moves
+    .map((move) => `${move.moveNumber}:${move.move}`)
+    .join(',')
+
+  return `${onlineGame.gameId}:${onlineGame.handicap || 0}:${moves}`
 }
 
 function AutomatchForm({

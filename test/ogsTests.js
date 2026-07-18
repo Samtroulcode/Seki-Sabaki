@@ -340,6 +340,7 @@ describe('OGS client', () => {
       game_name: 'Friendly game',
       width: 19,
       height: 19,
+      handicap: 0,
       phase: 'play',
       players: {
         black: {id: 7, username: 'sente'},
@@ -374,11 +375,17 @@ describe('OGS client', () => {
     assert.strictEqual(state.onlineGame.status, 'connected')
     assert.strictEqual(state.onlineGame.gameName, 'Friendly game')
     assert.deepStrictEqual(state.onlineGame.board, {width: 19, height: 19})
+    assert.strictEqual(state.onlineGame.handicap, 0)
     assert.strictEqual(state.onlineGame.players.black.username, 'sente')
     assert.strictEqual(state.onlineGame.players.white.username, 'gote')
     assert.strictEqual(state.onlineGame.phase, 'stone removal')
     assert.strictEqual(state.onlineGame.moveCount, 3)
     assert.strictEqual(state.onlineGame.lastMove, 'cc')
+    assert.deepStrictEqual(state.onlineGame.moves, [
+      {move: 'aa', moveNumber: 1},
+      {move: 'bb', moveNumber: 2},
+      {move: 'cc', moveNumber: 3},
+    ])
     assert.deepStrictEqual(state.onlineGame.clock, {
       currentPlayer: 8,
       expiration: 1784381000000,
@@ -394,6 +401,14 @@ describe('OGS client', () => {
       },
     ])
     assert.strictEqual(JSON.stringify(state).includes('must-not-leak'), false)
+
+    socket.receive('game/12345/move', {move_number: 3, move: 'dd'})
+    state = client.getState()
+    assert.deepStrictEqual(state.onlineGame.moves.at(-1), {
+      move: 'dd',
+      moveNumber: 3,
+    })
+    assert.strictEqual(state.onlineGame.moves.length, 3)
 
     socket.receive('game/12345/reset-chats')
     assert.deepStrictEqual(client.getState().onlineGame.chat, [])

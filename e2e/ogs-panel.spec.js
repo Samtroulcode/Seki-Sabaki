@@ -45,6 +45,7 @@ test.describe('OGS mock panel', () => {
           board: null,
           phase: null,
           players: null,
+          moves: [],
           moveCount: 0,
           lastMove: null,
           clock: null,
@@ -90,7 +91,11 @@ test.describe('OGS mock panel', () => {
               black: {id: 7, username: 'sekibot'},
               white: {id: 8, username: 'opponent'},
             },
-            moveCount: 12,
+            moves: [
+              {move: 'aa', moveNumber: 1},
+              {move: 'bb', moveNumber: 2},
+            ],
+            moveCount: 2,
             lastMove: 'dd',
             clock: null,
             chat: [{username: 'opponent', body: 'good luck'}],
@@ -158,6 +163,21 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-online-game')).toContainText('19x19')
     await expect(page.locator('.ogs-online-game')).toContainText('opponent')
     await expect(page.locator('.ogs-online-game')).toContainText('good luck')
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex, treePosition} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        tree.root.data.SO?.[0] === 'https://online-go.com/game/42' &&
+        sequence.length === 3 &&
+        sequence[1].B?.[0] === 'aa' &&
+        sequence[2].W?.[0] === 'bb' &&
+        treePosition === [...tree.getSequence(tree.root.id)].at(-1).id
+      )
+    })
 
     await page.getByTitle('Show OGS Panel').click()
 
