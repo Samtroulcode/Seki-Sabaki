@@ -375,12 +375,9 @@ describe('OGS client', () => {
         black: {id: 7, username: 'sente'},
         white: {id: 8, username: 'gote'},
       },
-      moves: [
-        ['aa', 1],
-        ['bb', 2],
-      ],
+      moves: 'aabb',
     })
-    socket.receive('game/12345/move', {move_number: 3, move: 'cc'})
+    socket.receive('game/12345/move', {move_number: 3, move: [2, 2, 1000]})
     socket.receive('game/12345/clock', {
       current_player: 8,
       expiration: 1784381000000,
@@ -438,6 +435,19 @@ describe('OGS client', () => {
       moveNumber: 3,
     })
     assert.strictEqual(state.onlineGame.moves.length, 3)
+
+    socket.receive('game/12345/gamedata', {
+      game_name: 'Friendly game',
+      width: 9,
+      height: 9,
+      moves: [[0, 0, 1000], {x: 1, y: 1}, [9, 9, 1000], '..'],
+    })
+    state = client.getState()
+    assert.deepStrictEqual(state.onlineGame.moves, [
+      {move: 'aa', moveNumber: 1},
+      {move: 'bb', moveNumber: 2},
+      {move: '..', moveNumber: 3},
+    ])
 
     socket.receive('game/12345/reset-chats')
     assert.deepStrictEqual(client.getState().onlineGame.chat, [])
