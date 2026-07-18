@@ -114,7 +114,7 @@ describe('OGS client', () => {
 
   it('sanitizes public user data', () => {
     assert.deepStrictEqual(
-      sanitizeUser('https://beta.online-go.com', {
+      sanitizeUser('https://online-go.com', {
         id: 123,
         username: 'sente',
         icon: '/user/icon.png',
@@ -125,7 +125,7 @@ describe('OGS client', () => {
         username: 'sente',
         rank: '1d',
         rating: 1900,
-        iconUrl: 'https://beta.online-go.com/user/icon.png',
+        iconUrl: 'https://online-go.com/user/icon.png',
         online: true,
       },
     )
@@ -134,14 +134,14 @@ describe('OGS client', () => {
   it('rejects non-OGS avatar URLs', () => {
     for (let icon of [
       'https://example.com/avatar.png',
-      'http://beta.online-go.com/avatar.png',
+      'http://online-go.com/avatar.png',
       'file:///tmp/avatar.png',
       'data:image/svg+xml,avatar',
       'javascript:alert(1)',
       '//example.com/avatar.png',
     ]) {
       assert.strictEqual(
-        sanitizeUser('https://beta.online-go.com', {
+        sanitizeUser('https://online-go.com', {
           username: 'sente',
           icon,
           ratings: {overall: {rating: 1900}},
@@ -180,7 +180,7 @@ describe('OGS client', () => {
     assert.strictEqual(client.getState().socket.authenticated, true)
 
     let socket = FakeWebSocket.instances[0]
-    assert.strictEqual(socket.url, 'wss://beta.online-go.com/')
+    assert.strictEqual(socket.url, 'wss://online-go.com/')
     assert.strictEqual(JSON.parse(socket.sent[0])[0], 'authenticate')
     assert.strictEqual(JSON.parse(socket.sent[0])[1].jwt, 'jwt-token')
     assert.strictEqual(Number.isInteger(JSON.parse(socket.sent[0])[2]), true)

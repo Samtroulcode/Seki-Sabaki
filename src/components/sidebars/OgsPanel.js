@@ -242,8 +242,8 @@ export default class OgsPanel extends Component {
         'div',
         {class: 'ogs-panel-branding'},
         h('div', {class: 'ogs-panel-logo'}, 'OGS'),
-        h('h2', {}, t('Online Go Server Beta')),
-        h('p', {}, t('Connect to beta.online-go.com.')),
+        h('h2', {}, t('Online Go Server')),
+        h('p', {}, t('Connect to online-go.com.')),
       ),
 
       !connected

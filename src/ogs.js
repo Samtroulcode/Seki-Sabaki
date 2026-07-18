@@ -1,6 +1,6 @@
 const {randomUUID} = require('crypto')
 
-const DEFAULT_SERVER_URL = 'https://beta.online-go.com'
+const DEFAULT_SERVER_URL = 'https://online-go.com'
 const USER_AGENT = 'Seki-Sabaki/0.1'
 const DEFAULT_MATCHMAKING_OPTIONS = {
   boardSizes: [19],
