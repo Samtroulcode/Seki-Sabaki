@@ -37,7 +37,7 @@
     "glob": "allow",
     "grep": "allow",
     "list": "allow",
-    "edit": "ask",
+    "edit": "allow",
     "question": "allow",
     "todowrite": "allow",
     "webfetch": "ask",
@@ -59,7 +59,8 @@
       "npm install*": "ask",
       "npm run build*": "ask",
       "npm run dist*": "ask",
-      "git commit*": "ask",
+      "git add*": "allow",
+      "git commit*": "allow",
       "git push*": "ask",
       "rm *": "deny",
       "rm -r *": "deny",
@@ -67,12 +68,7 @@
       "git reset --hard*": "deny",
       "git checkout -- *": "deny",
       "git clean*": "deny",
-      "git push --force*": "deny",
-      "*&&*": "deny",
-      "*;*": "deny",
-      "*|*": "deny",
-      "*`*": "deny",
-      "*$(*": "deny"
+      "git push --force*": "deny"
     },
     "task": {
       "*": "deny",
@@ -98,12 +94,7 @@
           "git diff*": "allow",
           "git log*": "allow",
           "npm test": "ask",
-          "npm run format-check": "ask",
-          "*&&*": "deny",
-          "*;*": "deny",
-          "*|*": "deny",
-          "*`*": "deny",
-          "*$(*": "deny"
+          "npm run format-check": "ask"
         }
       }
     }

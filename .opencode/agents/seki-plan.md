@@ -31,11 +31,6 @@ permission:
     'git remote*': allow
     'npm test': ask
     'npm run format-check': ask
-    '*&&*': deny
-    '*;*': deny
-    '*|*': deny
-    '*`*': deny
-    '*$(*': deny
 ---
 
 You are the planning and architecture agent for Seki-Sabaki.

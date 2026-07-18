@@ -7,7 +7,7 @@ mode: primary
 temperature: 0.2
 color: primary
 permission:
-  edit: ask
+  edit: allow
   question: allow
   todowrite: allow
   webfetch: ask
@@ -37,7 +37,8 @@ permission:
     'npm run bundle': allow
     'npx playwright test*': ask
     'npm install*': ask
-    'git commit*': ask
+    'git add*': allow
+    'git commit*': allow
     'git push*': ask
     'rm *': deny
     'rm -r *': deny
@@ -46,11 +47,6 @@ permission:
     'git checkout -- *': deny
     'git clean*': deny
     'git push --force*': deny
-    '*&&*': deny
-    '*;*': deny
-    '*|*': deny
-    '*`*': deny
-    '*$(*': deny
 ---
 
 You are the primary implementation agent for Seki-Sabaki.
