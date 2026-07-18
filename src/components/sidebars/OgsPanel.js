@@ -39,6 +39,7 @@ export default class OgsPanel extends Component {
 
     this.syncedOnlineGameKey = null
     this.declinedOnlineGameId = null
+    this.handledOnlineGameErrorKey = null
     this.syncingOnlineGame = false
 
     this.handleUsernameInput = (evt) => {
@@ -94,6 +95,9 @@ export default class OgsPanel extends Component {
         onlineGame: null,
         activeGames: [],
       })
+      this.syncedOnlineGameKey = null
+      this.declinedOnlineGameId = null
+      this.handledOnlineGameErrorKey = null
     }
 
     this.handleActiveGameButtonClick = async (gameId) => {
@@ -102,6 +106,7 @@ export default class OgsPanel extends Component {
       try {
         let result = await window.sabaki.ogs.connectGame(gameId)
         this.declinedOnlineGameId = null
+        this.handledOnlineGameErrorKey = null
 
         if (result.ok) {
           this.setState({
@@ -205,10 +210,14 @@ export default class OgsPanel extends Component {
 
     this.syncingOnlineGame = true
     try {
-      loaded = await sabaki.loadOgsGame(onlineGame, {
-        suppressAskForSave: sameGame,
-        clearHistory: !sameGame,
-      })
+      loaded = sameGame ? await sabaki.applyOgsGameUpdate(onlineGame) : false
+
+      if (!loaded) {
+        loaded = await sabaki.loadOgsGame(onlineGame, {
+          suppressAskForSave: sameGame,
+          clearHistory: !sameGame,
+        })
+      }
     } finally {
       this.syncingOnlineGame = false
     }
@@ -260,7 +269,19 @@ export default class OgsPanel extends Component {
         activeGames: state.activeGames || [],
         connected: true,
       })
+      await this.handleOnlineGameError(state.onlineGame)
       await this.syncOnlineGameToBoard(state.onlineGame)
+    }
+  }
+
+  async handleOnlineGameError(onlineGame) {
+    if (onlineGame?.status !== 'error') return
+
+    let key = `${onlineGame.gameId}:${onlineGame.error || ''}`
+    if (key === this.handledOnlineGameErrorKey) return
+
+    if (await sabaki.handleOgsGameError(onlineGame)) {
+      this.handledOnlineGameErrorKey = key
     }
   }
 

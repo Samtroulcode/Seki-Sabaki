@@ -18,7 +18,7 @@ import * as gametree from './gametree.js'
 import * as gobantransformer from './gobantransformer.js'
 import * as gtplogger from './gtplogger.js'
 import * as helper from './helper.js'
-import {buildOgsGameTree} from './ogsboard.js'
+import {buildOgsGameTree, parseOgsMove} from './ogsboard.js'
 import * as sound from './sound.js'
 
 deadstones.useFetch('./node_modules/@sabaki/deadstones/wasm/deadstones_bg.wasm')
@@ -190,6 +190,8 @@ class Sabaki extends EventEmitter {
     this.treeHash = this.generateTreeHash()
     this.historyPointer = 0
     this.history = []
+    this.ogsPendingMove = null
+    this.ogsSubmittingMove = false
     this.recordHistory()
 
     // Bind state to settings
@@ -734,7 +736,67 @@ class Sabaki extends EventEmitter {
       clearHistory,
       onlineGameId: onlineGame?.gameId ?? null,
     })
+    this.ogsPendingMove = null
+    this.ogsSubmittingMove = false
     this.goToEnd()
+    return true
+  }
+
+  async applyOgsGameUpdate(onlineGame) {
+    if (
+      this.state.onlineGameId == null ||
+      this.state.onlineGameId !== onlineGame?.gameId ||
+      onlineGame.board == null ||
+      !Array.isArray(onlineGame.moves)
+    ) {
+      return false
+    }
+
+    let serverMoves = getOgsServerMoves(onlineGame)
+    let localMoves = this.getOgsLocalMoves()
+
+    if (movesEqual(localMoves, serverMoves)) {
+      this.clearConfirmedOgsPendingMove(serverMoves.at(-1))
+      return true
+    }
+
+    if (
+      this.ogsPendingMove != null &&
+      this.ogsPendingMove.gameId === onlineGame.gameId &&
+      localMoves.length === serverMoves.length + 1 &&
+      movesEqual(localMoves.slice(0, -1), serverMoves) &&
+      movesEqual([localMoves.at(-1)], [this.ogsPendingMove])
+    ) {
+      return true
+    }
+
+    if (
+      localMoves.length + 1 !== serverMoves.length ||
+      !movesEqual(localMoves, serverMoves.slice(0, -1))
+    ) {
+      return false
+    }
+
+    this.clearConfirmedOgsPendingMove(
+      serverMoves.find((move) => this.isOgsPendingMove(move)),
+    )
+
+    let move = serverMoves.at(-1)
+    let vertex = parseOgsMove(
+      move.move,
+      onlineGame.board.width,
+      onlineGame.board.height,
+    )
+
+    if (vertex == null) return false
+
+    await this.makeMove(vertex, {
+      player: getOgsMovePlayer(move.moveNumber, onlineGame.handicap),
+      allowOnlineLocal: true,
+      suppressWarnings: true,
+    })
+    this.clearConfirmedOgsPendingMove(move)
+
     return true
   }
 
@@ -1222,8 +1284,18 @@ class Sabaki extends EventEmitter {
     this.events.emit('vertexClick')
   }
 
-  async makeMove(vertex, {player = null, generateEngineMove = false} = {}) {
-    if (this.state.onlineGameId != null) return this.submitOgsMove(vertex)
+  async makeMove(
+    vertex,
+    {
+      player = null,
+      generateEngineMove = false,
+      allowOnlineLocal = false,
+      suppressWarnings = false,
+    } = {},
+  ) {
+    if (this.state.onlineGameId != null && !allowOnlineLocal) {
+      return this.submitOgsMove(vertex)
+    }
 
     if (!['play', 'autoplay', 'guess'].includes(this.state.mode)) {
       this.closeDrawer()
@@ -1243,13 +1315,13 @@ class Sabaki extends EventEmitter {
       player,
       vertex,
     )
-    if (!pass && overwrite) return
+    if (!pass && overwrite) return false
 
     let prev = tree.get(node.parentId)
     let color = player > 0 ? 'B' : 'W'
     let ko = false
 
-    if (!pass) {
+    if (!pass && !suppressWarnings) {
       if (prev != null && setting.get('game.show_ko_warning')) {
         let nextBoard = board.makeMove(player, vertex)
         let prevBoard = gametree.getBoard(tree, prev.id)
@@ -1268,7 +1340,7 @@ class Sabaki extends EventEmitter {
             [t('Play Anyway'), t("Don't Play")],
             1,
           )
-          if (answer !== 0) return
+          if (answer !== 0) return false
         }
       }
 
@@ -1284,7 +1356,7 @@ class Sabaki extends EventEmitter {
           [t('Play Anyway'), t("Don't Play")],
           1,
         )
-        if (answer !== 0) return
+        if (answer !== 0) return false
       }
     }
 
@@ -1339,6 +1411,8 @@ class Sabaki extends EventEmitter {
         nextTreePosition,
       )
     }
+
+    return true
   }
 
   makePass() {
@@ -1376,17 +1450,69 @@ class Sabaki extends EventEmitter {
 
   async submitOgsMove(vertex) {
     if (helper.vertexEquals(vertex, [-1, -1])) return this.submitOgsPass()
+    if (!(await this.beginOgsOptimisticSubmission())) return
 
-    let result = await window.sabaki.ogs.playMove(
-      this.state.onlineGameId,
-      vertex,
-    )
-    if (!result.ok) await this.showOgsPlayError(result.error)
+    try {
+      let player = await this.getOgsOptimisticPlayer()
+      if (player == null) return
+
+      let optimisticMove = sgf.stringifyVertex(vertex)
+      this.ogsPendingMove = {
+        gameId: this.state.onlineGameId,
+        move: optimisticMove,
+        moveNumber: this.getOgsLocalMoves().length + 1,
+      }
+
+      let played = await this.makeMove(vertex, {
+        player,
+        allowOnlineLocal: true,
+        suppressWarnings: true,
+      })
+      if (!played) {
+        this.ogsPendingMove = null
+        return
+      }
+
+      let result = await window.sabaki.ogs.playMove(
+        this.state.onlineGameId,
+        vertex,
+      )
+      if (!result.ok)
+        await this.rejectOgsOptimisticMove(result.error, result.state)
+    } finally {
+      this.ogsSubmittingMove = false
+    }
   }
 
   async submitOgsPass() {
-    let result = await window.sabaki.ogs.pass(this.state.onlineGameId)
-    if (!result.ok) await this.showOgsPlayError(result.error)
+    if (!(await this.beginOgsOptimisticSubmission())) return
+
+    try {
+      let player = await this.getOgsOptimisticPlayer()
+      if (player == null) return
+
+      this.ogsPendingMove = {
+        gameId: this.state.onlineGameId,
+        move: '..',
+        moveNumber: this.getOgsLocalMoves().length + 1,
+      }
+
+      let played = await this.makeMove([-1, -1], {
+        player,
+        allowOnlineLocal: true,
+        suppressWarnings: true,
+      })
+      if (!played) {
+        this.ogsPendingMove = null
+        return
+      }
+
+      let result = await window.sabaki.ogs.pass(this.state.onlineGameId)
+      if (!result.ok)
+        await this.rejectOgsOptimisticMove(result.error, result.state)
+    } finally {
+      this.ogsSubmittingMove = false
+    }
   }
 
   async submitOgsResign() {
@@ -1406,10 +1532,148 @@ class Sabaki extends EventEmitter {
 
   async showOgsPlayError(error) {
     let t = i18n.context('sabaki.play')
-    await dialog.showMessageBox(
-      error?.message || t('Unable to send OGS game command.'),
-      'warning',
+    let message = error?.message || t('Unable to send OGS game command.')
+
+    if (error?.code) {
+      message += `\n\n${t('Code')}: ${error.code}`
+    }
+
+    await dialog.showMessageBox(message, 'warning')
+  }
+
+  async beginOgsOptimisticSubmission() {
+    if (this.ogsSubmittingMove || this.ogsPendingMove != null) {
+      await this.showOgsPlayError({
+        code: 'move-pending',
+        message: 'An OGS move is already pending.',
+      })
+      return false
+    }
+
+    this.ogsSubmittingMove = true
+    return true
+  }
+
+  async getOgsOptimisticPlayer() {
+    let ogsState = await window.sabaki.ogs.getState()
+    let onlineGame = ogsState?.onlineGame
+
+    if (this.ogsPendingMove != null || onlineGame?.pendingMove) {
+      await this.showOgsPlayError({
+        code: 'move-pending',
+        message: 'An OGS move is already pending.',
+      })
+      return null
+    }
+
+    if (
+      onlineGame?.gameId !== this.state.onlineGameId ||
+      onlineGame.status !== 'connected' ||
+      onlineGame.phase !== 'play'
+    ) {
+      await this.showOgsPlayError({
+        code: 'invalid-state',
+        message: 'OGS game is not ready to play.',
+      })
+      return null
+    }
+
+    let userId = normalizeOgsId(ogsState?.user?.id)
+    let blackId = normalizeOgsId(onlineGame.players?.black?.id)
+    let whiteId = normalizeOgsId(onlineGame.players?.white?.id)
+
+    if (userId == null || blackId == null || whiteId == null) {
+      await this.showOgsPlayError({
+        code: 'invalid-state',
+        message: 'OGS game players are not available.',
+      })
+      return null
+    }
+
+    if (userId !== blackId && userId !== whiteId) {
+      await this.showOgsPlayError({
+        code: 'invalid-state',
+        message: 'OGS user is not a player in this game.',
+      })
+      return null
+    }
+
+    let playerToMove = getOgsPlayerToMove(onlineGame)
+    if (playerToMove != null && playerToMove !== userId) {
+      await this.showOgsPlayError({
+        code: 'not-your-turn',
+        message: 'It is not your turn in this OGS game.',
+      })
+      return null
+    }
+
+    return userId === blackId ? 1 : -1
+  }
+
+  async rejectOgsOptimisticMove(error, state = null) {
+    this.ogsPendingMove = null
+    await this.showOgsPlayError(error)
+
+    let ogsState = state == null ? await window.sabaki.ogs.getState() : state
+    let onlineGame = ogsState?.onlineGame
+    if (onlineGame?.board != null && Array.isArray(onlineGame.moves)) {
+      await this.loadOgsGame(onlineGame, {
+        suppressAskForSave: true,
+        clearHistory: false,
+      })
+    }
+  }
+
+  async handleOgsGameError(onlineGame) {
+    if (
+      this.ogsPendingMove == null ||
+      onlineGame?.gameId !== this.ogsPendingMove.gameId
+    ) {
+      return false
+    }
+
+    await this.rejectOgsOptimisticMove(
+      {
+        code: 'ogs-game-error',
+        message: onlineGame.error || 'OGS rejected the move.',
+      },
+      {onlineGame},
     )
+
+    return true
+  }
+
+  clearConfirmedOgsPendingMove(move) {
+    if (this.isOgsPendingMove(move)) {
+      this.ogsPendingMove = null
+    }
+  }
+
+  isOgsPendingMove(move) {
+    return (
+      this.ogsPendingMove != null &&
+      move != null &&
+      this.ogsPendingMove.moveNumber === move.moveNumber &&
+      this.ogsPendingMove.move === move.move
+    )
+  }
+
+  getOgsLocalMoves() {
+    let {gameTrees, gameIndex} = this.state
+    let tree = gameTrees[gameIndex]
+
+    return [...tree.getSequence(tree.root.id)]
+      .map((node) => node.data)
+      .slice(1)
+      .map((data, index) => {
+        let move = null
+
+        if (data.B != null) move = data.B[0] || '..'
+        else if (data.W != null) move = data.W[0] || '..'
+
+        return {moveNumber: index + 1, move}
+      })
+      .filter((move) => move.move != null)
   }
 
   useTool(tool, vertex, argument = null) {
@@ -3217,6 +3481,77 @@ class Sabaki extends EventEmitter {
       y,
     )
   }
+}
+
+function getOgsServerMoves(onlineGame) {
+  let width = onlineGame.board.width
+  let height = onlineGame.board.height
+
+  return [...onlineGame.moves]
+    .sort((a, b) => {
+      let aNumber = Number.isInteger(a?.moveNumber) ? a.moveNumber : Infinity
+      let bNumber = Number.isInteger(b?.moveNumber) ? b.moveNumber : Infinity
+
+      return aNumber - bNumber
+    })
+    .map((move, index) => ({
+      moveNumber: Number.isInteger(move?.moveNumber)
+        ? move.moveNumber
+        : index + 1,
+      move: move?.move,
+    }))
+    .filter((move) => parseOgsMove(move.move, width, height) != null)
+}
+
+function getOgsMovePlayer(moveNumber, handicap) {
+  let firstPlayer = Number.isInteger(handicap) && handicap > 1 ? -1 : 1
+  let secondPlayer = -firstPlayer
+
+  return moveNumber % 2 === 1 ? firstPlayer : secondPlayer
+}
+
+function getOgsPlayerToMove(onlineGame) {
+  if (
+    onlineGame.clock?.currentPlayer != null &&
+    onlineGame.clock.lastMove >= onlineGame.moveCount
+  ) {
+    return normalizeOgsId(onlineGame.clock.currentPlayer)
+  }
+
+  let blackId = normalizeOgsId(onlineGame.players?.black?.id)
+  let whiteId = normalizeOgsId(onlineGame.players?.white?.id)
+  if (blackId == null || whiteId == null) return null
+
+  let firstPlayer = onlineGame.handicap > 1 ? whiteId : blackId
+  let secondPlayer = firstPlayer === blackId ? whiteId : blackId
+
+  return onlineGame.moveCount % 2 === 0 ? firstPlayer : secondPlayer
+}
+
+function normalizeOgsId(value) {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
+    return value
+  }
+
+  if (typeof value === 'string' && /^[1-9][0-9]{0,15}$/.test(value)) {
+    let number = Number(value)
+    return Number.isSafeInteger(number) ? number : null
+  }
+
+  return null
+}
+
+function movesEqual(a, b) {
+  return (
+    Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every(
+      (move, index) =>
+        move?.moveNumber === b[index]?.moveNumber &&
+        move?.move === b[index]?.move,
+    )
+  )
 }
 
 export default new Sabaki()

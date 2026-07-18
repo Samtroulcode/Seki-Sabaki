@@ -17,6 +17,7 @@ test.describe('OGS mock panel', () => {
 
     await page.evaluate(() => {
       window.__ogsTestSession = null
+      window.__ogsPlayedMoves = []
       window.__ogsTestState = {
         user: null,
         socket: {
@@ -117,6 +118,27 @@ test.describe('OGS mock panel', () => {
           window.__ogsTestState.onlineGame = {status: 'idle', gameId: null}
           return {ok: true, state: window.__ogsTestState}
         },
+        playMove: async (gameId, vertex) => {
+          window.__ogsPlayedMoves.push({gameId, vertex})
+          if (window.__ogsRejectNextMove) {
+            window.__ogsRejectNextMove = false
+            return {
+              ok: false,
+              error: {code: 'not-your-turn', message: 'Not your turn.'},
+              state: window.__ogsTestState,
+            }
+          }
+
+          return {ok: true, state: window.__ogsTestState}
+        },
+        pass: async (gameId) => {
+          window.__ogsPlayedMoves.push({gameId, pass: true})
+          return {ok: true, state: window.__ogsTestState}
+        },
+        resign: async (gameId) => {
+          window.__ogsPlayedMoves.push({gameId, resign: true})
+          return {ok: true, state: window.__ogsTestState}
+        },
         logout: async () => {
           window.__ogsTestSession = null
           window.__ogsTestState.user = null
@@ -189,6 +211,89 @@ test.describe('OGS mock panel', () => {
         sequence[1].B?.[0] === 'aa' &&
         sequence[2].W?.[0] === 'bb' &&
         treePosition === [...tree.getSequence(tree.root.id)].at(-1).id
+      )
+    })
+
+    await page.evaluate(() => {
+      window.__sabaki.clickVertex([2, 2])
+    })
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__ogsPlayedMoves.length === 1 &&
+        window.__ogsPlayedMoves[0].gameId === 42 &&
+        window.__ogsPlayedMoves[0].vertex[0] === 2 &&
+        window.__ogsPlayedMoves[0].vertex[1] === 2 &&
+        sequence.length === 4 &&
+        sequence[3].B?.[0] === 'cc'
+      )
+    })
+
+    await page.evaluate(() => {
+      window.__sabaki.clickVertex([4, 4])
+    })
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return window.__ogsPlayedMoves.length === 1 && sequence.length === 4
+    })
+
+    await page.evaluate(async () => {
+      window.__ogsTestState.onlineGame.moves.push({move: 'cc', moveNumber: 3})
+      window.__ogsTestState.onlineGame.moves.push({move: 'dd', moveNumber: 4})
+      window.__ogsTestState.onlineGame.moveCount = 4
+      window.__ogsTestState.onlineGame.lastMove = 'dd'
+      await window.__sabaki.applyOgsGameUpdate(window.__ogsTestState.onlineGame)
+    })
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__sabaki.ogsPendingMove == null &&
+        sequence.length === 5 &&
+        sequence[3].B?.[0] === 'cc' &&
+        sequence[4].W?.[0] === 'dd'
+      )
+    })
+
+    await page.evaluate(() => {
+      window.__ogsTestState.user = {
+        id: '7',
+        username: 'sekibot',
+        rank: '1d',
+      }
+      window.__ogsRejectNextMove = true
+      window.__ogsPlayError = null
+      window.__sabaki.showOgsPlayError = async (error) => {
+        window.__ogsPlayError = error
+      }
+      window.__sabaki.clickVertex([4, 4])
+    })
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = [...tree.getSequence(tree.root.id)].map(
+        (node) => node.data,
+      )
+
+      return (
+        window.__ogsPlayError?.code === 'not-your-turn' &&
+        sequence.length === 5 &&
+        sequence[3].B?.[0] === 'cc' &&
+        sequence[4].W?.[0] === 'dd'
       )
     })
 
