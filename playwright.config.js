@@ -84,5 +84,10 @@ module.exports = defineConfig({
       testMatch: /heatmap-label-font\.spec\.js/,
       dependencies: ['smoke'],
     },
+    {
+      name: 'ogs-panel',
+      testMatch: /ogs-panel\.spec\.js/,
+      dependencies: ['smoke'],
+    },
   ],
 })

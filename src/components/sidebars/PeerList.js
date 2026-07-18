@@ -164,33 +164,35 @@ export class EnginePeerList extends Component {
     whiteEngineSyncerId,
     analyzingEngineSyncerId,
     engineGameOngoing,
+    showToolBar = true,
   }) {
     return h(
       'div',
       {
-        class: 'engine-peer-list',
+        class: classnames('engine-peer-list', {'no-tool-bar': !showToolBar}),
       },
 
-      h(
-        ToolBar,
-        {},
+      showToolBar &&
+        h(
+          ToolBar,
+          {},
 
-        h(ToolBarButton, {
-          icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
-          tooltip: t('Attach Engine…'),
-          menu: true,
-          onClick: this.handleAttachEngineButtonClick,
-        }),
+          h(ToolBarButton, {
+            icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
+            tooltip: t('Attach Engine…'),
+            menu: true,
+            onClick: this.handleAttachEngineButtonClick,
+          }),
 
-        h(ToolBarButton, {
-          icon: './node_modules/@primer/octicons/build/svg/zap-16.svg',
-          tooltip: !engineGameOngoing
-            ? t('Start Engine vs. Engine Game')
-            : t('Stop Engine vs. Engine Game'),
-          checked: !!engineGameOngoing,
-          onClick: this.handleStartStopGameButtonClick,
-        }),
-      ),
+          h(ToolBarButton, {
+            icon: './node_modules/@primer/octicons/build/svg/zap-16.svg',
+            tooltip: !engineGameOngoing
+              ? t('Start Engine vs. Engine Game')
+              : t('Stop Engine vs. Engine Game'),
+            checked: !!engineGameOngoing,
+            onClick: this.handleStartStopGameButtonClick,
+          }),
+        ),
 
       h(
         'ul',

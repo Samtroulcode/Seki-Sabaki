@@ -1,9 +1,14 @@
 import {h, Component} from 'preact'
 
+import sabaki from '../modules/sabaki.js'
+import i18n from '../i18n.js'
 import SplitContainer from './helpers/SplitContainer.js'
+import ToolBar, {ToolBarButton} from './ToolBar.js'
 import GtpConsole from './sidebars/GtpConsole.js'
+import OgsPanel from './sidebars/OgsPanel.js'
 import {EnginePeerList} from './sidebars/PeerList.js'
 
+const t = i18n.context('LeftSidebar')
 const setting = {
   get: (key) => window.sabaki.setting.get(key),
   set: (key, value) => window.sabaki.setting.set(key, value),
@@ -17,6 +22,7 @@ export default class LeftSidebar extends Component {
     this.state = {
       peerListHeight: setting.get('view.peerlist_height'),
       selectedEngineSyncerId: null,
+      showOgsPanel: false,
     }
 
     this.handlePeerListHeightChange = ({sideSize}) => {
@@ -63,6 +69,20 @@ export default class LeftSidebar extends Component {
         syncer.queueCommand(command)
       }
     }
+
+    this.handleOgsPanelToggle = () => {
+      this.setState(({showOgsPanel}) => ({showOgsPanel: !showOgsPanel}))
+    }
+
+    this.handleAttachEngineButtonClick = (evt) => {
+      let {left, bottom} = evt.currentTarget.getBoundingClientRect()
+
+      sabaki.openEnginesMenu({x: left, y: bottom})
+    }
+
+    this.handleStartStopGameButtonClick = () => {
+      sabaki.startStopEngineGame(sabaki.state.treePosition)
+    }
   }
 
   shouldComponentUpdate(nextProps) {
@@ -82,7 +102,7 @@ export default class LeftSidebar extends Component {
       showLeftSidebar,
       consoleLog,
     },
-    {peerListHeight, selectedEngineSyncerId},
+    {peerListHeight, selectedEngineSyncerId, showOgsPanel},
   ) {
     return h(
       'section',
@@ -91,45 +111,81 @@ export default class LeftSidebar extends Component {
         id: 'leftsidebar',
       },
 
-      h(SplitContainer, {
-        vertical: true,
-        invert: true,
-        sideSize: peerListHeight,
+      h(
+        ToolBar,
+        {},
 
-        sideContent: h(EnginePeerList, {
-          attachedEngineSyncers,
-          analyzingEngineSyncerId,
-          blackEngineSyncerId,
-          whiteEngineSyncerId,
-          selectedEngineSyncerId,
-          engineGameOngoing,
-
-          onEngineSelect: this.handleEngineSelect,
+        h(ToolBarButton, {
+          icon: './node_modules/@primer/octicons/build/svg/question-16.svg',
+          tooltip: t('Show OGS Panel'),
+          checked: showOgsPanel,
+          onClick: this.handleOgsPanelToggle,
         }),
 
-        mainContent: h(GtpConsole, {
-          show: showLeftSidebar,
-          consoleLog,
-          attachedEngine: attachedEngineSyncers
-            .map((syncer) =>
-              syncer.id !== selectedEngineSyncerId
-                ? null
-                : {
-                    name: syncer.engine.name,
-                    get commands() {
-                      return syncer.commands
-                    },
-                  },
-            )
-            .find((x) => x != null),
-
-          onSubmit: this.handleCommandSubmit,
-          onControlStep: this.handleCommandControlStep,
+        h(ToolBarButton, {
+          icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
+          tooltip: t('Attach Engine…'),
+          menu: true,
+          onClick: this.handleAttachEngineButtonClick,
         }),
 
-        onChange: this.handlePeerListHeightChange,
-        onFinish: this.handlePeerListHeightFinish,
-      }),
+        h(ToolBarButton, {
+          icon: './node_modules/@primer/octicons/build/svg/zap-16.svg',
+          tooltip: !engineGameOngoing
+            ? t('Start Engine vs. Engine Game')
+            : t('Stop Engine vs. Engine Game'),
+          checked: !!engineGameOngoing,
+          onClick: this.handleStartStopGameButtonClick,
+        }),
+      ),
+
+      h(
+        'div',
+        {class: 'left-sidebar-content'},
+
+        showOgsPanel
+          ? h(OgsPanel)
+          : h(SplitContainer, {
+              vertical: true,
+              invert: true,
+              sideSize: peerListHeight,
+
+              sideContent: h(EnginePeerList, {
+                attachedEngineSyncers,
+                analyzingEngineSyncerId,
+                blackEngineSyncerId,
+                whiteEngineSyncerId,
+                selectedEngineSyncerId,
+                engineGameOngoing,
+                showToolBar: false,
+
+                onEngineSelect: this.handleEngineSelect,
+              }),
+
+              mainContent: h(GtpConsole, {
+                show: showLeftSidebar,
+                consoleLog,
+                attachedEngine: attachedEngineSyncers
+                  .map((syncer) =>
+                    syncer.id !== selectedEngineSyncerId
+                      ? null
+                      : {
+                          name: syncer.engine.name,
+                          get commands() {
+                            return syncer.commands
+                          },
+                        },
+                  )
+                  .find((x) => x != null),
+
+                onSubmit: this.handleCommandSubmit,
+                onControlStep: this.handleCommandControlStep,
+              }),
+
+              onChange: this.handlePeerListHeightChange,
+              onFinish: this.handlePeerListHeightFinish,
+            }),
+      ),
     )
   }
 }
