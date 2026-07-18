@@ -140,6 +140,10 @@ function getInitialOnlineGameState() {
   }
 }
 
+function getInitialActiveGamesState() {
+  return []
+}
+
 function getWebSocketUrl(serverUrl) {
   let url = new URL(serverUrl)
 
@@ -453,6 +457,7 @@ class OgsClient {
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
+    this.activeGames = getInitialActiveGamesState()
   }
 
   getSession() {
@@ -465,6 +470,7 @@ class OgsClient {
       socket: this.socket.getState(),
       matchmaking: {...this.matchmaking},
       onlineGame: cloneOnlineGameState(this.onlineGame),
+      activeGames: this.activeGames.map((game) => ({...game})),
     }
   }
 
@@ -473,6 +479,7 @@ class OgsClient {
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
+    this.activeGames = getInitialActiveGamesState()
     return true
   }
 
@@ -606,6 +613,11 @@ class OgsClient {
   }
 
   handleSocketEvent(event, payload) {
+    if (event === 'active_game') {
+      this.upsertActiveGame(payload)
+      return
+    }
+
     if (event === 'automatch/start') {
       let gameId = sanitizeOptionalGameId(payload?.game_id)
 
@@ -698,6 +710,49 @@ class OgsClient {
         }
         break
     }
+  }
+
+  upsertActiveGame(payload) {
+    let game = sanitizeActiveGame(payload)
+    if (game == null) return
+
+    this.activeGames = [
+      ...this.activeGames.filter((item) => item.id !== game.id),
+      game,
+    ].sort((a, b) => a.id - b.id)
+  }
+}
+
+function sanitizeActiveGame(data) {
+  let id = sanitizeOptionalGameId(data?.id)
+  let width = sanitizeBoardSize(data?.width)
+  let height = sanitizeBoardSize(data?.height)
+
+  if (id == null) return null
+
+  return {
+    id,
+    name: sanitizeString(data?.name, 200),
+    board: width == null || height == null ? null : {width, height},
+    phase: sanitizeGamePhase(data?.phase),
+    moveNumber: sanitizeMoveCount(data?.move_number, 0),
+    playerToMove: sanitizeOptionalGameId(data?.player_to_move),
+    clockExpiration:
+      typeof data?.clock_expiration === 'number' &&
+      Number.isFinite(data.clock_expiration)
+        ? data.clock_expiration
+        : null,
+    black: sanitizeActiveGamePlayer(data?.black),
+    white: sanitizeActiveGamePlayer(data?.white),
+  }
+}
+
+function sanitizeActiveGamePlayer(player) {
+  if (player == null || typeof player !== 'object') return null
+
+  return {
+    id: sanitizeOptionalGameId(player.id),
+    username: sanitizeString(player.username || player.name, 80),
   }
 }
 

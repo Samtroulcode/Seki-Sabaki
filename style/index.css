@@ -1505,6 +1505,22 @@ header {
     display: grid;
     gap: .6rem;
   }
+  .ogs-active-games {
+    display: grid;
+    gap: .5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ogs-active-games li,
+  .ogs-active-game-summary {
+    display: grid;
+    gap: .25rem;
+  }
+  .ogs-active-games li {
+    padding: .5rem;
+    background: #111;
+  }
   .ogs-game-status {
     display: grid;
     grid-template-columns: auto 1fr;

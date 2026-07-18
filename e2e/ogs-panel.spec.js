@@ -51,6 +51,17 @@ test.describe('OGS mock panel', () => {
           clock: null,
           chat: [],
         },
+        activeGames: [
+          {
+            id: 42,
+            name: 'Fixture Game',
+            board: {width: 19, height: 19},
+            phase: 'play',
+            moveNumber: 2,
+            black: {id: 7, username: 'sekibot'},
+            white: {id: 8, username: 'opponent'},
+          },
+        ],
       }
       window.sabaki.ogs = {
         getSession: async () => window.__ogsTestSession,
@@ -157,8 +168,10 @@ test.describe('OGS mock panel', () => {
       'Automatch payload logged.',
     )
     await expect(page.locator('.ogs-online-game')).toBeVisible()
-    await page.locator('.ogs-game-connect-form input[name="gameId"]').fill('42')
-    await page.locator('.ogs-game-connect-form button[type="submit"]').click()
+    await expect(page.locator('.ogs-online-game')).toContainText('Active games')
+    await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
+    await expect(page.locator('.ogs-online-game')).toContainText('sekibot')
+    await page.locator('.ogs-active-games button').click()
     await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
     await expect(page.locator('.ogs-online-game')).toContainText('19x19')
     await expect(page.locator('.ogs-online-game')).toContainText('opponent')

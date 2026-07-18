@@ -325,8 +325,37 @@ describe('OGS client', () => {
     })
 
     await client.login({username: 'sente', password: 'secret'})
+    FakeWebSocket.instances[0].receive('active_game', {
+      id: 12345,
+      name: 'Friendly game',
+      width: 19,
+      height: 19,
+      phase: 'play',
+      move_number: 2,
+      player_to_move: 7,
+      clock_expiration: 1784381000000,
+      black: {id: 7, username: 'sente'},
+      white: {id: 8, username: 'gote'},
+      jwt: 'must-not-leak',
+    })
 
-    let state = client.connectGame({gameId: '12345'})
+    let state = client.getState()
+    assert.deepStrictEqual(state.activeGames, [
+      {
+        id: 12345,
+        name: 'Friendly game',
+        board: {width: 19, height: 19},
+        phase: 'play',
+        moveNumber: 2,
+        playerToMove: 7,
+        clockExpiration: 1784381000000,
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+    ])
+    assert.strictEqual(JSON.stringify(state).includes('must-not-leak'), false)
+
+    state = client.connectGame({gameId: '12345'})
     let socket = FakeWebSocket.instances[0]
 
     assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
