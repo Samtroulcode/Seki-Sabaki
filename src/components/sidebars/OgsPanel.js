@@ -32,6 +32,8 @@ export default class OgsPanel extends Component {
       connected: false,
       socket: null,
       matchmaking: {options: defaultMatchmakingOptions},
+      onlineGame: null,
+      gameIdInput: '',
     }
 
     this.handleUsernameInput = (evt) => {
@@ -66,6 +68,7 @@ export default class OgsPanel extends Component {
           user: result.user,
           socket: result.state?.socket || null,
           matchmaking: result.state?.matchmaking || this.state.matchmaking,
+          onlineGame: result.state?.onlineGame || null,
           connected: true,
         })
       } else {
@@ -77,7 +80,58 @@ export default class OgsPanel extends Component {
 
     this.handleDisconnectButtonClick = async () => {
       await window.sabaki.ogs.logout()
-      this.setState({user: null, connected: false, error: null, socket: null})
+      this.setState({
+        user: null,
+        connected: false,
+        error: null,
+        socket: null,
+        onlineGame: null,
+      })
+    }
+
+    this.handleGameIdInput = (evt) => {
+      this.setState({gameIdInput: evt.currentTarget.value})
+    }
+
+    this.handleConnectGameSubmit = async (evt) => {
+      evt.preventDefault()
+
+      let gameId = this.state.gameIdInput
+      if ((gameId || '').trim() === '') return
+
+      this.setState({busy: true, error: null})
+
+      try {
+        let result = await window.sabaki.ogs.connectGame(gameId)
+
+        if (result.ok) {
+          this.setState({
+            socket: result.state.socket,
+            matchmaking: result.state.matchmaking,
+            onlineGame: result.state.onlineGame,
+          })
+        } else {
+          this.setState({
+            error: result.error?.message || t('Unable to connect to game.'),
+            onlineGame: result.state?.onlineGame || this.state.onlineGame,
+          })
+        }
+      } catch (err) {
+        this.setState({error: t('Unable to connect to game.')})
+      }
+
+      this.setState({busy: false})
+    }
+
+    this.handleDisconnectGameButtonClick = async () => {
+      let gameId = this.state.onlineGame?.gameId
+      if (gameId == null) return
+
+      let result = await window.sabaki.ogs.disconnectGame(gameId)
+
+      if (result.ok) {
+        this.setState({onlineGame: result.state.onlineGame})
+      }
     }
 
     this.handleMatchmakingOptionChange = async (evt) => {
@@ -144,6 +198,15 @@ export default class OgsPanel extends Component {
   }
 
   async componentDidMount() {
+    this.pollTimer = setInterval(() => this.refreshOgsState(), 2000)
+    await this.refreshOgsState()
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.pollTimer)
+  }
+
+  async refreshOgsState() {
     let state = null
 
     try {
@@ -158,12 +221,16 @@ export default class OgsPanel extends Component {
         user: state.user,
         socket: state.socket,
         matchmaking: state.matchmaking,
+        onlineGame: state.onlineGame,
         connected: true,
       })
     }
   }
 
-  render(props, {username, user, busy, error, connected, socket, matchmaking}) {
+  render(
+    props,
+    {username, user, busy, error, connected, socket, matchmaking, onlineGame},
+  ) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
     let authenticated = socket?.status === 'authenticated'
 
@@ -250,6 +317,15 @@ export default class OgsPanel extends Component {
               onConditionChange: this.handleConditionOptionChange,
               onMultiChange: this.handleMultiOptionChange,
               onLogAutomatch: this.handleLogAutomatchButtonClick,
+            }),
+            h(OnlineGameForm, {
+              onlineGame,
+              authenticated,
+              busy,
+              gameIdInput: this.state.gameIdInput || '',
+              onGameIdInput: this.handleGameIdInput,
+              onConnectGame: this.handleConnectGameSubmit,
+              onDisconnectGame: this.handleDisconnectGameButtonClick,
             }),
             h(
               'button',
@@ -347,6 +423,108 @@ function AutomatchForm({
       t('Log automatch request'),
     ),
   )
+}
+
+function OnlineGameForm({
+  onlineGame,
+  authenticated,
+  busy,
+  gameIdInput,
+  onGameIdInput,
+  onConnectGame,
+  onDisconnectGame,
+}) {
+  let gameStatus = onlineGame?.status || 'idle'
+  let hasGame = onlineGame?.gameId != null
+
+  return h(
+    'section',
+    {class: 'ogs-online-game'},
+    h('h3', {}, t('Game connection')),
+    h('p', {}, t('Connect to an existing OGS game in read-only mode for now.')),
+    h(
+      'form',
+      {class: 'ogs-game-connect-form', onSubmit: onConnectGame},
+      h(
+        'label',
+        {},
+        h('span', {}, t('Game ID')),
+        h('input', {
+          name: 'gameId',
+          type: 'text',
+          inputmode: 'numeric',
+          pattern: '[0-9]*',
+          value: gameIdInput,
+          disabled: busy || !authenticated,
+          onInput: onGameIdInput,
+        }),
+      ),
+      h(
+        'button',
+        {
+          type: 'submit',
+          disabled: busy || !authenticated || gameIdInput.trim() === '',
+        },
+        t('Connect game'),
+      ),
+    ),
+    h(
+      'dl',
+      {class: 'ogs-game-status'},
+      h('dt', {}, t('Status')),
+      h('dd', {}, gameStatus),
+      h('dt', {}, t('Game')),
+      h('dd', {}, hasGame ? String(onlineGame.gameId) : t('None')),
+      h('dt', {}, t('Name')),
+      h('dd', {}, onlineGame?.gameName || t('Unknown')),
+      h('dt', {}, t('Board')),
+      h('dd', {}, formatBoard(onlineGame?.board)),
+      h('dt', {}, t('Phase')),
+      h('dd', {}, onlineGame?.phase || t('Unknown')),
+      h('dt', {}, t('Moves')),
+      h('dd', {}, String(onlineGame?.moveCount || 0)),
+    ),
+    onlineGame?.error != null && h('p', {class: 'ogs-error'}, onlineGame.error),
+    onlineGame?.players != null &&
+      h(
+        'p',
+        {class: 'ogs-game-players'},
+        t('Black'),
+        ': ',
+        onlineGame.players.black?.username || t('Unknown'),
+        ' — ',
+        t('White'),
+        ': ',
+        onlineGame.players.white?.username || t('Unknown'),
+      ),
+    onlineGame?.chat?.length > 0 &&
+      h(
+        'ol',
+        {class: 'ogs-game-chat'},
+        onlineGame.chat
+          .slice(-5)
+          .map((line) =>
+            h(
+              'li',
+              {},
+              h('strong', {}, line.username || t('OGS')),
+              ': ',
+              line.body,
+            ),
+          ),
+      ),
+    hasGame &&
+      h(
+        'button',
+        {type: 'button', onClick: onDisconnectGame},
+        t('Disconnect game'),
+      ),
+  )
+}
+
+function formatBoard(board) {
+  if (board == null) return t('Unknown')
+  return `${board.width}x${board.height}`
 }
 
 function CheckboxGroup({

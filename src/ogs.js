@@ -122,6 +122,22 @@ function getInitialMatchmakingState() {
   }
 }
 
+function getInitialOnlineGameState() {
+  return {
+    status: 'idle',
+    gameId: null,
+    error: null,
+    gameName: null,
+    board: null,
+    phase: null,
+    players: null,
+    moveCount: 0,
+    lastMove: null,
+    clock: null,
+    chat: [],
+  }
+}
+
 function getWebSocketUrl(serverUrl) {
   let url = new URL(serverUrl)
 
@@ -157,9 +173,14 @@ function logOgsSocketMessage(direction, message) {
 }
 
 class OgsSocket {
-  constructor({serverUrl, webSocketImpl = globalThis.WebSocket}) {
+  constructor({
+    serverUrl,
+    webSocketImpl = globalThis.WebSocket,
+    onEvent = null,
+  }) {
     this.serverUrl = serverUrl
     this.WebSocketImpl = webSocketImpl
+    this.onEvent = onEvent
     this.socket = null
     this.state = getInitialSocketState()
     this.lastRequestId = 0
@@ -241,6 +262,11 @@ class OgsSocket {
     if (!Array.isArray(data) || data.length === 0) return
 
     let id = data[0]
+
+    if (typeof id === 'string') {
+      if (typeof this.onEvent === 'function') this.onEvent(id, data[1])
+      return
+    }
 
     if (!Number.isInteger(id)) return
 
@@ -417,9 +443,14 @@ class OgsClient {
   } = {}) {
     this.serverUrl = serverUrl.replace(/\/$/, '')
     this.fetch = fetchImpl
-    this.socket = new OgsSocket({serverUrl: this.serverUrl, webSocketImpl})
+    this.socket = new OgsSocket({
+      serverUrl: this.serverUrl,
+      webSocketImpl,
+      onEvent: (event, payload) => this.handleSocketEvent(event, payload),
+    })
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
+    this.onlineGame = getInitialOnlineGameState()
   }
 
   getSession() {
@@ -431,6 +462,7 @@ class OgsClient {
       user: this.getSession(),
       socket: this.socket.getState(),
       matchmaking: {...this.matchmaking},
+      onlineGame: cloneOnlineGameState(this.onlineGame),
     }
   }
 
@@ -438,6 +470,7 @@ class OgsClient {
     this.socket.disconnect()
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
+    this.onlineGame = getInitialOnlineGameState()
     return true
   }
 
@@ -529,6 +562,277 @@ class OgsClient {
     console.log('[ogs:automatch] mock find_match', JSON.stringify(payload))
 
     return this.getState()
+  }
+
+  connectGame(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+    this.assertAuthenticatedSocket()
+
+    this.onlineGame = {
+      ...getInitialOnlineGameState(),
+      status: 'connecting',
+      gameId,
+    }
+
+    this.socket.send('game/connect', {game_id: gameId, chat: true})
+
+    return this.getState()
+  }
+
+  disconnectGame(input = {}) {
+    let gameId = sanitizeGameId(input.gameId ?? this.onlineGame.gameId)
+    this.assertAuthenticatedSocket()
+
+    this.socket.send('game/disconnect', {game_id: gameId})
+
+    if (this.onlineGame.gameId === gameId) {
+      this.onlineGame = getInitialOnlineGameState()
+    }
+
+    return this.getState()
+  }
+
+  assertAuthenticatedSocket() {
+    let state = this.socket.getState()
+
+    if (!state.authenticated || state.status !== 'authenticated') {
+      throw new OgsError(
+        'socket-not-authenticated',
+        'OGS socket is not authenticated.',
+      )
+    }
+  }
+
+  handleSocketEvent(event, payload) {
+    if (event === 'automatch/start') {
+      let gameId = sanitizeOptionalGameId(payload?.game_id)
+
+      if (gameId != null) {
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'matched',
+          gameId,
+          error: null,
+        }
+      }
+
+      return
+    }
+
+    let match = /^game\/(\d+)\/(.+)$/.exec(event)
+    if (match == null) return
+
+    let gameId = sanitizeOptionalGameId(match[1])
+    if (gameId == null || gameId !== this.onlineGame.gameId) return
+
+    this.applyGameEvent(match[2], payload)
+  }
+
+  applyGameEvent(type, payload) {
+    switch (type) {
+      case 'gamedata':
+        this.onlineGame = {
+          ...this.onlineGame,
+          ...sanitizeGameData(payload),
+          status: 'connected',
+          error: null,
+        }
+        break
+
+      case 'move':
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'connected',
+          moveCount: sanitizeMoveCount(
+            payload?.move_number,
+            this.onlineGame.moveCount + 1,
+          ),
+          lastMove: sanitizeMove(payload?.move),
+          error: null,
+        }
+        break
+
+      case 'clock':
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'connected',
+          clock: sanitizeClock(payload),
+          error: null,
+        }
+        break
+
+      case 'phase':
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'connected',
+          phase: sanitizeGamePhase(payload),
+          error: null,
+        }
+        break
+
+      case 'chat':
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'connected',
+          chat: [...this.onlineGame.chat, sanitizeGameChatLine(payload)]
+            .filter((line) => line != null)
+            .slice(-20),
+          error: null,
+        }
+        break
+
+      case 'reset-chats':
+        this.onlineGame = {...this.onlineGame, chat: []}
+        break
+
+      case 'error':
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'error',
+          error: sanitizeErrorMessage(payload),
+        }
+        break
+    }
+  }
+}
+
+function sanitizeGameId(value) {
+  let gameId = sanitizeOptionalGameId(value)
+
+  if (gameId == null) {
+    throw new OgsError('invalid-input', 'A valid OGS game ID is required.')
+  }
+
+  return gameId
+}
+
+function sanitizeOptionalGameId(value) {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
+    return value
+  }
+
+  if (typeof value === 'string' && /^[1-9][0-9]{0,15}$/.test(value)) {
+    let number = Number(value)
+    return Number.isSafeInteger(number) ? number : null
+  }
+
+  return null
+}
+
+function sanitizeGameData(data) {
+  let width = sanitizeBoardSize(data?.width)
+  let height = sanitizeBoardSize(data?.height)
+  let moves = Array.isArray(data?.moves) ? data.moves : []
+
+  return {
+    gameName: sanitizeString(data?.game_name, 200),
+    board: width == null || height == null ? null : {width, height},
+    phase: sanitizeGamePhase(data?.phase),
+    players: sanitizePlayers(data?.players),
+    moveCount: moves.length,
+  }
+}
+
+function sanitizeGamePhase(value) {
+  return sanitizeString(
+    value != null && typeof value === 'object' ? value.phase : value,
+    80,
+  )
+}
+
+function sanitizeBoardSize(value) {
+  return Number.isInteger(value) && value > 0 && value <= 25 ? value : null
+}
+
+function sanitizePlayers(players) {
+  if (players == null || typeof players !== 'object') return null
+
+  return {
+    black: sanitizePlayer(players.black),
+    white: sanitizePlayer(players.white),
+  }
+}
+
+function sanitizePlayer(player) {
+  if (player == null || typeof player !== 'object') return null
+
+  return {
+    id: sanitizeOptionalGameId(player.id),
+    username: sanitizeString(player.username, 80),
+  }
+}
+
+function sanitizeMoveCount(value, fallback) {
+  if (Number.isInteger(value) && value >= 0) return value
+  return Number.isInteger(fallback) && fallback >= 0 ? fallback : 0
+}
+
+function sanitizeMove(move) {
+  return typeof move === 'string' && /^[a-z.]{2}$/.test(move) ? move : null
+}
+
+function sanitizeClock(clock) {
+  if (clock == null || typeof clock !== 'object') return null
+
+  return {
+    currentPlayer: sanitizeOptionalGameId(clock.current_player),
+    expiration:
+      typeof clock.expiration === 'number' && Number.isFinite(clock.expiration)
+        ? clock.expiration
+        : null,
+    lastMove: sanitizeMoveCount(clock.last_move, null),
+  }
+}
+
+function sanitizeGameChatLine(message) {
+  let line = message?.line || message
+  if (line == null || typeof line !== 'object') return null
+
+  let body = line.body
+
+  if (typeof body !== 'string') return null
+
+  body = sanitizeString(body, 1000)
+  if (body === '') return null
+
+  return {
+    channel: sanitizeString(line.channel || message?.channel || 'main', 40),
+    username: sanitizeString(line.username, 80),
+    body,
+    moveNumber: sanitizeMoveCount(line.move_number, null),
+    date:
+      typeof line.date === 'number' && Number.isFinite(line.date)
+        ? line.date
+        : null,
+  }
+}
+
+function sanitizeString(value, maxLength) {
+  return typeof value === 'string' ? value.slice(0, maxLength) : null
+}
+
+function sanitizeErrorMessage(value) {
+  if (typeof value === 'string') return value.slice(0, 200)
+  if (typeof value?.message === 'string') return value.message.slice(0, 200)
+  if (typeof value?.error === 'string') return value.error.slice(0, 200)
+  return 'OGS game error.'
+}
+
+function cloneOnlineGameState(state) {
+  return {
+    ...state,
+    board: state.board == null ? null : {...state.board},
+    players:
+      state.players == null
+        ? null
+        : {
+            black:
+              state.players.black == null ? null : {...state.players.black},
+            white:
+              state.players.white == null ? null : {...state.players.white},
+          },
+    clock: state.clock == null ? null : {...state.clock},
+    chat: state.chat.map((line) => ({...line})),
   }
 }
 
@@ -656,6 +960,22 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
   ipcMain.handle('ogs:logMockAutomatchRequest', () =>
     client.logMockAutomatchRequest(),
   )
+
+  ipcMain.handle('ogs:connectGame', (evt, input) => {
+    try {
+      return {ok: true, state: client.connectGame(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:disconnectGame', (evt, input) => {
+    try {
+      return {ok: true, state: client.disconnectGame(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
 
   ipcMain.handle('ogs:login', async (evt, credentials) => {
     try {

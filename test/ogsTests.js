@@ -48,6 +48,10 @@ class FakeWebSocket {
   close() {
     this.onclose?.()
   }
+
+  receive(event, payload) {
+    this.onmessage?.({data: JSON.stringify([event, payload])})
+  }
 }
 
 class FailingWebSocket {
@@ -311,6 +315,119 @@ describe('OGS client', () => {
     state = client.setMatchmakingOptions({boardSizes: [19]})
     assert.strictEqual(state.matchmaking.status, 'idle')
     assert.strictEqual(state.matchmaking.payload, null)
+  })
+
+  it('connects to an OGS game and stores sanitized pushed game events', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+
+    let state = client.connectGame({gameId: '12345'})
+    let socket = FakeWebSocket.instances[0]
+
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/connect',
+      {game_id: 12345, chat: true},
+    ])
+    assert.strictEqual(state.onlineGame.status, 'connecting')
+    assert.strictEqual(state.onlineGame.gameId, 12345)
+
+    socket.receive('game/12345/gamedata', {
+      game_name: 'Friendly game',
+      width: 19,
+      height: 19,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: [
+        ['aa', 1],
+        ['bb', 2],
+      ],
+    })
+    socket.receive('game/12345/move', {move_number: 3, move: 'cc'})
+    socket.receive('game/12345/clock', {
+      current_player: 8,
+      expiration: 1784381000000,
+      last_move: 3,
+      jwt: 'must-not-leak',
+    })
+    socket.receive('game/12345/chat', {
+      channel: 'main',
+      line: {
+        username: 'gote',
+        body: 'hello',
+        move_number: 3,
+        date: 1784381000000,
+      },
+    })
+    socket.receive('game/12345/phase', {phase: 'stone removal'})
+    socket.receive('game/99999/move', {move_number: 99, move: 'dd'})
+
+    state = client.getState()
+
+    assert.strictEqual(state.onlineGame.status, 'connected')
+    assert.strictEqual(state.onlineGame.gameName, 'Friendly game')
+    assert.deepStrictEqual(state.onlineGame.board, {width: 19, height: 19})
+    assert.strictEqual(state.onlineGame.players.black.username, 'sente')
+    assert.strictEqual(state.onlineGame.players.white.username, 'gote')
+    assert.strictEqual(state.onlineGame.phase, 'stone removal')
+    assert.strictEqual(state.onlineGame.moveCount, 3)
+    assert.strictEqual(state.onlineGame.lastMove, 'cc')
+    assert.deepStrictEqual(state.onlineGame.clock, {
+      currentPlayer: 8,
+      expiration: 1784381000000,
+      lastMove: 3,
+    })
+    assert.deepStrictEqual(state.onlineGame.chat, [
+      {
+        channel: 'main',
+        username: 'gote',
+        body: 'hello',
+        moveNumber: 3,
+        date: 1784381000000,
+      },
+    ])
+    assert.strictEqual(JSON.stringify(state).includes('must-not-leak'), false)
+
+    socket.receive('game/12345/reset-chats')
+    assert.deepStrictEqual(client.getState().onlineGame.chat, [])
+
+    socket.receive('game/12345/error', {message: 'Game unavailable.'})
+    assert.strictEqual(client.getState().onlineGame.status, 'error')
+    assert.strictEqual(client.getState().onlineGame.error, 'Game unavailable.')
+
+    state = client.disconnectGame({gameId: 12345})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/disconnect',
+      {game_id: 12345},
+    ])
+    assert.strictEqual(state.onlineGame.status, 'idle')
+    assert.strictEqual(state.onlineGame.gameId, null)
+  })
+
+  it('rejects invalid game IDs before sending game commands', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+    let sentCount = socket.sent.length
+
+    assert.throws(
+      () => client.connectGame({gameId: 'https://online-go.com/game/1'}),
+      (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+
+    assert.strictEqual(socket.sent.length, sentCount)
   })
 
   it('serializes IPC login errors without throwing raw errors', async () => {

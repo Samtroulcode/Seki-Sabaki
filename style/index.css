@@ -1419,11 +1419,13 @@ header {
     gap: .8rem;
   }
   .ogs-login-form label,
+  .ogs-game-connect-form label,
   .ogs-matchmaking label {
     display: grid;
     gap: .3rem;
   }
   .ogs-login-form input,
+  .ogs-game-connect-form input,
   .ogs-matchmaking input,
   .ogs-matchmaking select {
     width: 100%;
@@ -1492,6 +1494,34 @@ header {
   .ogs-matchmaking {
     padding-top: .8rem;
     border-top: 1px solid #292A2D;
+  }
+  .ogs-online-game {
+    display: grid;
+    gap: .6rem;
+    padding-top: .8rem;
+    border-top: 1px solid #292A2D;
+  }
+  .ogs-game-connect-form {
+    display: grid;
+    gap: .6rem;
+  }
+  .ogs-game-status {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: .35rem .8rem;
+    margin: 0;
+  }
+  .ogs-game-status dt {
+    color: #aaa;
+  }
+  .ogs-game-status dd {
+    margin: 0;
+  }
+  .ogs-game-chat {
+    display: grid;
+    gap: .25rem;
+    margin: 0;
+    padding-left: 1.2rem;
   }
 
 .tool-bar {

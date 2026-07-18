@@ -37,6 +37,19 @@ test.describe('OGS mock panel', () => {
           },
           error: null,
         },
+        onlineGame: {
+          status: 'idle',
+          gameId: null,
+          error: null,
+          gameName: null,
+          board: null,
+          phase: null,
+          players: null,
+          moveCount: 0,
+          lastMove: null,
+          clock: null,
+          chat: [],
+        },
       }
       window.sabaki.ogs = {
         getSession: async () => window.__ogsTestSession,
@@ -64,6 +77,29 @@ test.describe('OGS mock panel', () => {
         logMockAutomatchRequest: async () => {
           window.__ogsTestState.matchmaking.status = 'mock-logged'
           return window.__ogsTestState
+        },
+        connectGame: async (gameId) => {
+          window.__ogsTestState.onlineGame = {
+            status: 'connected',
+            gameId: Number(gameId),
+            error: null,
+            gameName: 'Fixture Game',
+            board: {width: 19, height: 19},
+            phase: 'play',
+            players: {
+              black: {id: 7, username: 'sekibot'},
+              white: {id: 8, username: 'opponent'},
+            },
+            moveCount: 12,
+            lastMove: 'dd',
+            clock: null,
+            chat: [{username: 'opponent', body: 'good luck'}],
+          }
+          return {ok: true, state: window.__ogsTestState}
+        },
+        disconnectGame: async () => {
+          window.__ogsTestState.onlineGame = {status: 'idle', gameId: null}
+          return {ok: true, state: window.__ogsTestState}
         },
         logout: async () => {
           window.__ogsTestSession = null
@@ -115,6 +151,13 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-matchmaking')).toContainText(
       'Automatch payload logged.',
     )
+    await expect(page.locator('.ogs-online-game')).toBeVisible()
+    await page.locator('.ogs-game-connect-form input[name="gameId"]').fill('42')
+    await page.locator('.ogs-game-connect-form button[type="submit"]').click()
+    await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
+    await expect(page.locator('.ogs-online-game')).toContainText('19x19')
+    await expect(page.locator('.ogs-online-game')).toContainText('opponent')
+    await expect(page.locator('.ogs-online-game')).toContainText('good luck')
 
     await page.getByTitle('Show OGS Panel').click()
 

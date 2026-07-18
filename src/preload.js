@@ -144,6 +144,9 @@ window.sabaki = {
       ipcRenderer.invoke('ogs:setMatchmakingOptions', options),
     logMockAutomatchRequest: () =>
       ipcRenderer.invoke('ogs:logMockAutomatchRequest'),
+    connectGame: (gameId) => ipcRenderer.invoke('ogs:connectGame', {gameId}),
+    disconnectGame: (gameId) =>
+      ipcRenderer.invoke('ogs:disconnectGame', {gameId}),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 
