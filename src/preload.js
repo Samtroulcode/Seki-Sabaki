@@ -147,6 +147,14 @@ window.sabaki = {
     connectGame: (gameId) => ipcRenderer.invoke('ogs:connectGame', {gameId}),
     disconnectGame: (gameId) =>
       ipcRenderer.invoke('ogs:disconnectGame', {gameId}),
+    playMove: (gameId, vertex) =>
+      ipcRenderer.invoke('ogs:playMove', {
+        gameId,
+        x: Array.isArray(vertex) ? vertex[0] : null,
+        y: Array.isArray(vertex) ? vertex[1] : null,
+      }),
+    pass: (gameId) => ipcRenderer.invoke('ogs:pass', {gameId}),
+    resign: (gameId) => ipcRenderer.invoke('ogs:resign', {gameId}),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 

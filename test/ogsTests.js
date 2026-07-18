@@ -484,6 +484,187 @@ describe('OGS client', () => {
     assert.strictEqual(socket.sent.length, sentCount)
   })
 
+  it('sends validated OGS move, pass, and resign commands', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      game_name: 'Friendly game',
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: [],
+    })
+    socket.receive('game/12345/clock', {current_player: 7, last_move: 0})
+
+    client.playMove({gameId: 12345, x: 2, y: 3})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/move',
+      {game_id: 12345, move: 'cd'},
+    ])
+    assert.throws(
+      () => client.playMove({gameId: 12345, x: 3, y: 3}),
+      (err) => err instanceof OgsError && err.code === 'move-pending',
+    )
+
+    socket.receive('game/12345/move', {move_number: 1, move: 'cd'})
+    socket.receive('game/12345/clock', {current_player: 8, last_move: 1})
+    assert.throws(
+      () => client.playMove({gameId: 12345, x: 3, y: 3}),
+      (err) => err instanceof OgsError && err.code === 'not-your-turn',
+    )
+
+    socket.receive('game/12345/move', {move_number: 2, move: 'dd'})
+    client.pass({gameId: 12345})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/move',
+      {game_id: 12345, move: '..'},
+    ])
+
+    client.resign({gameId: 12345})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/resign',
+      {game_id: 12345},
+    ])
+
+    assert.throws(
+      () => client.playMove({gameId: 12345, x: 9, y: 0}),
+      (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+  })
+
+  it('rejects OGS moves before board size is known', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    let sentCount = socket.sent.length
+
+    assert.throws(
+      () => client.playMove({gameId: 12345, x: 2, y: 3}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.strictEqual(socket.sent.length, sentCount)
+  })
+
+  it('clears pending OGS moves when the game reports an error', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: [],
+    })
+    socket.receive('game/12345/clock', {current_player: 7, last_move: 0})
+
+    client.playMove({gameId: 12345, x: 2, y: 3})
+    assert.strictEqual(client.getState().onlineGame.pendingMove, true)
+
+    socket.receive('game/12345/error', {message: 'Rejected move.'})
+    assert.strictEqual(client.getState().onlineGame.pendingMove, false)
+  })
+
+  it('rejects OGS game commands when player IDs are unknown', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {black: {username: 'sente'}, white: {username: 'gote'}},
+      moves: [],
+    })
+
+    let sentCount = socket.sent.length
+
+    assert.throws(
+      () => client.playMove({gameId: 12345, x: 2, y: 3}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.throws(
+      () => client.resign({gameId: 12345}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.strictEqual(socket.sent.length, sentCount)
+  })
+
+  it('ignores stale active-game turn data when history gives turn', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+
+    socket.receive('active_game', {
+      id: 12345,
+      width: 9,
+      height: 9,
+      phase: 'play',
+      player_to_move: 8,
+      black: {id: 7, username: 'sente'},
+      white: {id: 8, username: 'gote'},
+    })
+    client.connectGame({gameId: 12345})
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: 'aabb',
+    })
+    socket.receive('game/12345/clock', {current_player: 8, last_move: 1})
+
+    client.playMove({gameId: 12345, x: 2, y: 2})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/move',
+      {game_id: 12345, move: 'cc'},
+    ])
+  })
+
   it('serializes IPC login errors without throwing raw errors', async () => {
     let handlers = {}
     let ipcMain = {

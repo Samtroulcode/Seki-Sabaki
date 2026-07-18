@@ -962,8 +962,6 @@ class Sabaki extends EventEmitter {
   // Playing
 
   clickVertex(vertex, {button = 0, ctrlKey = false, x = 0, y = 0} = {}) {
-    if (this.state.onlineGameId != null) return
-
     this.closeDrawer()
 
     let t = i18n.context('sabaki.play')
@@ -977,6 +975,18 @@ class Sabaki extends EventEmitter {
     }
 
     let [vx, vy] = vertex
+
+    if (this.state.onlineGameId != null) {
+      if (
+        button === 0 &&
+        ['play', 'autoplay'].includes(this.state.mode) &&
+        board.get(vertex) === 0
+      ) {
+        this.submitOgsMove(vertex)
+      }
+
+      return
+    }
 
     if (['play', 'autoplay'].includes(this.state.mode)) {
       if (button === 0) {
@@ -1213,7 +1223,7 @@ class Sabaki extends EventEmitter {
   }
 
   async makeMove(vertex, {player = null, generateEngineMove = false} = {}) {
-    if (this.state.onlineGameId != null) return
+    if (this.state.onlineGameId != null) return this.submitOgsMove(vertex)
 
     if (!['play', 'autoplay', 'guess'].includes(this.state.mode)) {
       this.closeDrawer()
@@ -1332,7 +1342,7 @@ class Sabaki extends EventEmitter {
   }
 
   makePass() {
-    if (this.state.onlineGameId != null) return
+    if (this.state.onlineGameId != null) return this.submitOgsPass()
 
     // Let an attached engine respond to the pass, as it does for a board click,
     // unless an engine-vs-engine game is already driving moves.
@@ -1341,8 +1351,8 @@ class Sabaki extends EventEmitter {
     })
   }
 
-  makeResign({player = null} = {}) {
-    if (this.state.onlineGameId != null) return
+  async makeResign({player = null} = {}) {
+    if (this.state.onlineGameId != null) return this.submitOgsResign()
 
     let {gameTrees, gameIndex, treePosition} = this.state
     let {currentPlayer} = this.inferredState
@@ -1362,6 +1372,44 @@ class Sabaki extends EventEmitter {
     this.makeMove([-1, -1], {player})
 
     this.events.emit('resign', {player})
+  }
+
+  async submitOgsMove(vertex) {
+    if (helper.vertexEquals(vertex, [-1, -1])) return this.submitOgsPass()
+
+    let result = await window.sabaki.ogs.playMove(
+      this.state.onlineGameId,
+      vertex,
+    )
+    if (!result.ok) await this.showOgsPlayError(result.error)
+  }
+
+  async submitOgsPass() {
+    let result = await window.sabaki.ogs.pass(this.state.onlineGameId)
+    if (!result.ok) await this.showOgsPlayError(result.error)
+  }
+
+  async submitOgsResign() {
+    let t = i18n.context('sabaki.play')
+    let answer = await dialog.showMessageBox(
+      t('Do you really want to resign this OGS game?'),
+      'warning',
+      [t('Resign'), t('Cancel')],
+      1,
+    )
+
+    if (answer !== 0) return
+
+    let result = await window.sabaki.ogs.resign(this.state.onlineGameId)
+    if (!result.ok) await this.showOgsPlayError(result.error)
+  }
+
+  async showOgsPlayError(error) {
+    let t = i18n.context('sabaki.play')
+    await dialog.showMessageBox(
+      error?.message || t('Unable to send OGS game command.'),
+      'warning',
+    )
   }
 
   useTool(tool, vertex, argument = null) {

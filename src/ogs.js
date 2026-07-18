@@ -135,6 +135,7 @@ function getInitialOnlineGameState() {
     moves: [],
     moveCount: 0,
     lastMove: null,
+    pendingMove: false,
     clock: null,
     chat: [],
   }
@@ -601,6 +602,46 @@ class OgsClient {
     return this.getState()
   }
 
+  playMove(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+    let board = this.onlineGame.board
+
+    if (board == null) {
+      throw new OgsError('invalid-state', 'OGS board size is not available.')
+    }
+
+    let move = encodeOgsCoordinates(input.x, input.y, board)
+
+    if (move == null || move === '..') {
+      throw new OgsError('invalid-input', 'A valid OGS move is required.')
+    }
+
+    this.assertCanPlayGameCommand(gameId)
+    this.socket.send('game/move', {game_id: gameId, move})
+    this.onlineGame = {...this.onlineGame, pendingMove: true}
+
+    return this.getState()
+  }
+
+  pass(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+
+    this.assertCanPlayGameCommand(gameId)
+    this.socket.send('game/move', {game_id: gameId, move: '..'})
+    this.onlineGame = {...this.onlineGame, pendingMove: true}
+
+    return this.getState()
+  }
+
+  resign(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+
+    this.assertCanPlayGameCommand(gameId, {requireTurn: false})
+    this.socket.send('game/resign', {game_id: gameId})
+
+    return this.getState()
+  }
+
   assertAuthenticatedSocket() {
     let state = this.socket.getState()
 
@@ -610,6 +651,71 @@ class OgsClient {
         'OGS socket is not authenticated.',
       )
     }
+  }
+
+  assertCanPlayGameCommand(gameId, {requireTurn = true} = {}) {
+    this.assertAuthenticatedSocket()
+
+    if (
+      this.onlineGame.gameId !== gameId ||
+      this.onlineGame.status !== 'connected'
+    ) {
+      throw new OgsError('invalid-state', 'OGS game is not connected.')
+    }
+
+    if (this.onlineGame.phase !== 'play') {
+      throw new OgsError('invalid-state', 'OGS game is not in play phase.')
+    }
+
+    if (requireTurn && this.onlineGame.pendingMove) {
+      throw new OgsError('move-pending', 'An OGS move is already pending.')
+    }
+
+    let userId = sanitizeOptionalGameId(this.session?.user?.id)
+    if (userId == null) {
+      throw new OgsError('invalid-state', 'OGS user is not available.')
+    }
+
+    let blackId = this.onlineGame.players?.black?.id
+    let whiteId = this.onlineGame.players?.white?.id
+
+    if (blackId == null || whiteId == null) {
+      throw new OgsError('invalid-state', 'OGS game players are not available.')
+    }
+
+    if (![blackId, whiteId].includes(userId)) {
+      throw new OgsError(
+        'invalid-state',
+        'OGS user is not a player in this game.',
+      )
+    }
+
+    let playerToMove = this.getPlayerToMove(gameId)
+    if (requireTurn && playerToMove != null && playerToMove !== userId) {
+      throw new OgsError(
+        'not-your-turn',
+        'It is not your turn in this OGS game.',
+      )
+    }
+  }
+
+  getPlayerToMove(gameId) {
+    if (
+      this.onlineGame.clock?.currentPlayer != null &&
+      this.onlineGame.clock.lastMove >= this.onlineGame.moveCount
+    ) {
+      return this.onlineGame.clock.currentPlayer
+    }
+
+    let historyPlayerToMove = getPlayerToMoveFromHistory(this.onlineGame)
+    if (historyPlayerToMove != null) return historyPlayerToMove
+
+    let activePlayerToMove = this.activeGames.find(
+      (game) => game.id === gameId,
+    )?.playerToMove
+    if (activePlayerToMove != null) return activePlayerToMove
+
+    return null
   }
 
   handleSocketEvent(event, payload) {
@@ -669,6 +775,7 @@ class OgsClient {
           moves,
           moveCount: moves.length,
           lastMove: move.move,
+          pendingMove: false,
           error: null,
         }
         break
@@ -710,6 +817,7 @@ class OgsClient {
         this.onlineGame = {
           ...this.onlineGame,
           status: 'error',
+          pendingMove: false,
           error: sanitizeErrorMessage(payload),
         }
         break
@@ -758,6 +866,17 @@ function sanitizeActiveGamePlayer(player) {
     id: sanitizeOptionalGameId(player.id),
     username: sanitizeString(player.username || player.name, 80),
   }
+}
+
+function getPlayerToMoveFromHistory(onlineGame) {
+  let blackId = onlineGame.players?.black?.id
+  let whiteId = onlineGame.players?.white?.id
+  if (blackId == null || whiteId == null) return null
+
+  let firstPlayer = onlineGame.handicap > 1 ? whiteId : blackId
+  let secondPlayer = firstPlayer === blackId ? whiteId : blackId
+
+  return onlineGame.moveCount % 2 === 0 ? firstPlayer : secondPlayer
 }
 
 function sanitizeGameId(value) {
@@ -1154,6 +1273,30 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
   ipcMain.handle('ogs:disconnectGame', (evt, input) => {
     try {
       return {ok: true, state: client.disconnectGame(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:playMove', (evt, input) => {
+    try {
+      return {ok: true, state: client.playMove(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:pass', (evt, input) => {
+    try {
+      return {ok: true, state: client.pass(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:resign', (evt, input) => {
+    try {
+      return {ok: true, state: client.resign(input || {})}
     } catch (err) {
       return {ok: false, error: serializeError(err), state: client.getState()}
     }
