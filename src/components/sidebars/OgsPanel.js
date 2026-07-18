@@ -264,6 +264,8 @@ function getSocketLabel(socket) {
   switch (socket?.status) {
     case 'authentication-sent':
       return t('Authentication sent')
+    case 'authenticated':
+      return t('Authenticated')
     case 'connected':
       return t('Connected')
     case 'connecting':

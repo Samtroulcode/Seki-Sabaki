@@ -153,6 +153,8 @@ class OgsSocket {
     this.WebSocketImpl = webSocketImpl
     this.socket = null
     this.state = getInitialSocketState()
+    this.lastRequestId = 0
+    this.pendingRequests = new Map()
   }
 
   getState() {
@@ -160,6 +162,10 @@ class OgsSocket {
   }
 
   disconnect() {
+    this.rejectPendingRequests(
+      new OgsError('socket-disconnected', 'OGS socket is disconnected.'),
+    )
+
     if (this.socket != null) {
       try {
         this.socket.close()
@@ -179,6 +185,74 @@ class OgsSocket {
 
     logOgsSocketMessage('send', message)
     this.socket.send(message)
+  }
+
+  sendAndGetResponse(event, data) {
+    if (this.socket == null || this.state.status === 'disconnected') {
+      return Promise.reject(
+        new OgsError('socket-disconnected', 'OGS socket is disconnected.'),
+      )
+    }
+
+    let id = ++this.lastRequestId
+    let message = JSON.stringify([event, data, id])
+
+    let promise = new Promise((resolve, reject) => {
+      this.pendingRequests.set(id, {resolve, reject})
+    })
+
+    try {
+      logOgsSocketMessage('send', message)
+      this.socket.send(message)
+    } catch (err) {
+      this.pendingRequests.delete(id)
+      throw err
+    }
+
+    return promise
+  }
+
+  rejectPendingRequests(err) {
+    for (let {reject} of this.pendingRequests.values()) {
+      reject(err)
+    }
+
+    this.pendingRequests.clear()
+  }
+
+  handleMessage(message) {
+    let data
+
+    try {
+      data = typeof message === 'string' ? JSON.parse(message) : message
+    } catch (err) {
+      return
+    }
+
+    if (!Array.isArray(data) || data.length === 0) return
+
+    let id = data[0]
+
+    if (!Number.isInteger(id)) return
+
+    let pending = this.pendingRequests.get(id)
+    if (pending == null) return
+
+    this.pendingRequests.delete(id)
+
+    let error = data.length > 2 ? data[2] : null
+    if (error != null) {
+      pending.reject(
+        new OgsError(
+          'socket-request-failed',
+          typeof error.message === 'string'
+            ? error.message
+            : 'OGS socket request failed.',
+        ),
+      )
+    } else {
+      pending.resolve(data[1])
+    }
   }
 
   connect(jwtToken) {
@@ -211,6 +285,7 @@ class OgsSocket {
           authenticated: false,
           error: 'OGS socket connection timed out.',
         }
+        this.rejectPendingRequests(new OgsError('network', this.state.error))
         reject(new OgsError('network', this.state.error))
       }, 10000)
 
@@ -239,13 +314,13 @@ class OgsSocket {
 
       this.socket = socket
 
-      socket.onopen = () => {
+      socket.onopen = async () => {
         if (this.socket !== socket) return
 
         try {
           console.log('[ogs:socket] open')
           this.state = {status: 'connected', authenticated: false, error: null}
-          this.send('authenticate', {
+          await this.sendAndGetResponse('authenticate', {
             jwt: jwtToken,
             device_id: randomUUID(),
             user_agent: USER_AGENT,
@@ -254,17 +329,26 @@ class OgsSocket {
             client_version: '0.1',
           })
           this.state = {
-            status: 'authentication-sent',
-            authenticated: false,
+            status: 'authenticated',
+            authenticated: true,
             error: null,
           }
           finish(() => resolve(this.getState()))
         } catch (err) {
+          if (settled) return
+
           try {
             socket.close()
           } catch (closeError) {}
           if (this.socket === socket) this.socket = null
-          this.state = getInitialSocketState()
+          this.state = {
+            status: 'error',
+            authenticated: false,
+            error:
+              err instanceof OgsError
+                ? err.message
+                : 'OGS socket authentication failed.',
+          }
           finish(() => reject(err))
         }
       }
@@ -278,6 +362,7 @@ class OgsSocket {
           authenticated: false,
           error: 'OGS socket connection failed.',
         }
+        this.rejectPendingRequests(new OgsError('network', this.state.error))
         finish(() => reject(new OgsError('network', this.state.error)))
       }
 
@@ -285,6 +370,7 @@ class OgsSocket {
         if (this.socket !== socket) return
 
         logOgsSocketMessage('recv', evt?.data)
+        this.handleMessage(evt?.data)
       }
 
       socket.onclose = (evt) => {
@@ -298,6 +384,7 @@ class OgsSocket {
             authenticated: false,
             error: 'OGS socket closed before connecting.',
           }
+          this.rejectPendingRequests(new OgsError('network', this.state.error))
           finish(() => reject(new OgsError('network', this.state.error)))
           return
         }
@@ -305,6 +392,9 @@ class OgsSocket {
         if (this.state.status !== 'error') {
           this.state = getInitialSocketState()
         }
+        this.rejectPendingRequests(
+          new OgsError('socket-disconnected', 'OGS socket is disconnected.'),
+        )
       }
     })
   }

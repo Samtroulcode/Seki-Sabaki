@@ -20,8 +20,8 @@ test.describe('OGS mock panel', () => {
       window.__ogsTestState = {
         user: null,
         socket: {
-          status: 'authentication-sent',
-          authenticated: false,
+          status: 'authenticated',
+          authenticated: true,
           error: null,
         },
         matchmaking: {
@@ -79,7 +79,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-status')).toContainText('Online')
     await expect(page.locator('.ogs-status')).toContainText('1d')
     await expect(page.locator('.ogs-socket-status')).toContainText(
-      'Authentication sent',
+      'Authenticated',
     )
     await expect(page.locator('.ogs-matchmaking')).toBeVisible()
     await page

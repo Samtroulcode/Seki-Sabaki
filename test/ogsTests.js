@@ -32,6 +32,17 @@ class FakeWebSocket {
 
   send(message) {
     this.sent.push(message)
+
+    let data = JSON.parse(message)
+    if (data[0] === 'authenticate' && Number.isInteger(data[2])) {
+      setTimeout(
+        () =>
+          this.onmessage?.({
+            data: JSON.stringify([data[2], {id: 7, username: 'sente'}]),
+          }),
+        0,
+      )
+    }
   }
 
   close() {
@@ -45,6 +56,27 @@ class FailingWebSocket {
   }
 
   close() {}
+}
+
+class RejectingAuthWebSocket extends FakeWebSocket {
+  send(message) {
+    this.sent.push(message)
+
+    let data = JSON.parse(message)
+    if (data[0] === 'authenticate' && Number.isInteger(data[2])) {
+      setTimeout(
+        () =>
+          this.onmessage?.({
+            data: JSON.stringify([
+              data[2],
+              null,
+              {code: 'auth', message: 'Authentication failed.'},
+            ]),
+          }),
+        0,
+      )
+    }
+  }
 }
 
 function loginFetch(url, options = {}) {
@@ -140,12 +172,14 @@ describe('OGS client', () => {
     })
     assert.deepStrictEqual(user, client.getSession())
     assert.strictEqual(user.jwtToken, undefined)
-    assert.strictEqual(client.getState().socket.status, 'authentication-sent')
+    assert.strictEqual(client.getState().socket.status, 'authenticated')
+    assert.strictEqual(client.getState().socket.authenticated, true)
 
     let socket = FakeWebSocket.instances[0]
     assert.strictEqual(socket.url, 'wss://beta.online-go.com/')
     assert.strictEqual(JSON.parse(socket.sent[0])[0], 'authenticate')
     assert.strictEqual(JSON.parse(socket.sent[0])[1].jwt, 'jwt-token')
+    assert.strictEqual(Number.isInteger(JSON.parse(socket.sent[0])[2]), true)
 
     client.logout()
     assert.strictEqual(client.getSession(), null)
@@ -161,6 +195,22 @@ describe('OGS client', () => {
     await assert.rejects(
       () => client.login({username: 'sente', password: 'secret'}),
       (err) => err instanceof OgsError && err.code === 'network',
+    )
+
+    assert.strictEqual(client.getSession(), null)
+    assert.strictEqual(client.getState().user, null)
+    assert.strictEqual(client.getState().socket.status, 'error')
+  })
+
+  it('does not keep a session after socket auth rejection', async () => {
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: RejectingAuthWebSocket,
+    })
+
+    await assert.rejects(
+      () => client.login({username: 'sente', password: 'secret'}),
+      (err) => err instanceof OgsError && err.code === 'socket-request-failed',
     )
 
     assert.strictEqual(client.getSession(), null)
