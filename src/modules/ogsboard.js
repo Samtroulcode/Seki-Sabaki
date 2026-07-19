@@ -2,6 +2,9 @@ import sgf from '@sabaki/sgf'
 import Board from '@sabaki/go-board'
 
 import * as gametree from './gametree.js'
+import {getOgsServerMoves, parseOgsMove} from './ogsreconcile.js'
+
+export {parseOgsMove}
 
 export function buildOgsGameTree(
   onlineGame,
@@ -45,31 +48,17 @@ export function buildOgsGameTree(
 
     let position = draft.root.id
     let moves = Array.isArray(onlineGame?.moves)
-      ? [...onlineGame.moves].sort(compareMoves)
+      ? getOgsServerMoves({...onlineGame, board: {width, height}})
       : []
-    let moveIndex = 0
 
     for (let i = 0; i < moves.length; i++) {
-      let vertex = parseOgsMove(moves[i]?.move, width, height)
-      if (vertex == null) continue
-
-      let moveNumber = Number.isInteger(moves[i].moveNumber)
-        ? moves[i].moveNumber
-        : moveIndex + 1
-      let color = getMoveColor(moveNumber, onlineGame?.handicap)
+      let vertex = parseOgsMove(moves[i].move, width, height)
+      let color = getMoveColor(moves[i].moveNumber, onlineGame?.handicap)
       position = draft.appendNode(position, {
         [color]: [sgf.stringifyVertex(vertex)],
       })
-      moveIndex++
     }
   })
-}
-
-function compareMoves(a, b) {
-  let aNumber = Number.isInteger(a?.moveNumber) ? a.moveNumber : Infinity
-  let bNumber = Number.isInteger(b?.moveNumber) ? b.moveNumber : Infinity
-
-  return aNumber - bNumber
 }
 
 function getMoveColor(moveNumber, handicap) {
@@ -77,16 +66,4 @@ function getMoveColor(moveNumber, handicap) {
   let secondPlayer = firstPlayer === 'B' ? 'W' : 'B'
 
   return moveNumber % 2 === 1 ? firstPlayer : secondPlayer
-}
-
-export function parseOgsMove(move, width, height) {
-  if (move === '..') return [-1, -1]
-  if (typeof move !== 'string' || !/^[a-z]{2}$/.test(move)) return null
-
-  let x = move.charCodeAt(0) - 97
-  let y = move.charCodeAt(1) - 97
-
-  if (x < 0 || y < 0 || x >= width || y >= height) return null
-
-  return [x, y]
 }

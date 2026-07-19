@@ -18,7 +18,19 @@ import * as gametree from './gametree.js'
 import * as gobantransformer from './gobantransformer.js'
 import * as gtplogger from './gtplogger.js'
 import * as helper from './helper.js'
-import {buildOgsGameTree, parseOgsMove} from './ogsboard.js'
+import OgsBoardSessionController from './ogsboardsessioncontroller.js'
+import {buildOgsGameTree} from './ogsboard.js'
+import {
+  getOgsLineMoves,
+  getOgsMovePlayer,
+  getOgsPlayerToMove,
+  getOgsServerMoves,
+  normalizeOgsId,
+  parseOgsMove,
+  parseOgsStoneString,
+  reconcileOgsMoves,
+  sameVertices,
+} from './ogsreconcile.js'
 import * as sound from './sound.js'
 
 deadstones.useFetch('./node_modules/@sabaki/deadstones/wasm/deadstones_bg.wasm')
@@ -39,6 +51,30 @@ const setting = {
 }
 
 class Sabaki extends EventEmitter {
+  get ogsPendingMove() {
+    return this.ogsBoardSession.pendingMove
+  }
+
+  set ogsPendingMove(value) {
+    this.ogsBoardSession.pendingMove = value
+  }
+
+  get ogsSubmittingMove() {
+    return this.ogsBoardSession.submittingMove
+  }
+
+  set ogsSubmittingMove(value) {
+    this.ogsBoardSession.submittingMove = value
+  }
+
+  get ogsSubmissionId() {
+    return this.ogsBoardSession.submissionId
+  }
+
+  set ogsSubmissionId(value) {
+    this.ogsBoardSession.submissionId = value
+  }
+
   constructor() {
     super()
 
@@ -191,9 +227,7 @@ class Sabaki extends EventEmitter {
     this.treeHash = this.generateTreeHash()
     this.historyPointer = 0
     this.history = []
-    this.ogsPendingMove = null
-    this.ogsSubmittingMove = false
-    this.ogsSubmissionId = 0
+    this.ogsBoardSession = new OgsBoardSessionController()
     this.ogsGameEndNoticeKey = null
     this.ogsGameEndNoticeGameId = null
     this.ogsGameEndNoticePromise = null
@@ -746,9 +780,7 @@ class Sabaki extends EventEmitter {
       onlineGameId: onlineGame?.gameId ?? null,
     })
     this.setState({activeWorkspace: 'board'})
-    this.ogsPendingMove = null
-    this.ogsSubmittingMove = false
-    this.ogsSubmissionId++
+    this.ogsBoardSession.invalidateOperations()
     this.goToEnd()
     return true
   }
@@ -762,9 +794,7 @@ class Sabaki extends EventEmitter {
       return false
     }
 
-    this.ogsPendingMove = null
-    this.ogsSubmittingMove = false
-    this.ogsSubmissionId++
+    this.ogsBoardSession.invalidateOperations()
     this.setState({onlineGameId: null})
 
     return true
@@ -825,48 +855,38 @@ class Sabaki extends EventEmitter {
 
     let serverMoves = getOgsServerMoves(onlineGame)
     let localMoves = this.getOgsLocalMoves()
+    let pendingMove =
+      this.ogsPendingMove?.gameId === onlineGame.gameId
+        ? this.ogsPendingMove
+        : null
+    let reconciliation = reconcileOgsMoves({
+      localMoves,
+      serverMoves,
+      pendingMove,
+    })
 
-    if (movesEqual(localMoves, serverMoves)) {
-      this.clearConfirmedOgsPendingMove(serverMoves.at(-1))
+    if (reconciliation.confirmedPendingMove != null) {
+      this.clearConfirmedOgsPendingMove(reconciliation.confirmedPendingMove)
+    }
+
+    if (reconciliation.status === 'in-sync') {
       return true
     }
 
-    if (
-      this.ogsPendingMove != null &&
-      this.ogsPendingMove.gameId === onlineGame.gameId &&
-      localMoves.length === serverMoves.length + 1 &&
-      movesEqual(localMoves.slice(0, -1), serverMoves) &&
-      movesEqual([localMoves.at(-1)], [this.ogsPendingMove])
-    ) {
+    if (reconciliation.status === 'pending-local-move') {
       return true
     }
 
-    if (localMoves.length > serverMoves.length) {
+    if (reconciliation.status !== 'applied') {
       return false
     }
-
-    for (let i = 0; i < localMoves.length; i++) {
-      let localMove = localMoves[i]
-      let serverMove = serverMoves[i]
-      let pendingConfirmed =
-        this.isOgsPendingMove(localMove) &&
-        movesEqual([localMove], [serverMove])
-
-      if (!pendingConfirmed && !movesEqual([localMove], [serverMove])) {
-        return false
-      }
-    }
-
-    this.clearConfirmedOgsPendingMove(
-      serverMoves.find((move) => this.isOgsPendingMove(move)),
-    )
 
     let {gameTrees, gameIndex, treePosition} = this.state
     let tree = gameTrees[gameIndex]
     let [lineEnd] = this.getOgsLineNodes(tree).slice(-1)
     let updateTreePosition = lineEnd?.id === treePosition
 
-    for (let move of serverMoves.slice(localMoves.length)) {
+    for (let move of reconciliation.appendMoves) {
       let vertex = parseOgsMove(
         move.move,
         onlineGame.board.width,
@@ -1714,7 +1734,11 @@ class Sabaki extends EventEmitter {
       return
     }
 
-    let deadStones = parseOgsStoneString(onlineGame.removedStones)
+    let deadStones = parseOgsStoneString(
+      onlineGame.removedStones,
+      onlineGame.board?.width,
+      onlineGame.board?.height,
+    )
 
     if (this.state.mode !== 'scoring') {
       this.setMode('scoring', {guessDeadStones: false})
@@ -1775,7 +1799,8 @@ class Sabaki extends EventEmitter {
   }
 
   async beginOgsOptimisticSubmission() {
-    if (this.ogsSubmittingMove || this.ogsPendingMove != null) {
+    let submissionId = this.ogsBoardSession.beginSubmission()
+    if (submissionId == null) {
       await this.showOgsPlayError({
         code: 'move-pending',
         message: 'An OGS move is already pending.',
@@ -1783,8 +1808,7 @@ class Sabaki extends EventEmitter {
       return null
     }
 
-    this.ogsSubmittingMove = true
-    return ++this.ogsSubmissionId
+    return submissionId
   }
 
   async getOgsOptimisticPlayer(submissionId = null, gameId = null) {
@@ -1852,10 +1876,9 @@ class Sabaki extends EventEmitter {
   }
 
   isCurrentOgsSubmission({submissionId = null, gameId = null, pendingMove}) {
-    return (
-      (submissionId == null || this.ogsSubmissionId === submissionId) &&
-      (gameId == null || this.state.onlineGameId === gameId) &&
-      this.ogsPendingMove === pendingMove
+    return this.ogsBoardSession.isCurrentSubmission(
+      {submissionId, gameId, pendingMove},
+      this.state.onlineGameId,
     )
   }
 
@@ -1913,18 +1936,11 @@ class Sabaki extends EventEmitter {
   }
 
   clearConfirmedOgsPendingMove(move) {
-    if (this.isOgsPendingMove(move)) {
-      this.ogsPendingMove = null
-    }
+    this.ogsBoardSession.clearPendingMove(move)
   }
 
   isOgsPendingMove(move) {
-    return (
-      this.ogsPendingMove != null &&
-      move != null &&
-      this.ogsPendingMove.moveNumber === move.moveNumber &&
-      this.ogsPendingMove.move === move.move
-    )
+    return this.ogsBoardSession.isPendingMove(move)
   }
 
   getOgsLocalMoves() {
@@ -3824,64 +3840,6 @@ class Sabaki extends EventEmitter {
   }
 }
 
-function getOgsServerMoves(onlineGame) {
-  let width = onlineGame.board.width
-  let height = onlineGame.board.height
-
-  return [...onlineGame.moves]
-    .sort((a, b) => {
-      let aNumber = Number.isInteger(a?.moveNumber) ? a.moveNumber : Infinity
-      let bNumber = Number.isInteger(b?.moveNumber) ? b.moveNumber : Infinity
-
-      return aNumber - bNumber
-    })
-    .map((move, index) => ({
-      moveNumber: Number.isInteger(move?.moveNumber)
-        ? move.moveNumber
-        : index + 1,
-      move: move?.move,
-    }))
-    .filter((move) => parseOgsMove(move.move, width, height) != null)
-}
-
-function getOgsMovePlayer(moveNumber, handicap) {
-  let firstPlayer = Number.isInteger(handicap) && handicap > 1 ? -1 : 1
-  let secondPlayer = -firstPlayer
-
-  return moveNumber % 2 === 1 ? firstPlayer : secondPlayer
-}
-
-function getOgsPlayerToMove(onlineGame) {
-  if (
-    onlineGame.clock?.currentPlayer != null &&
-    onlineGame.clock.lastMove >= onlineGame.moveCount
-  ) {
-    return normalizeOgsId(onlineGame.clock.currentPlayer)
-  }
-
-  let blackId = normalizeOgsId(onlineGame.players?.black?.id)
-  let whiteId = normalizeOgsId(onlineGame.players?.white?.id)
-  if (blackId == null || whiteId == null) return null
-
-  let firstPlayer = onlineGame.handicap > 1 ? whiteId : blackId
-  let secondPlayer = firstPlayer === blackId ? whiteId : blackId
-
-  return onlineGame.moveCount % 2 === 0 ? firstPlayer : secondPlayer
-}
-
-function normalizeOgsId(value) {
-  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
-    return value
-  }
-
-  if (typeof value === 'string' && /^[1-9][0-9]{0,15}$/.test(value)) {
-    let number = Number(value)
-    return Number.isSafeInteger(number) ? number : null
-  }
-
-  return null
-}
-
 function getOgsGameEndMessage(onlineGame) {
   let t = i18n.context('sabaki.ogs')
   let lines = [
@@ -3953,43 +3911,6 @@ function getOgsColorPlayerLabel(color, player) {
   return player?.username == null || player.username === ''
     ? color
     : `${color} (${player.username})`
-}
-
-function parseOgsStoneString(value) {
-  if (typeof value !== 'string') return []
-
-  let result = []
-  for (let i = 0; i < value.length - 1; i += 2) {
-    let vertex = parseOgsMove(value.slice(i, i + 2))
-    if (vertex != null && !helper.vertexEquals(vertex, [-1, -1])) {
-      result.push(vertex)
-    }
-  }
-
-  return result
-}
-
-function sameVertices(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
-    return false
-  }
-
-  return a.every((vertex) =>
-    b.some((other) => helper.vertexEquals(vertex, other)),
-  )
-}
-
-function movesEqual(a, b) {
-  return (
-    Array.isArray(a) &&
-    Array.isArray(b) &&
-    a.length === b.length &&
-    a.every(
-      (move, index) =>
-        move?.moveNumber === b[index]?.moveNumber &&
-        move?.move === b[index]?.move,
-    )
-  )
 }
 
 export default new Sabaki()
