@@ -11,6 +11,33 @@ const timeSystems = ['byoyomi', 'fischer']
 const conditions = ['required', 'preferred', 'no-preference']
 const rules = ['japanese', 'chinese', 'aga', 'korean', 'ing', 'nz']
 const handicapValues = ['enabled', 'disabled']
+const conditionLabels = {
+  required: t('Required'),
+  preferred: t('Preferred'),
+  'no-preference': t('No preference'),
+}
+const speedLabels = {
+  blitz: t('Blitz'),
+  rapid: t('Rapid'),
+  live: t('Live'),
+  correspondence: t('Correspondence'),
+}
+const timeSystemLabels = {
+  byoyomi: t('Byo-yomi'),
+  fischer: t('Fischer'),
+}
+const ruleLabels = {
+  japanese: t('Japanese'),
+  chinese: t('Chinese'),
+  aga: t('AGA'),
+  korean: t('Korean'),
+  ing: t('Ing'),
+  nz: t('New Zealand'),
+}
+const handicapLabels = {
+  enabled: t('Enabled'),
+  disabled: t('Disabled'),
+}
 const defaultMatchmakingOptions = {
   boardSizes: [19],
   speeds: ['rapid'],
@@ -723,11 +750,11 @@ function AutomatchForm({
   return h(
     'section',
     {class: 'ogs-matchmaking'},
-    h('h3', {}, t('Automatch')),
-    h('p', {}, t('Find an OGS opponent with the selected options.')),
+    h('h3', {}, t('Play')),
+    h('p', {}, t('Choose how you want to play and find an OGS opponent.')),
 
     h(CheckboxGroup, {
-      title: t('Board sizes'),
+      title: t('Board size'),
       name: 'boardSizes',
       values: boardSizes,
       selected: options.boardSizes,
@@ -737,19 +764,21 @@ function AutomatchForm({
     }),
 
     h(CheckboxGroup, {
-      title: t('Speeds'),
+      title: t('Game speed'),
       name: 'speeds',
       values: speeds,
       selected: options.speeds,
+      format: (speed) => speedLabels[speed] || speed,
       disabled: active || busy,
       onChange: onMultiChange,
     }),
 
     h(SelectField, {
-      label: t('Time system'),
+      label: t('Clock'),
       name: 'timeSystem',
       value: options.timeSystem,
       values: timeSystems,
+      format: (timeSystem) => timeSystemLabels[timeSystem] || timeSystem,
       disabled: active || busy,
       onChange: onOptionChange,
     }),
@@ -772,18 +801,24 @@ function AutomatchForm({
 
     h(ConditionValueField, {
       title: t('Rules'),
+      valueLabel: t('Rule set'),
+      conditionLabel: t('Preference'),
       group: 'rules',
       option: options.rules,
       values: rules,
+      formatValue: (rule) => ruleLabels[rule] || rule,
       disabled: active || busy,
       onChange: onConditionChange,
     }),
 
     h(ConditionValueField, {
-      title: t('Handicap'),
+      title: t('Handicap games'),
+      valueLabel: t('Handicap'),
+      conditionLabel: t('Preference'),
       group: 'handicap',
       option: options.handicap,
       values: handicapValues,
+      formatValue: (value) => handicapLabels[value] || value,
       disabled: active || busy,
       onChange: onConditionChange,
     }),
@@ -805,7 +840,7 @@ function AutomatchForm({
             disabled: busy,
             onClick: onCancelAutomatch,
           },
-          t('Cancel automatch'),
+          t('Cancel search'),
         )
       : h(
           'button',
@@ -814,10 +849,10 @@ function AutomatchForm({
             disabled: busy || !authenticated || active,
             title: !authenticated
               ? t('OGS socket must be authenticated first.')
-              : t('Start OGS automatch.'),
+              : t('Find an OGS opponent.'),
             onClick: onStartAutomatch,
           },
-          t('Start automatch'),
+          t('Find opponent'),
         ),
   )
 }
@@ -962,7 +997,15 @@ function CheckboxGroup({
   )
 }
 
-function SelectField({label, name, value, values, disabled, onChange}) {
+function SelectField({
+  label,
+  name,
+  value,
+  values,
+  format = (x) => x,
+  disabled,
+  onChange,
+}) {
   return h(
     'label',
     {},
@@ -970,7 +1013,7 @@ function SelectField({label, name, value, values, disabled, onChange}) {
     h(
       'select',
       {name, value, disabled, onChange},
-      values.map((item) => h('option', {value: item}, item)),
+      values.map((item) => h('option', {value: item}, format(item))),
     ),
   )
 }
@@ -997,6 +1040,9 @@ function ConditionValueField({
   group,
   option,
   values,
+  valueLabel,
+  conditionLabel,
+  formatValue = (x) => x,
   disabled,
   onChange,
 }) {
@@ -1004,22 +1050,59 @@ function ConditionValueField({
     'fieldset',
     {},
     h('legend', {}, title),
-    h(SelectField, {
-      label: t('Condition'),
+    h(RadioGroup, {
+      label: conditionLabel,
       name: `${group}.condition`,
-      value: option.condition,
+      selected: option.condition,
       values: conditions,
+      format: (condition) => conditionLabels[condition] || condition,
       disabled,
       onChange,
     }),
     h(SelectField, {
-      label: t('Value'),
+      label: valueLabel,
       name: `${group}.value`,
       value: option.value,
       values,
+      format: formatValue,
       disabled,
       onChange,
     }),
+  )
+}
+
+function RadioGroup({
+  label,
+  name,
+  values,
+  selected,
+  format = (x) => x,
+  disabled,
+  onChange,
+}) {
+  return h(
+    'div',
+    {class: 'ogs-option-group'},
+    h('span', {class: 'ogs-option-group-label'}, label),
+    h(
+      'div',
+      {class: 'ogs-inline-options'},
+      values.map((value) =>
+        h(
+          'label',
+          {class: 'ogs-inline-option'},
+          h('input', {
+            type: 'radio',
+            name,
+            value,
+            checked: selected === value,
+            disabled,
+            onChange,
+          }),
+          h('span', {}, format(value)),
+        ),
+      ),
+    ),
   )
 }
 

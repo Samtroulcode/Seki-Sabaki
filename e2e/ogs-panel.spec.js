@@ -24,6 +24,7 @@ test.describe('OGS mock panel', () => {
       window.__ogsPlayedMoves = []
       window.__ogsRemovedStonesCommands = []
       window.__ogsChatMessages = []
+      window.__ogsMatchmakingOptions = []
       window.__ogsTestState = {
         user: null,
         socket: {
@@ -90,6 +91,7 @@ test.describe('OGS mock panel', () => {
           }
         },
         setMatchmakingOptions: async (options) => {
+          window.__ogsMatchmakingOptions.push(options)
           window.__ogsTestState.matchmaking.options = options
           return window.__ogsTestState
         },
@@ -252,6 +254,17 @@ test.describe('OGS mock panel', () => {
       page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Social'}),
     ).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('.ogs-matchmaking')).toBeVisible()
+    await expect(page.locator('.ogs-matchmaking h3')).toHaveText('Play')
+    await expect(page.locator('.ogs-matchmaking')).toContainText('Game speed')
+    await expect(page.locator('.ogs-matchmaking')).toContainText('Rule set')
+    await expect(page.locator('.ogs-matchmaking')).toContainText('Preference')
+    await expect(page.locator('.ogs-matchmaking')).not.toContainText(
+      'Automatch',
+    )
+    await expect(page.locator('.ogs-matchmaking')).not.toContainText('Value')
+    await expect(page.locator('.ogs-matchmaking')).not.toContainText(
+      'Condition',
+    )
     await page
       .locator('.ogs-matchmaking input[name="boardSizes"][value="9"]')
       .check()
@@ -279,15 +292,46 @@ test.describe('OGS mock panel', () => {
       .locator('.ogs-matchmaking select[name="rules.value"]')
       .selectOption('chinese')
     await page
+      .locator(
+        '.ogs-matchmaking input[name="rules.condition"][value="preferred"]',
+      )
+      .check()
+    await expect(
+      page.locator(
+        '.ogs-matchmaking input[name="rules.condition"][value="preferred"]',
+      ),
+    ).toBeChecked()
+    await page
       .locator('.ogs-matchmaking select[name="handicap.value"]')
       .selectOption('disabled')
-    await page.locator('.ogs-matchmaking button').click()
+    await page
+      .locator(
+        '.ogs-matchmaking input[name="handicap.condition"][value="no-preference"]',
+      )
+      .check()
+    await expect(
+      page.locator(
+        '.ogs-matchmaking input[name="handicap.condition"][value="no-preference"]',
+      ),
+    ).toBeChecked()
+    await page.waitForFunction(
+      () =>
+        window.__ogsTestState.matchmaking.options.rules.condition ===
+          'preferred' &&
+        window.__ogsTestState.matchmaking.options.rules.value === 'chinese' &&
+        window.__ogsTestState.matchmaking.options.handicap.condition ===
+          'no-preference' &&
+        window.__ogsTestState.matchmaking.options.handicap.value ===
+          'disabled' &&
+        window.__ogsMatchmakingOptions.length >= 8,
+    )
+    await page.getByRole('button', {name: 'Find opponent'}).click()
     await expect(page.locator('.ogs-matchmaking')).toContainText(
       'Searching for opponent…',
     )
-    await page.getByRole('button', {name: 'Cancel automatch'}).click()
+    await page.getByRole('button', {name: 'Cancel search'}).click()
     await expect(
-      page.getByRole('button', {name: 'Start automatch'}),
+      page.getByRole('button', {name: 'Find opponent'}),
     ).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toContainText('Active games')
