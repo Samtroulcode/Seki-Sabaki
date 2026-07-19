@@ -13,14 +13,36 @@ accounts.
 - **In-game OGS context panel**: live-game controls beside the board, including
   clock, captures, pass/resign, stone removal, and game chat.
 
+## Current Implementation Status
+
+Current OGS work supports a minimal online-play slice:
+
+- OGS login/session state is owned by the main process.
+- The renderer uses narrow `window.sabaki.ogs` IPC methods for OGS actions.
+- The OGS workspace shows account state, active games, automatch controls, and
+  placeholder dashboard sections.
+- One active OGS game can be attached to the Sabaki board at a time.
+- Attached games project into SGF, preserve the OGS source URL, and use
+  `boardAttachment` plus temporary `onlineGameId` compatibility state.
+- The in-game OGS context panel supports clocks, captures, pass/resign, chat,
+  stone removal, rejected-move recovery, and game-end detach behavior.
+- Automated coverage uses fake OGS state rather than live OGS accounts.
+
+Cleanup still in progress:
+
+- `src/ogs.js` is still a large mixed module.
+- `OgsPanel` still contains dashboard orchestration.
+- Notifications, historical game review, custom challenges, social surfaces, and
+  broader game history remain roadmap items.
+
 ## Priorities
 
 ### 1. Active Game Communication
 
-- Make game chat interactive for the currently attached OGS game.
+- Keep game chat reliable for the currently attached OGS game.
 - Keep networking in the main process and expose only narrow validated IPC.
-- Start with the main game chat channel; add other OGS channels only after their
-  behavior is verified.
+- Expand from the main game chat channel only after other OGS channels are
+  verified.
 
 ### 2. Games And Review
 

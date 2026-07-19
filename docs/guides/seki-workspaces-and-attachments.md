@@ -89,16 +89,34 @@ The next document-store step should give local documents stable IDs and make
 Open, Save, Save As, Close, Detach, and Export behavior depend on the active
 resource type instead of a single global file field.
 
-## Refactor Direction
+## Current Cleanup Status
 
-Near-term extractions should be small and testable:
+Implemented:
 
-1. Move attachment helpers and guards out of `sabaki.js`.
-2. Move OGS dashboard orchestration out of `OgsPanel` so it becomes mostly
-   presentation.
-3. Split `src/ogs.js` into protocol adaptation, transport/session, matchmaking,
+- Board attachment helpers live in `src/modules/boardattachment.js`.
+- `boardAttachment` is the preferred state for board ownership.
+- `onlineGameId` remains as a compatibility field and is synchronized through
+  `sabaki.setState()`.
+- Loading an OGS game attaches it to the board and switches to the Board
+  workspace.
+- Detaching an OGS game preserves the projected SGF as a local board document.
+- OGS rejected moves clear the board's pending optimistic move through the same
+  error path used by the OGS workspace.
+
+Partially complete:
+
+- OGS board synchronization has moved into `OgsPanelSyncController`, but
+  `OgsPanel` still owns dashboard-level orchestration.
+- OGS board submission and pending-move state have a dedicated controller, but
+  broader online session state still lives in the OGS client/main-process
+  integration.
+
+Remaining cleanup should stay small and testable:
+
+1. Move more OGS dashboard orchestration out of `OgsPanel`.
+2. Split `src/ogs.js` into protocol adaptation, transport/session, matchmaking,
    game state, and IPC contracts.
-4. Replace renderer-visible arbitrary objects with validated IPC request,
+3. Replace renderer-visible arbitrary objects with validated IPC request,
    response, event, and public-state contracts.
-5. Keep `sabaki.js` as a compatibility facade while moving workspace, document,
+4. Keep `sabaki.js` as a compatibility facade while moving workspace, document,
    online, notification, and analysis responsibilities into focused modules.
