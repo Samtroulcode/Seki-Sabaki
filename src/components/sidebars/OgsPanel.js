@@ -2,6 +2,11 @@ import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
+import {
+  updateMultiMatchmakingOption,
+  updateNestedMatchmakingOption,
+  updateScalarMatchmakingOption,
+} from '../../modules/ogsmatchmakingoptions.js'
 import OgsPanelSyncController from '../../modules/ogspanelsync.js'
 
 const t = i18n.context('OgsPanel')
@@ -188,37 +193,38 @@ export default class OgsPanel extends Component {
     this.handleMatchmakingOptionChange = async (evt) => {
       let {name, value} = evt.currentTarget
 
-      await this.updateMatchmakingOptions({
-        ...this.state.matchmaking.options,
-        [name]: name.endsWith('RankDiff') ? +value : value,
-      })
+      await this.updateMatchmakingOptions(
+        updateScalarMatchmakingOption(
+          this.state.matchmaking.options,
+          name,
+          value,
+        ),
+      )
     }
 
     this.handleConditionOptionChange = async (evt) => {
       let {name, value} = evt.currentTarget
-      let [group, key] = name.split('.')
 
-      await this.updateMatchmakingOptions({
-        ...this.state.matchmaking.options,
-        [group]: {
-          ...this.state.matchmaking.options[group],
-          [key]: value,
-        },
-      })
+      await this.updateMatchmakingOptions(
+        updateNestedMatchmakingOption(
+          this.state.matchmaking.options,
+          name,
+          value,
+        ),
+      )
     }
 
     this.handleMultiOptionChange = async (evt) => {
       let {name, value, checked} = evt.currentTarget
-      let current = this.state.matchmaking.options[name] || []
-      let parsedValue = name === 'boardSizes' ? +value : value
-      let next = checked
-        ? [...current, parsedValue]
-        : current.filter((item) => item !== parsedValue)
 
-      await this.updateMatchmakingOptions({
-        ...this.state.matchmaking.options,
-        [name]: next,
-      })
+      await this.updateMatchmakingOptions(
+        updateMultiMatchmakingOption(
+          this.state.matchmaking.options,
+          name,
+          value,
+          checked,
+        ),
+      )
     }
 
     this.handleStartAutomatchButtonClick = async () => {
