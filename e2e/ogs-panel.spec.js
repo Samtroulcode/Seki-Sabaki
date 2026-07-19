@@ -255,9 +255,21 @@ test.describe('OGS mock panel', () => {
     await page
       .locator('.ogs-matchmaking input[name="boardSizes"][value="9"]')
       .check()
+    await expect(
+      page.locator('.ogs-matchmaking input[name="boardSizes"][value="9"]'),
+    ).toBeChecked()
+    await expect(
+      page.locator('.ogs-matchmaking input[name="boardSizes"][value="9"]'),
+    ).toHaveCSS('background-color', 'rgb(0, 130, 240)')
     await page
       .locator('.ogs-matchmaking input[name="speeds"][value="blitz"]')
       .check()
+    await expect(
+      page.locator('.ogs-matchmaking input[name="speeds"][value="blitz"]'),
+    ).toBeChecked()
+    await expect(
+      page.locator('.ogs-matchmaking input[name="speeds"][value="blitz"]'),
+    ).toHaveCSS('background-color', 'rgb(0, 130, 240)')
     await page
       .locator('.ogs-matchmaking select[name="timeSystem"]')
       .selectOption('fischer')

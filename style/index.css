@@ -1960,6 +1960,13 @@ button:active {
   padding: 0;
   accent-color: #0082f0;
 }
+.ogs-matchmaking .ogs-inline-option input:checked {
+  border-color: #2f9fff;
+  background: #0082f0;
+}
+.ogs-matchmaking .ogs-inline-option input:checked::before {
+  filter: invert(1);
+}
 .ogs-matchmaking-status {
   color: #8cdcda;
 }
