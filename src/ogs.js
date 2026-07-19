@@ -1,5 +1,7 @@
 const {randomUUID} = require('crypto')
 
+const {ratingToRank, rankNumberToRank} = require('./ogs/ranks.js')
+
 const DEFAULT_SERVER_URL = 'https://online-go.com'
 const USER_AGENT = 'Seki-Sabaki/0.1'
 const DEFAULT_MATCHMAKING_OPTIONS = {
@@ -58,24 +60,6 @@ function getCookieHeader(setCookies) {
     .map((cookie) => cookie.split(';')[0].trim())
     .filter((cookie) => cookie !== '')
     .join('; ')
-}
-
-function ratingToRank(rating) {
-  if (typeof rating !== 'number' || !Number.isFinite(rating)) return null
-
-  let clippedRating = Math.min(Math.max(rating, 100), 6000)
-  let rank = Math.round(Math.log(clippedRating / 525) * 23.15)
-  rank = Math.min(Math.max(rank, 0), 38)
-
-  if (rank < 30) return `${30 - rank}k`
-  return `${rank - 29}d`
-}
-
-function rankNumberToRank(rank) {
-  if (!Number.isInteger(rank) || rank < 0 || rank > 38) return null
-
-  if (rank < 30) return `${30 - rank}k`
-  return `${rank - 29}d`
 }
 
 function resolveOgsUrl(serverUrl, value) {
