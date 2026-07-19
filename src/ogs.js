@@ -152,6 +152,8 @@ function getInitialOnlineGameState() {
     lastMove: null,
     pendingMove: false,
     clock: null,
+    removedStones: '',
+    removedStonesAccepted: [],
     chat: [],
   }
 }
@@ -665,6 +667,46 @@ class OgsClient {
     return this.getState()
   }
 
+  setRemovedStones(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+    let stones = encodeClientOgsStones(input.stones, this.onlineGame.board)
+    let removed = sanitizeRemovedFlag(input.removed)
+
+    this.assertCanRemoveStones(gameId)
+    this.socket.send('game/removed_stones/set', {
+      game_id: gameId,
+      removed,
+      stones,
+    })
+    this.onlineGame = {
+      ...this.onlineGame,
+      removedStones: mergeRemovedStoneStrings(
+        this.onlineGame.removedStones,
+        stones,
+        removed,
+      ),
+    }
+
+    return this.getState()
+  }
+
+  acceptRemovedStones(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+
+    this.assertCanRemoveStones(gameId)
+    let stones = sanitizeRemovedStoneString(
+      this.onlineGame.removedStones,
+      this.onlineGame.board,
+    )
+    this.socket.send('game/removed_stones/accept', {
+      game_id: gameId,
+      stones,
+      strict_seki_mode: input.strictSekiMode === true,
+    })
+
+    return this.getState()
+  }
+
   assertAuthenticatedSocket() {
     let state = this.socket.getState()
 
@@ -718,6 +760,38 @@ class OgsClient {
       throw new OgsError(
         'not-your-turn',
         'It is not your turn in this OGS game.',
+      )
+    }
+  }
+
+  assertCanRemoveStones(gameId) {
+    this.assertAuthenticatedSocket()
+
+    if (
+      this.onlineGame.gameId !== gameId ||
+      this.onlineGame.status !== 'connected'
+    ) {
+      throw new OgsError('invalid-state', 'OGS game is not connected.')
+    }
+
+    if (
+      this.onlineGame.phase !== 'stone removal' &&
+      this.onlineGame.clock?.stoneRemovalMode !== true
+    ) {
+      throw new OgsError(
+        'invalid-state',
+        'OGS game is not in stone removal phase.',
+      )
+    }
+
+    let userId = sanitizeOptionalGameId(this.session?.user?.id)
+    let blackId = this.onlineGame.players?.black?.id
+    let whiteId = this.onlineGame.players?.white?.id
+
+    if (userId == null || ![blackId, whiteId].includes(userId)) {
+      throw new OgsError(
+        'invalid-state',
+        'OGS user is not a player in this game.',
       )
     }
   }
@@ -826,6 +900,41 @@ class OgsClient {
           ...this.onlineGame,
           status: 'connected',
           phase: sanitizeGamePhase(payload),
+          error: null,
+        }
+        break
+
+      case 'removed_stones':
+        let removedStones = sanitizeRemovedStones(
+          payload,
+          this.onlineGame.board,
+        )
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'connected',
+          ...(removedStones == null ? {} : {removedStones}),
+          error: null,
+        }
+        break
+
+      case 'removed_stones_accepted':
+        this.onlineGame = {
+          ...this.onlineGame,
+          status: 'connected',
+          phase: sanitizeGamePhase(payload?.phase) || this.onlineGame.phase,
+          outcome:
+            sanitizeString(payload?.outcome, 200) || this.onlineGame.outcome,
+          winner:
+            sanitizeOptionalGameId(payload?.winner) || this.onlineGame.winner,
+          removedStones: sanitizeRemovedStoneString(
+            payload?.stones,
+            this.onlineGame.board,
+          ),
+          removedStonesAccepted: sanitizeRemovedStonesAccepted(
+            payload,
+            this.onlineGame,
+            this.onlineGame.removedStonesAccepted,
+          ),
           error: null,
         }
         break
@@ -1079,6 +1188,139 @@ function encodeOgsCoordinates(x, y, board = null) {
   return isMoveInBoard(move, board) ? move : null
 }
 
+function encodeClientOgsStones(value, board = null) {
+  if (board == null) {
+    throw new OgsError('invalid-state', 'OGS board size is not available.')
+  }
+
+  let maxStones = board.width * board.height
+  let moves = []
+
+  if (typeof value === 'string') {
+    if (value.length > maxStones * 2 || value.length % 2 !== 0) {
+      throw new OgsError('invalid-input', 'Invalid OGS stone list.')
+    }
+
+    for (let i = 0; i < value.length; i += 2) {
+      moves.push(value.slice(i, i + 2))
+    }
+  } else if (Array.isArray(value)) {
+    if (value.length === 0 || value.length > maxStones) {
+      throw new OgsError('invalid-input', 'Invalid OGS stone list.')
+    }
+
+    moves = value.map((vertex) => {
+      if (Array.isArray(vertex)) {
+        return encodeOgsCoordinates(vertex[0], vertex[1], board)
+      }
+      if (vertex != null && typeof vertex === 'object') {
+        return encodeOgsCoordinates(vertex.x, vertex.y, board)
+      }
+
+      return null
+    })
+  } else {
+    throw new OgsError('invalid-input', 'Invalid OGS stone list.')
+  }
+
+  let result = []
+
+  for (let move of moves) {
+    let encoded = encodeOgsMove(move, board)
+
+    if (encoded == null || encoded === '..') {
+      throw new OgsError('invalid-input', 'Invalid OGS stone list.')
+    }
+
+    if (!result.includes(encoded)) result.push(encoded)
+  }
+
+  if (result.length === 0) {
+    throw new OgsError('invalid-input', 'Invalid OGS stone list.')
+  }
+
+  return result.join('')
+}
+
+function sanitizeRemovedFlag(value) {
+  if (value == null) return true
+  if (typeof value === 'boolean') return value
+
+  throw new OgsError('invalid-input', 'Invalid OGS removed-stones flag.')
+}
+
+function sanitizeRemovedStones(payload, board = null) {
+  if (payload == null || typeof payload !== 'object') return null
+
+  if (
+    !Object.prototype.hasOwnProperty.call(payload, 'all_removed') &&
+    !Object.prototype.hasOwnProperty.call(payload, 'stones')
+  ) {
+    return null
+  }
+
+  let value = Object.prototype.hasOwnProperty.call(payload, 'all_removed')
+    ? payload.all_removed
+    : payload.stones
+
+  return sanitizeRemovedStoneString(value, board)
+}
+
+function sanitizeRemovedStoneString(value, board = null) {
+  if (typeof value !== 'string') return ''
+
+  let maxStones = board == null ? 26 * 26 : board.width * board.height
+  value = value.slice(0, maxStones * 2)
+
+  let result = []
+  for (let i = 0; i < value.length - 1; i += 2) {
+    let move = encodeOgsMove(value.slice(i, i + 2), board)
+    if (move != null && move !== '..' && !result.includes(move)) {
+      result.push(move)
+      if (result.length >= maxStones) break
+    }
+  }
+
+  return result.join('')
+}
+
+function sanitizeRemovedStonesAccepted(payload, onlineGame, previous = []) {
+  if (payload?.player_id === 0) {
+    return [
+      onlineGame.players?.black?.id,
+      onlineGame.players?.white?.id,
+    ].filter((id) => sanitizeOptionalGameId(id) != null)
+  }
+
+  let playerId = sanitizeOptionalGameId(payload?.player_id)
+  if (playerId == null) return previous
+
+  return [...new Set([...previous, playerId])]
+}
+
+function mergeRemovedStoneStrings(previous, stones, removed) {
+  let values = new Set(parseOgsStoneString(previous))
+
+  for (let stone of parseOgsStoneString(stones)) {
+    if (removed) values.add(stone)
+    else values.delete(stone)
+  }
+
+  return [...values].sort().join('')
+}
+
+function parseOgsStoneString(value) {
+  if (typeof value !== 'string') return []
+
+  let result = []
+  for (let i = 0; i < value.length - 1; i += 2) {
+    let move = value.slice(i, i + 2)
+    if (/^[a-z]{2}$/.test(move)) result.push(move)
+  }
+
+  return result
+}
+
 function isMoveInBoard(move, board) {
   if (move === '..' || board == null) return true
 
@@ -1277,6 +1519,8 @@ function cloneOnlineGameState(state) {
               state.players.white == null ? null : {...state.players.white},
           },
     clock: cloneClockState(state.clock),
+    removedStones: state.removedStones,
+    removedStonesAccepted: [...state.removedStonesAccepted],
     moves: state.moves.map((move) => ({...move})),
     chat: state.chat.map((line) => ({...line})),
   }
@@ -1463,6 +1707,22 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
   ipcMain.handle('ogs:resign', (evt, input) => {
     try {
       return {ok: true, state: client.resign(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:setRemovedStones', (evt, input) => {
+    try {
+      return {ok: true, state: client.setRemovedStones(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:acceptRemovedStones', (evt, input) => {
+    try {
+      return {ok: true, state: client.acceptRemovedStones(input || {})}
     } catch (err) {
       return {ok: false, error: serializeError(err), state: client.getState()}
     }

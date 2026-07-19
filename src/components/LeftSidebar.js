@@ -85,6 +85,9 @@ export default class LeftSidebar extends Component {
 
     this.handleOgsResignButtonClick = () => sabaki.makeResign()
 
+    this.handleOgsAcceptRemovedStonesButtonClick = () =>
+      sabaki.acceptOgsRemovedStones()
+
     this.handleOgsDisconnectGame = async (gameId) => {
       let result = await window.sabaki.ogs.disconnectGame(gameId)
 
@@ -155,6 +158,8 @@ export default class LeftSidebar extends Component {
               onlineGameId,
               onPass: this.handleOgsPassButtonClick,
               onResign: this.handleOgsResignButtonClick,
+              onAcceptRemovedStones:
+                this.handleOgsAcceptRemovedStonesButtonClick,
               onDisconnectGame: this.handleOgsDisconnectGame,
             })
           : h(SplitContainer, {

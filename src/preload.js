@@ -155,6 +155,10 @@ window.sabaki = {
       }),
     pass: (gameId) => ipcRenderer.invoke('ogs:pass', {gameId}),
     resign: (gameId) => ipcRenderer.invoke('ogs:resign', {gameId}),
+    setRemovedStones: (gameId, stones, removed) =>
+      ipcRenderer.invoke('ogs:setRemovedStones', {gameId, stones, removed}),
+    acceptRemovedStones: (gameId) =>
+      ipcRenderer.invoke('ogs:acceptRemovedStones', {gameId}),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 

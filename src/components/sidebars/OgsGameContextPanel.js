@@ -36,6 +36,19 @@ export default class OgsGameContextPanel extends Component {
       await this.refreshOgsState()
     }
 
+    this.handleAcceptRemovedStonesButtonClick = async () => {
+      let {onAcceptRemovedStones = () => {}} = this.props
+      this.setState({busy: true, error: null})
+
+      try {
+        await onAcceptRemovedStones()
+      } finally {
+        this.setState({busy: false})
+      }
+
+      await this.refreshOgsState()
+    }
+
     this.handleDisconnectButtonClick = async () => {
       let {onlineGameId, onDisconnectGame = () => {}} = this.props
       if (onlineGameId == null) return
@@ -130,6 +143,12 @@ export default class OgsGameContextPanel extends Component {
     if (synced && onlineGame.phase === 'finished') {
       await sabaki.showOgsGameEndInfo(onlineGame)
       sabaki.detachOgsGame(onlineGameId)
+    } else if (
+      synced &&
+      (onlineGame.phase === 'stone removal' ||
+        onlineGame.clock?.stoneRemovalMode === true)
+    ) {
+      sabaki.enterOgsStoneRemovalMode(onlineGame)
     }
   }
 
@@ -137,6 +156,9 @@ export default class OgsGameContextPanel extends Component {
     let game = onlineGame?.gameId === onlineGameId ? onlineGame : null
     game = withOptimisticPendingMove(game)
     let playable = game?.status === 'connected' && game?.phase === 'play'
+    let removingStones =
+      game?.status === 'connected' &&
+      (game.phase === 'stone removal' || game.clock?.stoneRemovalMode === true)
     let captures = getOgsCaptures(game)
     let clockView = getOgsClockView(game?.clock, game?.players)
 
@@ -194,7 +216,16 @@ export default class OgsGameContextPanel extends Component {
               h('dd', {}, game.rules || t('Unknown')),
               h('dt', {}, t('Ranked')),
               h('dd', {}, formatRanked(game.ranked)),
+              removingStones && h('dt', {}, t('Dead stones')),
+              removingStones &&
+                h('dd', {}, formatDeadStones(sabaki.state.deadStones)),
             ),
+            removingStones &&
+              h(
+                'p',
+                {class: 'ogs-stone-removal-hint'},
+                t('Click stones on the board to mark dead groups.'),
+              ),
             h(ChatSection, {chat: game.chat}),
           ],
 
@@ -220,6 +251,15 @@ export default class OgsGameContextPanel extends Component {
             onClick: this.handleResignButtonClick,
           },
           t('Resign'),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            disabled: busy || !removingStones,
+            onClick: this.handleAcceptRemovedStonesButtonClick,
+          },
+          t('Accept dead stones'),
         ),
         h(
           'button',
@@ -345,6 +385,10 @@ function formatBoard(board) {
 function formatRanked(ranked) {
   if (ranked == null) return t('Unknown')
   return ranked ? t('Ranked') : t('Unranked')
+}
+
+function formatDeadStones(deadStones = []) {
+  return t((p) => `${p.count} marked`, {count: deadStones.length})
 }
 
 function getInitial(player) {

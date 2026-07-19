@@ -356,14 +356,14 @@ class Sabaki extends EventEmitter {
 
   // User Interface
 
-  setMode(mode) {
+  setMode(mode, {guessDeadStones = true} = {}) {
     if (this.state.mode === mode) return
 
     this.setState({estimateOverrides: {}})
 
     let stateChange = {mode}
 
-    if (['scoring', 'estimator'].includes(mode)) {
+    if (['scoring', 'estimator'].includes(mode) && guessDeadStones) {
       // Guess dead stones
 
       let {gameIndex, gameTrees, treePosition} = this.state
@@ -1134,6 +1134,14 @@ class Sabaki extends EventEmitter {
     if (this.state.onlineGameId != null) {
       if (
         button === 0 &&
+        this.state.mode === 'scoring' &&
+        board.get(vertex) !== 0
+      ) {
+        this.toggleOgsRemovedStones(vertex, board)
+      }
+
+      if (
+        button === 0 &&
         ['play', 'autoplay'].includes(this.state.mode) &&
         board.get(vertex) === 0
       ) {
@@ -1693,6 +1701,65 @@ class Sabaki extends EventEmitter {
     if (answer !== 0) return
 
     let result = await window.sabaki.ogs.resign(this.state.onlineGameId)
+    if (!result.ok) await this.showOgsPlayError(result.error)
+  }
+
+  enterOgsStoneRemovalMode(onlineGame) {
+    if (this.state.onlineGameId == null) return
+    if (
+      onlineGame?.gameId !== this.state.onlineGameId ||
+      (onlineGame.phase !== 'stone removal' &&
+        onlineGame.clock?.stoneRemovalMode !== true)
+    ) {
+      return
+    }
+
+    let deadStones = parseOgsStoneString(onlineGame.removedStones)
+
+    if (this.state.mode !== 'scoring') {
+      this.setMode('scoring', {guessDeadStones: false})
+    }
+
+    if (!sameVertices(this.state.deadStones, deadStones)) {
+      this.setState({deadStones, estimateOverrides: {}})
+    }
+  }
+
+  toggleOgsRemovedStones(vertex, board) {
+    let {deadStones} = this.state
+    let dead = deadStones.some((v) => helper.vertexEquals(v, vertex))
+    let stones = board.getRelatedChains(vertex)
+
+    if (!dead) {
+      deadStones = [...deadStones, ...stones]
+    } else {
+      deadStones = deadStones.filter(
+        (v) => !stones.some((w) => helper.vertexEquals(v, w)),
+      )
+    }
+
+    this.setState({deadStones, estimateOverrides: {}}, () => {
+      this.submitOgsRemovedStones(stones, !dead)
+    })
+  }
+
+  async submitOgsRemovedStones(stones, removed = true) {
+    let gameId = this.state.onlineGameId
+    if (gameId == null) return
+
+    let result = await window.sabaki.ogs.setRemovedStones(
+      gameId,
+      stones,
+      removed,
+    )
+    if (!result.ok) await this.showOgsPlayError(result.error)
+  }
+
+  async acceptOgsRemovedStones() {
+    let gameId = this.state.onlineGameId
+    if (gameId == null) return
+
+    let result = await window.sabaki.ogs.acceptRemovedStones(gameId)
     if (!result.ok) await this.showOgsPlayError(result.error)
   }
 
@@ -3886,6 +3953,30 @@ function getOgsColorPlayerLabel(color, player) {
   return player?.username == null || player.username === ''
     ? color
     : `${color} (${player.username})`
+}
+
+function parseOgsStoneString(value) {
+  if (typeof value !== 'string') return []
+
+  let result = []
+  for (let i = 0; i < value.length - 1; i += 2) {
+    let vertex = parseOgsMove(value.slice(i, i + 2))
+    if (vertex != null && !helper.vertexEquals(vertex, [-1, -1])) {
+      result.push(vertex)
+    }
+  }
+
+  return result
+}
+
+function sameVertices(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+    return false
+  }
+
+  return a.every((vertex) =>
+    b.some((other) => helper.vertexEquals(vertex, other)),
+  )
 }
 
 function movesEqual(a, b) {

@@ -22,6 +22,7 @@ test.describe('OGS mock panel', () => {
     await page.evaluate(() => {
       window.__ogsTestSession = null
       window.__ogsPlayedMoves = []
+      window.__ogsRemovedStonesCommands = []
       window.__ogsTestState = {
         user: null,
         socket: {
@@ -154,6 +155,29 @@ test.describe('OGS mock panel', () => {
         },
         resign: async (gameId) => {
           window.__ogsPlayedMoves.push({gameId, resign: true})
+          return {ok: true, state: window.__ogsTestState}
+        },
+        setRemovedStones: async (gameId, stones, removed = true) => {
+          window.__ogsRemovedStonesCommands.push({
+            type: 'set',
+            gameId,
+            stones,
+            removed,
+          })
+          window.__ogsTestState.onlineGame.removedStones = stones
+            .map(
+              ([x, y]) =>
+                String.fromCharCode(97 + x) + String.fromCharCode(97 + y),
+            )
+            .join('')
+          return {ok: true, state: window.__ogsTestState}
+        },
+        acceptRemovedStones: async (gameId) => {
+          window.__ogsRemovedStonesCommands.push({
+            type: 'accept',
+            gameId,
+            stones: window.__sabaki.state.deadStones,
+          })
           return {ok: true, state: window.__ogsTestState}
         },
         logout: async () => {
@@ -487,6 +511,109 @@ test.describe('OGS mock panel', () => {
         sequence[1].B?.[0] === 'cc'
       )
     })
+  })
+
+  test('uses Sabaki scoring UI to accept OGS dead stones', async ({page}) => {
+    await waitForRender(page)
+    await page.waitForFunction(() => window.__sabaki.state.busy === 0)
+
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Stone Removal Fixture',
+        board: {width: 9, height: 9},
+        handicap: 0,
+        komi: 6.5,
+        rules: 'japanese',
+        ranked: false,
+        phase: 'stone removal',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [
+          {move: 'aa', moveNumber: 1},
+          {move: '..', moveNumber: 2},
+          {move: '..', moveNumber: 3},
+        ],
+        moveCount: 3,
+        lastMove: '..',
+        clock: {stoneRemovalMode: true},
+        removedStones: '',
+        removedStonesAccepted: [],
+        chat: [],
+      }
+
+      window.__ogsRemovedStonesCommands = []
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        setRemovedStones: async (gameId, stones, removed = true) => {
+          window.__ogsRemovedStonesCommands.push({
+            type: 'set',
+            gameId,
+            stones,
+            removed,
+          })
+          window.__ogsTestState.onlineGame.removedStones = stones
+            .map(
+              ([x, y]) =>
+                String.fromCharCode(97 + x) + String.fromCharCode(97 + y),
+            )
+            .join('')
+          return {ok: true, state: window.__ogsTestState}
+        },
+        acceptRemovedStones: async (gameId) => {
+          window.__ogsRemovedStonesCommands.push({
+            type: 'accept',
+            gameId,
+            stones: window.__sabaki.state.deadStones,
+          })
+          return {ok: true, state: window.__ogsTestState}
+        },
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.setState({
+        activeWorkspace: 'board',
+        showLeftSidebar: true,
+      })
+      window.__sabaki.enterOgsStoneRemovalMode(onlineGame)
+    })
+
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'Stone Removal Fixture',
+    )
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'Click stones on the board to mark dead groups.',
+    )
+    await page.waitForFunction(() => window.__sabaki.state.mode === 'scoring')
+
+    await page.evaluate(() => window.__sabaki.clickVertex([0, 0]))
+    await page.waitForFunction(
+      () =>
+        window.__ogsRemovedStonesCommands.length === 1 &&
+        window.__ogsRemovedStonesCommands[0].type === 'set' &&
+        window.__ogsRemovedStonesCommands[0].stones.length === 1 &&
+        window.__ogsRemovedStonesCommands[0].stones[0][0] === 0 &&
+        window.__ogsRemovedStonesCommands[0].stones[0][1] === 0,
+    )
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      '1 marked',
+    )
+
+    await page.getByRole('button', {name: 'Accept dead stones'}).click()
+    await page.waitForFunction(
+      () =>
+        window.__ogsRemovedStonesCommands.length === 2 &&
+        window.__ogsRemovedStonesCommands[1].type === 'accept' &&
+        window.__ogsRemovedStonesCommands[1].stones.length === 1,
+    )
   })
 
   test('syncs server moves to online main line while reviewing', async ({

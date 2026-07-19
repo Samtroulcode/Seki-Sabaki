@@ -468,6 +468,17 @@ describe('OGS client', () => {
       },
     })
     socket.receive('game/12345/phase', {phase: 'stone removal'})
+    socket.receive('game/12345/removed_stones', {
+      removed: true,
+      stones: 'babb',
+      all_removed: 'aabb',
+    })
+    socket.receive('game/12345/removed_stones_accepted', {
+      player_id: 7,
+      stones: 'babb',
+      strict_seki_mode: false,
+      phase: 'stone removal',
+    })
     socket.receive('game/99999/move', {move_number: 99, move: 'dd'})
 
     state = client.getState()
@@ -498,6 +509,37 @@ describe('OGS client', () => {
     assert.strictEqual(state.onlineGame.players.white.username, 'gote')
     assert.strictEqual(state.onlineGame.players.white.rank, '3k')
     assert.strictEqual(state.onlineGame.phase, 'stone removal')
+    assert.strictEqual(state.onlineGame.removedStones, 'babb')
+    assert.deepStrictEqual(state.onlineGame.removedStonesAccepted, [7])
+
+    socket.receive('game/12345/removed_stones', {strict_seki_mode: true})
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.removedStones, 'babb')
+
+    socket.receive('game/12345/removed_stones_accepted', {
+      player_id: 0,
+      stones: 'babb',
+      strict_seki_mode: true,
+      phase: 'stone removal',
+    })
+    state = client.getState()
+    assert.deepStrictEqual(state.onlineGame.removedStonesAccepted, [7, 8])
+
+    socket.receive('game/12345/removed_stones', {
+      removed: false,
+      stones: 'babb',
+      all_removed: '',
+    })
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.removedStones, '')
+
+    socket.receive('game/12345/removed_stones', {
+      removed: true,
+      all_removed: 'babb'.repeat(200),
+    })
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.removedStones, 'babb')
+
     assert.strictEqual(state.onlineGame.moveCount, 3)
     assert.strictEqual(state.onlineGame.lastMove, 'cc')
     assert.deepStrictEqual(state.onlineGame.moves, [
@@ -672,6 +714,69 @@ describe('OGS client', () => {
     assert.throws(
       () => client.playMove({gameId: 12345, x: 9, y: 0}),
       (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+  })
+
+  it('sends validated OGS stone removal commands', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      game_name: 'Friendly game',
+      width: 9,
+      height: 9,
+      phase: 'stone removal',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: ['aa', '..', '..'],
+    })
+
+    client.setRemovedStones({
+      gameId: 12345,
+      stones: [
+        [1, 0],
+        [1, 1],
+      ],
+    })
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/removed_stones/set',
+      {game_id: 12345, removed: true, stones: 'babb'},
+    ])
+    assert.strictEqual(client.getState().onlineGame.removedStones, 'babb')
+
+    client.acceptRemovedStones({gameId: 12345})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/removed_stones/accept',
+      {game_id: 12345, stones: 'babb', strict_seki_mode: false},
+    ])
+
+    assert.throws(
+      () => client.setRemovedStones({gameId: 12345, stones: [[9, 0]]}),
+      (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+    assert.throws(
+      () =>
+        client.setRemovedStones({
+          gameId: 12345,
+          stones: [[1, 0]],
+          removed: 'yes',
+        }),
+      (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+
+    socket.receive('game/12345/phase', {phase: 'play'})
+    assert.throws(
+      () => client.acceptRemovedStones({gameId: 12345, stones: []}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
     )
   })
 
