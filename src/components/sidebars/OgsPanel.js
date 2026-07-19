@@ -248,6 +248,7 @@ export default class OgsPanel extends Component {
     else this.declinedOnlineGameId = onlineGame.gameId
 
     if (loaded && onlineGame.phase === 'finished') {
+      await sabaki.showOgsGameEndInfo(onlineGame)
       sabaki.detachOgsGame(onlineGame.gameId)
     }
 

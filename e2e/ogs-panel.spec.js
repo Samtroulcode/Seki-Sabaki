@@ -583,6 +583,84 @@ test.describe('OGS mock panel', () => {
     ).toHaveText('Captures: 1')
   })
 
+  test('explains finished OGS games before detaching the board', async ({
+    page,
+  }) => {
+    await waitForRender(page)
+    await page.waitForFunction(() => window.__sabaki.state.busy === 0)
+
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Finished Fixture',
+        board: {width: 9, height: 9},
+        handicap: 0,
+        phase: 'finished',
+        outcome: 'Resignation',
+        winner: 7,
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [{move: 'aa', moveNumber: 1}],
+        moveCount: 1,
+        lastMove: 'aa',
+        clock: null,
+        chat: [],
+      }
+
+      window.__ogsGameEndDialog = null
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+      }
+      window.sabaki.dialog.showMessageBox = async (options) => {
+        window.__ogsGameEndDialog = options
+        return {response: 0}
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.setState({showLeftSidebar: true})
+    })
+
+    await page.waitForFunction(() =>
+      window.__ogsGameEndDialog?.message?.includes('has finished'),
+    )
+    await expect
+      .poll(() => page.evaluate(() => window.__ogsGameEndDialog.message))
+      .toContain('Winner: Black (sekibot)')
+    await expect
+      .poll(() => page.evaluate(() => window.__ogsGameEndDialog.message))
+      .toContain('Reason: White (opponent) resigned.')
+    await page.waitForFunction(() => window.__sabaki.state.onlineGameId == null)
+
+    await page.evaluate(async () => {
+      window.__ogsGameEndDialog = null
+      await window.__sabaki.showOgsGameEndInfo({
+        gameId: 43,
+        phase: 'finished',
+        outcome: 'Resignation',
+        winner: null,
+        players: null,
+        moveCount: 0,
+      })
+    })
+    await expect
+      .poll(() => page.evaluate(() => window.__ogsGameEndDialog.message))
+      .toContain('Reason: resigned')
+    await expect
+      .poll(() => page.evaluate(() => window.__ogsGameEndDialog.message))
+      .not.toContain('Winner:')
+    await expect
+      .poll(() => page.evaluate(() => window.__ogsGameEndDialog.message))
+      .not.toContain('resigned.')
+  })
+
   test('ignores stale OGS move rejection when confirmation arrives during dialog', async ({
     page,
   }) => {

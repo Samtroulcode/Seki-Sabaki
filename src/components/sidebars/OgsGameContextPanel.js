@@ -125,6 +125,7 @@ export default class OgsGameContextPanel extends Component {
     }
 
     if (synced && onlineGame.phase === 'finished') {
+      await sabaki.showOgsGameEndInfo(onlineGame)
       sabaki.detachOgsGame(onlineGameId)
     }
   }

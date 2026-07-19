@@ -194,6 +194,9 @@ class Sabaki extends EventEmitter {
     this.ogsPendingMove = null
     this.ogsSubmittingMove = false
     this.ogsSubmissionId = 0
+    this.ogsGameEndNoticeKey = null
+    this.ogsGameEndNoticeGameId = null
+    this.ogsGameEndNoticePromise = null
     this.recordHistory()
 
     // Bind state to settings
@@ -763,6 +766,49 @@ class Sabaki extends EventEmitter {
     this.ogsSubmittingMove = false
     this.ogsSubmissionId++
     this.setState({onlineGameId: null})
+
+    return true
+  }
+
+  async showOgsGameEndInfo(onlineGame) {
+    if (onlineGame?.gameId == null || onlineGame.phase !== 'finished') {
+      return false
+    }
+
+    if (
+      this.ogsGameEndNoticeGameId === onlineGame.gameId &&
+      this.ogsGameEndNoticePromise != null
+    ) {
+      await this.ogsGameEndNoticePromise
+      return true
+    }
+
+    let key = [
+      onlineGame.gameId,
+      onlineGame.moveCount || 0,
+      onlineGame.outcome || '',
+      onlineGame.winner || '',
+    ].join(':')
+    if (this.ogsGameEndNoticeKey === key) {
+      if (this.ogsGameEndNoticePromise != null) {
+        await this.ogsGameEndNoticePromise
+        return true
+      }
+
+      return false
+    }
+
+    this.ogsGameEndNoticeKey = key
+    this.ogsGameEndNoticeGameId = onlineGame.gameId
+    this.ogsGameEndNoticePromise = dialog
+      .showMessageBox(getOgsGameEndMessage(onlineGame), 'info')
+      .finally(() => {
+        if (this.ogsGameEndNoticeKey === key) {
+          this.ogsGameEndNoticePromise = null
+          this.ogsGameEndNoticeGameId = null
+        }
+      })
+    await this.ogsGameEndNoticePromise
 
     return true
   }
@@ -3767,6 +3813,79 @@ function normalizeOgsId(value) {
   }
 
   return null
+}
+
+function getOgsGameEndMessage(onlineGame) {
+  let t = i18n.context('sabaki.ogs')
+  let lines = [
+    t((p) => `OGS game #${p.gameId} has finished.`, {
+      gameId: onlineGame.gameId,
+    }),
+  ]
+  let winner = getOgsGameEndPlayerLabel(onlineGame, onlineGame.winner)
+  let loser = getOgsGameEndLoserLabel(onlineGame)
+  let outcome = onlineGame.outcome
+
+  if (winner != null) {
+    lines.push(t((p) => `Winner: ${p.winner}`, {winner}))
+  }
+
+  if (typeof outcome === 'string' && /resign|abandon/i.test(outcome)) {
+    let reason = /abandon/i.test(outcome) ? 'abandoned' : 'resigned'
+    lines.push(
+      loser == null
+        ? t((p) => `Reason: ${p.reason}`, {reason})
+        : t((p) => `Reason: ${p.loser} ${p.reason}.`, {loser, reason}),
+    )
+  } else if (outcome != null && outcome !== '') {
+    lines.push(t((p) => `Result: ${p.outcome}`, {outcome}))
+  }
+
+  return lines.join('\n\n')
+}
+
+function getOgsGameEndPlayerLabel(onlineGame, playerId) {
+  let normalizedId = normalizeOgsId(playerId)
+  if (normalizedId == null) return null
+
+  let players = onlineGame.players || {}
+  let blackId = normalizeOgsId(players.black?.id)
+  let whiteId = normalizeOgsId(players.white?.id)
+
+  if (blackId != null && normalizedId === blackId) {
+    return getOgsColorPlayerLabel('Black', players.black)
+  }
+
+  if (whiteId != null && normalizedId === whiteId) {
+    return getOgsColorPlayerLabel('White', players.white)
+  }
+
+  return null
+}
+
+function getOgsGameEndLoserLabel(onlineGame) {
+  let winner = normalizeOgsId(onlineGame.winner)
+  if (winner == null) return null
+
+  let players = onlineGame.players || {}
+  let blackId = normalizeOgsId(players.black?.id)
+  let whiteId = normalizeOgsId(players.white?.id)
+
+  if (blackId != null && winner === blackId) {
+    return getOgsColorPlayerLabel('White', players.white)
+  }
+
+  if (whiteId != null && winner === whiteId) {
+    return getOgsColorPlayerLabel('Black', players.black)
+  }
+
+  return null
+}
+
+function getOgsColorPlayerLabel(color, player) {
+  return player?.username == null || player.username === ''
+    ? color
+    : `${color} (${player.username})`
 }
 
 function movesEqual(a, b) {

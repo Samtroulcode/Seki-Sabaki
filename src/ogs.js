@@ -144,6 +144,8 @@ function getInitialOnlineGameState() {
     timeControl: null,
     timePerMove: null,
     phase: null,
+    outcome: null,
+    winner: null,
     players: null,
     moves: [],
     moveCount: 0,
@@ -780,6 +782,15 @@ class OgsClient {
         }
         break
 
+      case 'data':
+        this.onlineGame = {
+          ...this.onlineGame,
+          ...sanitizePartialGameData(payload, this.serverUrl, this.onlineGame),
+          status: 'connected',
+          error: null,
+        }
+        break
+
       case 'move':
         let move = sanitizeLiveMove(
           payload,
@@ -936,10 +947,43 @@ function sanitizeGameData(data, serverUrl) {
     timeControl: sanitizeTimeControl(data?.time_control),
     timePerMove: sanitizeNumber(data?.time_per_move),
     phase: sanitizeGamePhase(data?.phase),
+    outcome: sanitizeString(data?.outcome, 200),
+    winner: sanitizeOptionalGameId(data?.winner),
     players: sanitizePlayers(data?.players, serverUrl),
     moves,
     moveCount: moves.length,
     lastMove: moves.at(-1)?.move || null,
+  }
+}
+
+function sanitizePartialGameData(data, serverUrl, previous) {
+  let sanitized = sanitizeGameData(data, serverUrl)
+  let has = (key) => Object.prototype.hasOwnProperty.call(data || {}, key)
+  let hasBoard = has('width') && has('height')
+  let hasMoves = has('moves')
+  let board = hasBoard ? sanitized.board : previous.board
+  let moves = hasMoves ? sanitizeHistoricalMoves(data?.moves, board) : null
+
+  return {
+    gameName: has('game_name') ? sanitized.gameName : previous.gameName,
+    board,
+    handicap: has('handicap') ? sanitized.handicap : previous.handicap,
+    komi: has('komi') ? sanitized.komi : previous.komi,
+    rules: has('rules') ? sanitized.rules : previous.rules,
+    ranked: has('ranked') ? sanitized.ranked : previous.ranked,
+    timeControl: has('time_control')
+      ? sanitized.timeControl
+      : previous.timeControl,
+    timePerMove: has('time_per_move')
+      ? sanitized.timePerMove
+      : previous.timePerMove,
+    phase: has('phase') ? sanitized.phase : previous.phase,
+    outcome: has('outcome') ? sanitized.outcome : previous.outcome,
+    winner: has('winner') ? sanitized.winner : previous.winner,
+    players: has('players') ? sanitized.players : previous.players,
+    moves: hasMoves ? moves : previous.moves,
+    moveCount: hasMoves ? moves.length : previous.moveCount,
+    lastMove: hasMoves ? moves.at(-1)?.move || null : previous.lastMove,
   }
 }
 
@@ -1178,6 +1222,8 @@ function cloneOnlineGameState(state) {
     ranked: state.ranked,
     timeControl: state.timeControl == null ? null : {...state.timeControl},
     timePerMove: state.timePerMove,
+    outcome: state.outcome,
+    winner: state.winner,
     players:
       state.players == null
         ? null

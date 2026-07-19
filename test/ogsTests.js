@@ -509,6 +509,22 @@ describe('OGS client', () => {
     ])
     assert.strictEqual(JSON.stringify(state).includes('must-not-leak'), false)
 
+    socket.receive('game/12345/data', {
+      phase: 'finished',
+      outcome: 'Resignation',
+      winner: 7,
+    })
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.phase, 'finished')
+    assert.strictEqual(state.onlineGame.outcome, 'Resignation')
+    assert.strictEqual(state.onlineGame.winner, 7)
+    assert.deepStrictEqual(state.onlineGame.board, {width: 19, height: 19})
+    assert.deepStrictEqual(state.onlineGame.moves, [
+      {move: 'aa', moveNumber: 1},
+      {move: 'bb', moveNumber: 2},
+      {move: 'cc', moveNumber: 3},
+    ])
+
     socket.receive('game/12345/move', {move_number: 3, move: 'dd'})
     state = client.getState()
     assert.deepStrictEqual(state.onlineGame.moves.at(-1), {
