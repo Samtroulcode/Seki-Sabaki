@@ -9,6 +9,12 @@ import {
 } from '../../modules/ogsmatchmakingoptions.js'
 import OgsPanelSyncController from '../../modules/ogspanelsync.js'
 import {
+  CheckboxGroup,
+  NumberField,
+  RadioGroup,
+  SelectField,
+} from './OgsPanelControls.js'
+import {
   boardSizes,
   conditions,
   createOgsPanelLabels,
@@ -865,75 +871,6 @@ function OnlineGameForm({
   )
 }
 
-function CheckboxGroup({
-  title,
-  name,
-  values,
-  selected,
-  format = (x) => x,
-  disabled,
-  onChange,
-}) {
-  return h(
-    'fieldset',
-    {},
-    h('legend', {}, title),
-    values.map((value) =>
-      h(
-        'label',
-        {class: 'ogs-inline-option'},
-        h('input', {
-          type: 'checkbox',
-          name,
-          value,
-          checked: selected.includes(value),
-          disabled,
-          onChange,
-        }),
-        h('span', {}, format(value)),
-      ),
-    ),
-  )
-}
-
-function SelectField({
-  label,
-  name,
-  value,
-  values,
-  format = (x) => x,
-  disabled,
-  onChange,
-}) {
-  return h(
-    'label',
-    {},
-    h('span', {}, label),
-    h(
-      'select',
-      {name, value, disabled, onChange},
-      values.map((item) => h('option', {value: item}, format(item))),
-    ),
-  )
-}
-
-function NumberField({label, name, value, disabled, onInput}) {
-  return h(
-    'label',
-    {},
-    h('span', {}, label),
-    h('input', {
-      name,
-      type: 'number',
-      min: 0,
-      max: 9,
-      value,
-      disabled,
-      onInput,
-    }),
-  )
-}
-
 function ConditionValueField({
   title,
   group,
@@ -967,40 +904,5 @@ function ConditionValueField({
       disabled,
       onChange,
     }),
-  )
-}
-
-function RadioGroup({
-  label,
-  name,
-  values,
-  selected,
-  format = (x) => x,
-  disabled,
-  onChange,
-}) {
-  return h(
-    'div',
-    {class: 'ogs-option-group'},
-    h('span', {class: 'ogs-option-group-label'}, label),
-    h(
-      'div',
-      {class: 'ogs-inline-options'},
-      values.map((value) =>
-        h(
-          'label',
-          {class: 'ogs-inline-option'},
-          h('input', {
-            type: 'radio',
-            name,
-            value,
-            checked: selected === value,
-            disabled,
-            onChange,
-          }),
-          h('span', {}, format(value)),
-        ),
-      ),
-    ),
   )
 }
