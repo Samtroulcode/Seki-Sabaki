@@ -1094,6 +1094,92 @@ test.describe('OGS mock panel', () => {
     })
   })
 
+  test('clears board-context pending moves after OGS rejects a move', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Fixture Game',
+        board: {width: 19, height: 19},
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [],
+        moveCount: 0,
+        lastMove: null,
+        clock: null,
+        chat: [],
+      }
+
+      window.__ogsPlayedMoves = []
+      window.__ogsPlayErrors = []
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        playMove: async (gameId, vertex) => {
+          window.__ogsPlayedMoves.push({gameId, vertex})
+
+          if (window.__ogsPlayedMoves.length === 1) {
+            window.__ogsTestState.onlineGame = {
+              ...onlineGame,
+              status: 'error',
+              error: 'Illegal move: suicide is not allowed.',
+              moves: [],
+              moveCount: 0,
+              lastMove: null,
+            }
+          }
+
+          return {ok: true, state: window.__ogsTestState}
+        },
+      }
+      window.__sabaki.showOgsPlayError = async (error) => {
+        window.__ogsPlayErrors.push(error)
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.setState({showLeftSidebar: true})
+    })
+
+    await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
+
+    await page.evaluate(() => {
+      window.__sabaki.clickVertex([2, 2])
+    })
+    await page.waitForFunction(() => window.__sabaki.ogsPendingMove != null)
+
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.ogsPendingMove == null &&
+        window.__ogsPlayErrors.some(
+          (error) => error?.code === 'ogs-game-error',
+        ),
+    )
+
+    await page.evaluate(() => {
+      window.__ogsTestState.onlineGame = {
+        ...window.__ogsTestState.onlineGame,
+        status: 'connected',
+        error: null,
+      }
+      window.__sabaki.clickVertex([3, 3])
+    })
+    await page.waitForFunction(
+      () =>
+        window.__ogsPlayedMoves.length === 2 &&
+        window.__ogsPlayedMoves[1].vertex[0] === 3 &&
+        window.__ogsPlayedMoves[1].vertex[1] === 3,
+    )
+  })
+
   test('ignores stale OGS error state that already confirms pending move', async ({
     page,
   }) => {

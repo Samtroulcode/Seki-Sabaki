@@ -20,6 +20,8 @@ export default class OgsGameContextPanel extends Component {
       revision: 0,
     }
     this.syncingOnlineGame = false
+    this.handledOnlineGameErrorKey = null
+    this.handledOnlineGameErrorPendingMove = null
 
     this.handleSabakiChange = () => {
       this.setState(({revision}) => ({revision: revision + 1}))
@@ -143,7 +145,29 @@ export default class OgsGameContextPanel extends Component {
       error: state?.onlineGame?.error || null,
     })
 
+    await this.handleOnlineGameError(state?.onlineGame)
     await this.syncOnlineGameToBoard(state?.onlineGame)
+  }
+
+  async handleOnlineGameError(onlineGame) {
+    if (onlineGame?.status !== 'error') return
+
+    let pendingMove = sabaki.ogsPendingMove
+    if (pendingMove == null || pendingMove.gameId !== onlineGame.gameId) return
+
+    let pendingKey = `${pendingMove.moveNumber || ''}:${pendingMove.move || ''}`
+    let key = `${onlineGame.gameId}:${onlineGame.error || ''}:${pendingKey}`
+    if (
+      key === this.handledOnlineGameErrorKey &&
+      pendingMove === this.handledOnlineGameErrorPendingMove
+    ) {
+      return
+    }
+
+    if (await sabaki.handleOgsGameError(onlineGame)) {
+      this.handledOnlineGameErrorKey = key
+      this.handledOnlineGameErrorPendingMove = pendingMove
+    }
   }
 
   async syncOnlineGameToBoard(onlineGame) {

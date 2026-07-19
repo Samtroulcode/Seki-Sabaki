@@ -4,6 +4,7 @@ export default class OgsPanelSyncController {
     this.syncedOnlineGameKey = null
     this.declinedOnlineGameId = null
     this.handledOnlineGameErrorKey = null
+    this.handledOnlineGameErrorPendingMove = null
     this.syncingOnlineGame = false
   }
 
@@ -11,11 +12,13 @@ export default class OgsPanelSyncController {
     this.syncedOnlineGameKey = null
     this.declinedOnlineGameId = null
     this.handledOnlineGameErrorKey = null
+    this.handledOnlineGameErrorPendingMove = null
   }
 
   resetConnectAttempt() {
     this.declinedOnlineGameId = null
     this.handledOnlineGameErrorKey = null
+    this.handledOnlineGameErrorPendingMove = null
   }
 
   resetSyncKey() {
@@ -84,11 +87,21 @@ export default class OgsPanelSyncController {
   async handleOnlineGameError(onlineGame) {
     if (onlineGame?.status !== 'error') return
 
-    let key = `${onlineGame.gameId}:${onlineGame.error || ''}`
-    if (key === this.handledOnlineGameErrorKey) return
+    let pendingMove = this.sabaki.ogsPendingMove
+    if (pendingMove == null || pendingMove.gameId !== onlineGame.gameId) return
+
+    let pendingKey = `${pendingMove.moveNumber || ''}:${pendingMove.move || ''}`
+    let key = `${onlineGame.gameId}:${onlineGame.error || ''}:${pendingKey}`
+    if (
+      key === this.handledOnlineGameErrorKey &&
+      pendingMove === this.handledOnlineGameErrorPendingMove
+    ) {
+      return
+    }
 
     if (await this.sabaki.handleOgsGameError(onlineGame)) {
       this.handledOnlineGameErrorKey = key
+      this.handledOnlineGameErrorPendingMove = pendingMove
     }
   }
 }

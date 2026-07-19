@@ -7,7 +7,7 @@ import OgsPanelSyncController, {
 function createSabaki(overrides = {}) {
   let calls = []
 
-  return {
+  let sabaki = {
     calls,
     state: {onlineGameId: null},
     applyOgsGameUpdate: async (onlineGame) => {
@@ -28,10 +28,13 @@ function createSabaki(overrides = {}) {
     },
     handleOgsGameError: async (onlineGame) => {
       calls.push(['handleOgsGameError', onlineGame.gameId, onlineGame.error])
+      sabaki.ogsPendingMove = null
       return true
     },
     ...overrides,
   }
+
+  return sabaki
 }
 
 function createOnlineGame(overrides = {}) {
@@ -145,31 +148,41 @@ describe('OGS panel sync controller', () => {
     controller.syncedOnlineGameKey = 'sync-key'
     controller.declinedOnlineGameId = 42
     controller.handledOnlineGameErrorKey = '42:error'
+    controller.handledOnlineGameErrorPendingMove = {gameId: 42}
     controller.syncingOnlineGame = true
     controller.resetSession()
 
     assert.strictEqual(controller.syncedOnlineGameKey, null)
     assert.strictEqual(controller.declinedOnlineGameId, null)
     assert.strictEqual(controller.handledOnlineGameErrorKey, null)
+    assert.strictEqual(controller.handledOnlineGameErrorPendingMove, null)
     assert.strictEqual(controller.syncingOnlineGame, true)
 
     controller.syncedOnlineGameKey = 'sync-key'
     controller.declinedOnlineGameId = 42
     controller.handledOnlineGameErrorKey = '42:error'
+    controller.handledOnlineGameErrorPendingMove = {gameId: 42}
     controller.resetConnectAttempt()
 
     assert.strictEqual(controller.syncedOnlineGameKey, 'sync-key')
     assert.strictEqual(controller.declinedOnlineGameId, null)
     assert.strictEqual(controller.handledOnlineGameErrorKey, null)
+    assert.strictEqual(controller.handledOnlineGameErrorPendingMove, null)
 
     controller.syncedOnlineGameKey = 'sync-key'
     controller.declinedOnlineGameId = 42
     controller.handledOnlineGameErrorKey = '42:error'
+    let handledPendingMove = {gameId: 42}
+    controller.handledOnlineGameErrorPendingMove = handledPendingMove
     controller.resetSyncKey()
 
     assert.strictEqual(controller.syncedOnlineGameKey, null)
     assert.strictEqual(controller.declinedOnlineGameId, 42)
     assert.strictEqual(controller.handledOnlineGameErrorKey, '42:error')
+    assert.strictEqual(
+      controller.handledOnlineGameErrorPendingMove,
+      handledPendingMove,
+    )
   })
 
   it('shows finished attached games before detaching', async () => {
@@ -195,11 +208,30 @@ describe('OGS panel sync controller', () => {
     let controller = new OgsPanelSyncController({sabaki})
     let onlineGame = {status: 'error', gameId: 42, error: 'not-your-turn'}
 
+    sabaki.ogsPendingMove = {gameId: 42, moveNumber: 1, move: 'cc'}
     await controller.handleOnlineGameError(onlineGame)
     await controller.handleOnlineGameError(onlineGame)
 
     assert.deepStrictEqual(sabaki.calls, [
       ['handleOgsGameError', 42, 'not-your-turn'],
+    ])
+  })
+
+  it('handles the same online game error for a new pending submission', async () => {
+    let sabaki = createSabaki()
+    let controller = new OgsPanelSyncController({sabaki})
+    let onlineGame = {status: 'error', gameId: 42, error: 'illegal move'}
+
+    sabaki.ogsPendingMove = {gameId: 42, moveNumber: 1, move: 'cc'}
+    await controller.handleOnlineGameError(onlineGame)
+    await controller.handleOnlineGameError(onlineGame)
+
+    sabaki.ogsPendingMove = {gameId: 42, moveNumber: 1, move: 'cc'}
+    await controller.handleOnlineGameError(onlineGame)
+
+    assert.deepStrictEqual(sabaki.calls, [
+      ['handleOgsGameError', 42, 'illegal move'],
+      ['handleOgsGameError', 42, 'illegal move'],
     ])
   })
 })
