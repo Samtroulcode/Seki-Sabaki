@@ -2,6 +2,7 @@ import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
+import OgsPanelSyncController from '../../modules/ogspanelsync.js'
 
 const t = i18n.context('OgsPanel')
 
@@ -65,10 +66,7 @@ export default class OgsPanel extends Component {
       activeSection: 'overview',
     }
 
-    this.syncedOnlineGameKey = null
-    this.declinedOnlineGameId = null
-    this.handledOnlineGameErrorKey = null
-    this.syncingOnlineGame = false
+    this.syncController = new OgsPanelSyncController({sabaki})
 
     this.handleUsernameInput = (evt) => {
       this.setState({username: evt.currentTarget.value})
@@ -128,9 +126,7 @@ export default class OgsPanel extends Component {
         onlineGame: null,
         activeGames: [],
       })
-      this.syncedOnlineGameKey = null
-      this.declinedOnlineGameId = null
-      this.handledOnlineGameErrorKey = null
+      this.syncController.resetSession()
     }
 
     this.handleActiveGameButtonClick = async (gameId) => {
@@ -141,15 +137,16 @@ export default class OgsPanel extends Component {
           this.state.onlineGame?.gameId === gameId &&
           this.state.onlineGame?.status === 'connected'
         ) {
-          let loaded = await this.syncOnlineGameToBoard(this.state.onlineGame)
+          let loaded = await this.syncController.syncOnlineGameToBoard(
+            this.state.onlineGame,
+          )
           if (loaded) sabaki.setState({activeWorkspace: 'board'})
           this.setState({busy: false})
           return
         }
 
         let result = await window.sabaki.ogs.connectGame(gameId)
-        this.declinedOnlineGameId = null
-        this.handledOnlineGameErrorKey = null
+        this.syncController.resetConnectAttempt()
 
         if (result.ok) {
           this.setState({
@@ -158,7 +155,9 @@ export default class OgsPanel extends Component {
             onlineGame: result.state.onlineGame,
             activeGames: result.state.activeGames || this.state.activeGames,
           })
-          await this.syncOnlineGameToBoard(result.state.onlineGame)
+          await this.syncController.syncOnlineGameToBoard(
+            result.state.onlineGame,
+          )
         } else {
           this.setState({
             error: result.error?.message || t('Unable to connect to game.'),
@@ -182,7 +181,7 @@ export default class OgsPanel extends Component {
       if (result.ok) {
         this.setState({onlineGame: result.state.onlineGame})
         sabaki.detachOgsGame(gameId)
-        this.syncedOnlineGameKey = null
+        this.syncController.resetSyncKey()
       }
     }
 
@@ -273,59 +272,6 @@ export default class OgsPanel extends Component {
     }
   }
 
-  async syncOnlineGameToBoard(onlineGame) {
-    if (
-      onlineGame?.status !== 'connected' ||
-      onlineGame.board == null ||
-      !Array.isArray(onlineGame.moves)
-    ) {
-      return false
-    }
-
-    if (onlineGame.phase === 'finished' && sabaki.state.onlineGameId == null) {
-      return false
-    }
-
-    if (this.declinedOnlineGameId === onlineGame.gameId) return false
-    if (this.syncingOnlineGame) return false
-
-    let key = getOnlineGameSyncKey(onlineGame)
-    if (
-      key === this.syncedOnlineGameKey &&
-      (sabaki.state.onlineGameId === onlineGame.gameId ||
-        (onlineGame.phase === 'finished' && sabaki.state.onlineGameId == null))
-    ) {
-      return true
-    }
-
-    let sameGame = sabaki.state.onlineGameId === onlineGame.gameId
-    let loaded = false
-
-    this.syncingOnlineGame = true
-    try {
-      loaded = sameGame ? await sabaki.applyOgsGameUpdate(onlineGame) : false
-
-      if (!loaded) {
-        loaded = await sabaki.loadOgsGame(onlineGame, {
-          suppressAskForSave: sameGame,
-          clearHistory: !sameGame,
-        })
-      }
-    } finally {
-      this.syncingOnlineGame = false
-    }
-
-    if (loaded) this.syncedOnlineGameKey = key
-    else this.declinedOnlineGameId = onlineGame.gameId
-
-    if (loaded && onlineGame.phase === 'finished') {
-      await sabaki.showOgsGameEndInfo(onlineGame)
-      sabaki.detachOgsGame(onlineGame.gameId)
-    }
-
-    return loaded
-  }
-
   async updateMatchmakingOptions(options) {
     this.setState({
       matchmaking: {...this.state.matchmaking, options},
@@ -369,32 +315,24 @@ export default class OgsPanel extends Component {
         activeGames: state.activeGames || [],
         connected: true,
       })
-      await this.handleOnlineGameError(state.onlineGame)
+      await this.syncController.handleOnlineGameError(state.onlineGame)
 
       if (
         state.matchmaking?.status === 'matched' &&
         state.matchmaking?.matchedGameId === state.onlineGame?.gameId &&
         state.onlineGame?.status === 'connected'
       ) {
-        if (this.syncingOnlineGame) return
+        if (this.syncController.syncingOnlineGame) return
 
-        let opened = await this.syncOnlineGameToBoard(state.onlineGame)
-        if (!opened) this.declinedOnlineGameId = state.onlineGame.gameId
+        let opened = await this.syncController.syncOnlineGameToBoard(
+          state.onlineGame,
+        )
+        if (!opened)
+          this.syncController.declinedOnlineGameId = state.onlineGame.gameId
         await window.sabaki.ogs.acknowledgeAutomatchOpen(
           state.onlineGame.gameId,
         )
       }
-    }
-  }
-
-  async handleOnlineGameError(onlineGame) {
-    if (onlineGame?.status !== 'error') return
-
-    let key = `${onlineGame.gameId}:${onlineGame.error || ''}`
-    if (key === this.handledOnlineGameErrorKey) return
-
-    if (await sabaki.handleOgsGameError(onlineGame)) {
-      this.handledOnlineGameErrorKey = key
     }
   }
 
@@ -723,14 +661,6 @@ function SectionDetail({activeSection, connected}) {
     h('h3', {}, detail.title),
     h('p', {}, detail.text),
   )
-}
-
-function getOnlineGameSyncKey(onlineGame) {
-  let moves = onlineGame.moves
-    .map((move) => `${move.moveNumber}:${move.move}`)
-    .join(',')
-
-  return `${onlineGame.gameId}:${onlineGame.handicap || 0}:${onlineGame.phase || ''}:${moves}`
 }
 
 function AutomatchForm({
