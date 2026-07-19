@@ -8,6 +8,14 @@
   bottom: 0;
 }
 
+.split-container > * {
+  min-width: 0;
+  min-height: 0;
+}
+.split-container > .side {
+  overflow: hidden;
+}
+
 #apprail {
   position: absolute;
   left: 0;
