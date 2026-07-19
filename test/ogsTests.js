@@ -441,9 +441,21 @@ describe('OGS client', () => {
     })
     socket.receive('game/12345/move', {move_number: 3, move: [2, 2, 1000]})
     socket.receive('game/12345/clock', {
+      game_id: 12345,
+      title: 'Byo-Yomi',
+      black_player_id: 7,
+      white_player_id: 8,
       current_player: 8,
       expiration: 1784381000000,
+      now: 1784380940000,
       last_move: 3,
+      black_time: {thinking_time: 120, skip_bonus: true},
+      white_time: {
+        thinking_time: 60,
+        period_time: 30,
+        period_time_left: 20,
+        periods: 5,
+      },
       jwt: 'must-not-leak',
     })
     socket.receive('game/12345/chat', {
@@ -493,11 +505,33 @@ describe('OGS client', () => {
       {move: 'bb', moveNumber: 2},
       {move: 'cc', moveNumber: 3},
     ])
-    assert.deepStrictEqual(state.onlineGame.clock, {
-      currentPlayer: 8,
-      expiration: 1784381000000,
-      lastMove: 3,
+    assert.strictEqual(state.onlineGame.clock.gameId, 12345)
+    assert.strictEqual(state.onlineGame.clock.title, 'Byo-Yomi')
+    assert.strictEqual(state.onlineGame.clock.blackPlayerId, 7)
+    assert.strictEqual(state.onlineGame.clock.whitePlayerId, 8)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
+    assert.strictEqual(state.onlineGame.clock.expiration, 1784381000000)
+    assert.strictEqual(state.onlineGame.clock.now, 1784380940000)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 3)
+    assert.deepStrictEqual(state.onlineGame.clock.blackTime, {
+      thinkingTime: 120,
+      periodTime: null,
+      periodTimeLeft: null,
+      periods: null,
+      blockTime: null,
+      movesLeft: null,
+      skipBonus: true,
     })
+    assert.deepStrictEqual(state.onlineGame.clock.whiteTime, {
+      thinkingTime: 60,
+      periodTime: 30,
+      periodTimeLeft: 20,
+      periods: 5,
+      blockTime: null,
+      movesLeft: null,
+      skipBonus: false,
+    })
+    assert.strictEqual(Number.isFinite(state.onlineGame.clock.receivedAt), true)
     assert.deepStrictEqual(state.onlineGame.chat, [
       {
         channel: 'main',

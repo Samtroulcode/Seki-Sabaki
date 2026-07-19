@@ -96,6 +96,7 @@ test.describe('OGS mock panel', () => {
           return window.__ogsTestState
         },
         connectGame: async (gameId) => {
+          let now = Date.now()
           window.__ogsTestState.onlineGame = {
             status: 'connected',
             gameId: Number(gameId),
@@ -117,7 +118,15 @@ test.describe('OGS mock panel', () => {
             ],
             moveCount: 2,
             lastMove: 'dd',
-            clock: null,
+            clock: {
+              currentPlayer: 7,
+              expiration: now + 600000,
+              now,
+              receivedAt: now,
+              lastMove: 2,
+              blackTime: {thinkingTime: 600},
+              whiteTime: {thinkingTime: 180},
+            },
             chat: [{username: 'opponent', body: 'good luck'}],
           }
           return {ok: true, state: window.__ogsTestState}
@@ -241,6 +250,12 @@ test.describe('OGS mock panel', () => {
       'opponent',
     )
     await expect(page.locator('.ogs-game-context-panel')).toContainText('3k')
+    await expect(
+      page.locator('.ogs-game-context-player.black .ogs-game-context-clock'),
+    ).toContainText(/Clock: 9:5[0-9]|Clock: 10:00/)
+    await expect(
+      page.locator('.ogs-game-context-player.white .ogs-game-context-clock'),
+    ).toContainText('Clock: 3:00')
     await expect(page.locator('.ogs-game-context-chat')).toContainText(
       'good luck',
     )

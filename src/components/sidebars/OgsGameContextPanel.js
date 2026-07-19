@@ -3,6 +3,7 @@ import {h, Component} from 'preact'
 import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
 import * as gametree from '../../modules/gametree.js'
+import {getOgsClockView} from '../../modules/ogsclock.js'
 
 const t = i18n.context('OgsGameContextPanel')
 
@@ -60,8 +61,9 @@ export default class OgsGameContextPanel extends Component {
 
   async componentDidMount() {
     sabaki.on('change', this.handleSabakiChange)
-    await this.refreshOgsState()
     this.pollTimer = setInterval(() => this.refreshOgsState(), 2000)
+    this.clockTimer = setInterval(this.handleSabakiChange, 1000)
+    await this.refreshOgsState()
   }
 
   async componentDidUpdate(prevProps) {
@@ -73,6 +75,7 @@ export default class OgsGameContextPanel extends Component {
   componentWillUnmount() {
     sabaki.removeListener('change', this.handleSabakiChange)
     clearInterval(this.pollTimer)
+    clearInterval(this.clockTimer)
   }
 
   async refreshOgsState() {
@@ -135,6 +138,7 @@ export default class OgsGameContextPanel extends Component {
     game = withOptimisticPendingMove(game)
     let playable = game?.status === 'connected' && game?.phase === 'play'
     let captures = getOgsCaptures(game)
+    let clockView = getOgsClockView(game?.clock, game?.players)
 
     return h(
       'div',
@@ -156,6 +160,7 @@ export default class OgsGameContextPanel extends Component {
               user,
               currentPlayerId: game.clock?.currentPlayer,
               captures: captures.black,
+              clock: clockView.black,
             }),
             h(PlayerCard, {
               color: 'white',
@@ -164,6 +169,7 @@ export default class OgsGameContextPanel extends Component {
               user,
               currentPlayerId: game.clock?.currentPlayer,
               captures: captures.white,
+              clock: clockView.white,
             }),
             h(
               'dl',
@@ -236,6 +242,7 @@ function PlayerCard({
   user,
   currentPlayerId,
   captures = 0,
+  clock,
 }) {
   let isCurrentUser = user?.id != null && player?.id === Number(user.id)
   let rank = player?.rank || (isCurrentUser ? user.rank : null)
@@ -264,8 +271,25 @@ function PlayerCard({
         ': ',
         String(captures),
       ),
+      h(PlayerClock, {clock}),
     ),
     active && h('span', {class: 'ogs-game-context-turn'}, t('To move')),
+  )
+}
+
+function PlayerClock({clock}) {
+  if (clock == null || clock.label === '—') return null
+
+  return h(
+    'span',
+    {
+      class: `ogs-game-context-clock ${clock.active ? 'active' : ''}`,
+      title: t('Clock'),
+    },
+    t('Clock'),
+    ': ',
+    h('strong', {}, clock.label),
+    clock.detail != null && [' · ', clock.detail],
   )
 }
 
