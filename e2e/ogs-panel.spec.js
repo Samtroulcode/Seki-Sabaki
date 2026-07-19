@@ -884,6 +884,71 @@ test.describe('OGS mock panel', () => {
     })
   })
 
+  test('submits reviewed OGS board moves from the live line end', async ({
+    page,
+  }) => {
+    await waitForRender(page)
+    await page.waitForFunction(() => window.__sabaki.state.busy === 0)
+
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Fixture Game',
+        board: {width: 19, height: 19},
+        handicap: 0,
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [
+          {move: 'aa', moveNumber: 1},
+          {move: 'bb', moveNumber: 2},
+        ],
+        moveCount: 2,
+        lastMove: 'bb',
+        clock: {currentPlayer: 7, lastMove: 2},
+        chat: [],
+      }
+
+      window.__ogsPlayedMoves = []
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        playMove: async (gameId, vertex) => {
+          window.__ogsPlayedMoves.push({gameId, vertex})
+          return {ok: true, state: window.__ogsTestState}
+        },
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.goToBeginning()
+      await window.__sabaki.submitOgsMove([2, 2])
+    })
+
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex, treePosition} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let line = window.__sabaki.getOgsLineNodes(tree)
+      let sequence = line.map((node) => node.data)
+
+      return (
+        window.__ogsPlayedMoves.length === 1 &&
+        tree.root.children.length === 1 &&
+        treePosition === line.at(-1).id &&
+        sequence.length === 4 &&
+        sequence[1].B?.[0] === 'aa' &&
+        sequence[2].W?.[0] === 'bb' &&
+        sequence[3].B?.[0] === 'cc'
+      )
+    })
+  })
+
   test('shows OGS captures from the synchronized Sabaki board', async ({
     page,
   }) => {

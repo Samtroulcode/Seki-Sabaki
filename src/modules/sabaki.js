@@ -1636,11 +1636,14 @@ class Sabaki extends EventEmitter {
         moveNumber: this.getOgsLocalMoves().length + 1,
       }
       this.ogsPendingMove = pendingMove
+      let ogsLineEnd = this.getOgsBoardLineEnd()
 
       let played = await this.makeMove(vertex, {
         player,
         allowOnlineLocal: true,
         suppressWarnings: true,
+        treePosition: ogsLineEnd,
+        updateTreePosition: true,
       })
       if (!played) {
         this.ogsPendingMove = null
@@ -1700,11 +1703,14 @@ class Sabaki extends EventEmitter {
         moveNumber: this.getOgsLocalMoves().length + 1,
       }
       this.ogsPendingMove = pendingMove
+      let ogsLineEnd = this.getOgsBoardLineEnd()
 
       let played = await this.makeMove([-1, -1], {
         player,
         allowOnlineLocal: true,
         suppressWarnings: true,
+        treePosition: ogsLineEnd,
+        updateTreePosition: true,
       })
       if (!played) {
         this.ogsPendingMove = null
@@ -1991,6 +1997,14 @@ class Sabaki extends EventEmitter {
         return {moveNumber: index + 1, move}
       })
       .filter((move) => move.move != null)
+  }
+
+  getOgsBoardLineEnd() {
+    let {gameTrees, gameIndex} = this.state
+    let tree = gameTrees[gameIndex]
+    let [lineEnd] = this.getOgsLineNodes(tree).slice(-1)
+
+    return lineEnd?.id || this.state.treePosition
   }
 
   getOgsLineNodes(tree) {
