@@ -8,6 +8,7 @@ import {
   updateScalarMatchmakingOption,
 } from '../../modules/ogsmatchmakingoptions.js'
 import OgsPanelSyncController from '../../modules/ogspanelsync.js'
+import {AccountStatus, LoginForm} from './OgsPanelAccount.js'
 import {
   CheckboxGroup,
   NumberField,
@@ -19,13 +20,12 @@ import {
   QuickLinksCard,
   SectionDetail,
 } from './OgsPanelDashboard.js'
+import {OnlineGameForm} from './OgsPanelGames.js'
 import {
   boardSizes,
   conditions,
   createOgsPanelLabels,
   defaultMatchmakingOptions,
-  formatBoard,
-  formatPlayers,
   getSocketLabel,
   handicapValues,
   rules,
@@ -464,81 +464,6 @@ export default class OgsPanel extends Component {
   }
 }
 
-function LoginForm({
-  username,
-  busy,
-  error,
-  passwordRef,
-  onUsernameInput,
-  onSubmit,
-}) {
-  return h(
-    'form',
-    {class: 'ogs-login-form', onSubmit},
-
-    h('h3', {}, t('Connect account')),
-    h('p', {}, t('Sign in to unlock OGS play and account features.')),
-
-    h(
-      'label',
-      {},
-      h('span', {}, t('Username')),
-      h('input', {
-        name: 'username',
-        type: 'text',
-        value: username,
-        autocomplete: 'off',
-        disabled: busy,
-        onInput: onUsernameInput,
-      }),
-    ),
-
-    h(
-      'label',
-      {},
-      h('span', {}, t('Password')),
-      h('input', {
-        ref: passwordRef,
-        name: 'password',
-        type: 'password',
-        autocomplete: 'off',
-        disabled: busy,
-      }),
-    ),
-
-    error != null && h('p', {class: 'ogs-error'}, error),
-
-    h(
-      'button',
-      {type: 'submit', disabled: busy || username.trim() === ''},
-      busy ? t('Connecting…') : t('Connect'),
-    ),
-  )
-}
-
-function AccountStatus({user, username, socket}) {
-  return h(
-    'div',
-    {class: 'ogs-status'},
-
-    h('h3', {}, t('Account')),
-    user?.iconUrl != null &&
-      h('img', {class: 'ogs-avatar', src: user.iconUrl, alt: ''}),
-    h(
-      'dl',
-      {},
-      h('dt', {}, t('Username')),
-      h('dd', {class: 'ogs-status-username'}, user?.username || username),
-      h('dt', {}, t('Status')),
-      h('dd', {}, t('Online')),
-      h('dt', {}, t('Rank')),
-      h('dd', {}, user?.rank || t('Unknown')),
-      h('dt', {}, t('Socket')),
-      h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket, t)),
-    ),
-  )
-}
-
 function AutomatchForm({
   options,
   status,
@@ -661,106 +586,6 @@ function AutomatchForm({
           },
           t('Find opponent'),
         ),
-  )
-}
-
-function OnlineGameForm({
-  onlineGame,
-  activeGames = [],
-  authenticated,
-  busy,
-  onConnectGame,
-  onDisconnectGame,
-}) {
-  let gameStatus = onlineGame?.status || 'idle'
-  let hasGame = onlineGame?.gameId != null
-
-  return h(
-    'section',
-    {class: 'ogs-online-game'},
-    h('h3', {}, t('Active games')),
-    h('p', {}, t('Games reported by OGS for this account.')),
-    activeGames.length === 0
-      ? h('p', {class: 'ogs-empty'}, t('No active games reported yet.'))
-      : h(
-          'ul',
-          {class: 'ogs-active-games'},
-          activeGames.map((game) =>
-            h(
-              'li',
-              {key: game.id},
-              h(
-                'div',
-                {class: 'ogs-active-game-summary'},
-                h('strong', {}, game.name || `#${game.id}`),
-                h('span', {}, formatBoard(game.board, t)),
-                h('span', {}, game.phase || t('Unknown')),
-                h('span', {}, t('Move'), ' ', String(game.moveNumber || 0)),
-                h('span', {}, formatPlayers(game.black, game.white, t)),
-              ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  disabled: busy || !authenticated,
-                  onClick: () => onConnectGame(game.id),
-                },
-                onlineGame?.gameId === game.id ? t('Open board') : t('View'),
-              ),
-            ),
-          ),
-        ),
-    h(
-      'dl',
-      {class: 'ogs-game-status'},
-      h('dt', {}, t('Status')),
-      h('dd', {}, gameStatus),
-      h('dt', {}, t('Game')),
-      h('dd', {}, hasGame ? String(onlineGame.gameId) : t('None')),
-      h('dt', {}, t('Name')),
-      h('dd', {}, onlineGame?.gameName || t('Unknown')),
-      h('dt', {}, t('Board')),
-      h('dd', {}, formatBoard(onlineGame?.board, t)),
-      h('dt', {}, t('Phase')),
-      h('dd', {}, onlineGame?.phase || t('Unknown')),
-      h('dt', {}, t('Moves')),
-      h('dd', {}, String(onlineGame?.moveCount || 0)),
-    ),
-    onlineGame?.error != null && h('p', {class: 'ogs-error'}, onlineGame.error),
-    onlineGame?.players != null &&
-      h(
-        'p',
-        {class: 'ogs-game-players'},
-        t('Black'),
-        ': ',
-        onlineGame.players.black?.username || t('Unknown'),
-        ' — ',
-        t('White'),
-        ': ',
-        onlineGame.players.white?.username || t('Unknown'),
-      ),
-    onlineGame?.chat?.length > 0 &&
-      h(
-        'ol',
-        {class: 'ogs-game-chat'},
-        onlineGame.chat
-          .slice(-5)
-          .map((line) =>
-            h(
-              'li',
-              {},
-              h('strong', {}, line.username || t('OGS')),
-              ': ',
-              line.body,
-            ),
-          ),
-      ),
-    hasGame &&
-      h(
-        'button',
-        {type: 'button', onClick: onDisconnectGame},
-        t('Disconnect game'),
-      ),
   )
 }
 
