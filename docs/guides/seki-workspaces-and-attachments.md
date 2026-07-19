@@ -102,6 +102,8 @@ Implemented:
 - Detaching an OGS game preserves the projected SGF as a local board document.
 - OGS rejected moves clear the board's pending optimistic move through the same
   error path used by the OGS workspace.
+- OGS rank, error, and automatch option/payload helpers are extracted under
+  `src/ogs/` while `src/ogs.js` remains the public client facade.
 
 Partially complete:
 
@@ -114,7 +116,7 @@ Partially complete:
 Remaining cleanup should stay small and testable:
 
 1. Move more OGS dashboard orchestration out of `OgsPanel`.
-2. Split `src/ogs.js` into protocol adaptation, transport/session, matchmaking,
+2. Continue splitting `src/ogs.js` into protocol adaptation, transport/session,
    game state, and IPC contracts.
 3. Replace renderer-visible arbitrary objects with validated IPC request,
    response, event, and public-state contracts.
