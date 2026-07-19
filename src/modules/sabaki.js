@@ -795,32 +795,54 @@ class Sabaki extends EventEmitter {
       return true
     }
 
-    if (
-      localMoves.length + 1 !== serverMoves.length ||
-      !movesEqual(localMoves, serverMoves.slice(0, -1))
-    ) {
+    if (localMoves.length > serverMoves.length) {
       return false
+    }
+
+    for (let i = 0; i < localMoves.length; i++) {
+      let localMove = localMoves[i]
+      let serverMove = serverMoves[i]
+      let pendingConfirmed =
+        this.isOgsPendingMove(localMove) &&
+        movesEqual([localMove], [serverMove])
+
+      if (!pendingConfirmed && !movesEqual([localMove], [serverMove])) {
+        return false
+      }
     }
 
     this.clearConfirmedOgsPendingMove(
       serverMoves.find((move) => this.isOgsPendingMove(move)),
     )
 
-    let move = serverMoves.at(-1)
-    let vertex = parseOgsMove(
-      move.move,
-      onlineGame.board.width,
-      onlineGame.board.height,
-    )
+    let {gameTrees, gameIndex, treePosition} = this.state
+    let tree = gameTrees[gameIndex]
+    let [lineEnd] = this.getOgsLineNodes(tree).slice(-1)
+    let updateTreePosition = lineEnd?.id === treePosition
 
-    if (vertex == null) return false
+    for (let move of serverMoves.slice(localMoves.length)) {
+      let vertex = parseOgsMove(
+        move.move,
+        onlineGame.board.width,
+        onlineGame.board.height,
+      )
 
-    await this.makeMove(vertex, {
-      player: getOgsMovePlayer(move.moveNumber, onlineGame.handicap),
-      allowOnlineLocal: true,
-      suppressWarnings: true,
-    })
-    this.clearConfirmedOgsPendingMove(move)
+      if (vertex == null) return false
+
+      await this.makeMove(vertex, {
+        player: getOgsMovePlayer(move.moveNumber, onlineGame.handicap),
+        allowOnlineLocal: true,
+        suppressWarnings: true,
+        treePosition: lineEnd?.id,
+        updateTreePosition,
+      })
+      this.clearConfirmedOgsPendingMove(move)
+
+      gameTrees = this.state.gameTrees
+      gameIndex = this.state.gameIndex
+      tree = gameTrees[gameIndex]
+      lineEnd = this.getOgsLineNodes(tree).slice(-1)[0]
+    }
 
     return true
   }
@@ -1316,6 +1338,8 @@ class Sabaki extends EventEmitter {
       generateEngineMove = false,
       allowOnlineLocal = false,
       suppressWarnings = false,
+      treePosition = null,
+      updateTreePosition = true,
     } = {},
   ) {
     if (this.state.onlineGameId != null && !allowOnlineLocal) {
@@ -1328,7 +1352,8 @@ class Sabaki extends EventEmitter {
     }
 
     let t = i18n.context('sabaki.play')
-    let {gameTrees, gameIndex, treePosition} = this.state
+    let {gameTrees, gameIndex} = this.state
+    if (treePosition == null) treePosition = this.state.treePosition
     let tree = gameTrees[gameIndex]
     let node = tree.get(treePosition)
     let board = gametree.getBoard(tree, treePosition)
@@ -1396,7 +1421,14 @@ class Sabaki extends EventEmitter {
 
     let createNode = tree.get(nextTreePosition) == null
 
-    this.setCurrentTreePosition(newTree, nextTreePosition)
+    if (updateTreePosition) {
+      this.setCurrentTreePosition(newTree, nextTreePosition)
+    } else {
+      this.setState({
+        gameTrees: gameTrees.map((t, i) => (i !== gameIndex ? t : newTree)),
+      })
+      this.recordHistory()
+    }
 
     // Play sounds
 
@@ -1786,7 +1818,7 @@ class Sabaki extends EventEmitter {
     let {gameTrees, gameIndex} = this.state
     let tree = gameTrees[gameIndex]
 
-    return [...tree.getSequence(tree.root.id)]
+    return this.getOgsLineNodes(tree)
       .map((node) => node.data)
       .slice(1)
       .map((data, index) => {
@@ -1798,6 +1830,18 @@ class Sabaki extends EventEmitter {
         return {moveNumber: index + 1, move}
       })
       .filter((move) => move.move != null)
+  }
+
+  getOgsLineNodes(tree) {
+    let nodes = []
+    let node = tree.root
+
+    while (node != null) {
+      nodes.push(node)
+      node = node.children.length === 0 ? null : node.children[0]
+    }
+
+    return nodes
   }
 
   useTool(tool, vertex, argument = null) {

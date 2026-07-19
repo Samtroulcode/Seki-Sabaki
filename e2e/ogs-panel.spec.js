@@ -252,6 +252,15 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-online-game')).toContainText('19x19')
     await expect(page.locator('.ogs-online-game')).toContainText('opponent')
     await expect(page.locator('.ogs-online-game')).toContainText('good luck')
+    await page
+      .locator('.ogs-active-games')
+      .getByRole('button', {name: 'Open board'})
+      .click()
+    await page.waitForFunction(
+      () => window.__sabaki.state.activeWorkspace === 'board',
+    )
+    await expect(page.locator('#goban')).toBeVisible()
+    await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
 
     await page.evaluate(async () => {
       window.__sabaki.setState({
@@ -461,6 +470,62 @@ test.describe('OGS mock panel', () => {
         window.__sabaki.state.onlineGameId === 42 &&
         sequence.length === 2 &&
         sequence[1].B?.[0] === 'cc'
+      )
+    })
+  })
+
+  test('syncs server moves to online main line while reviewing', async ({
+    page,
+  }) => {
+    await waitForRender(page)
+    await page.waitForFunction(() => window.__sabaki.state.busy === 0)
+
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Fixture Game',
+        board: {width: 19, height: 19},
+        handicap: 0,
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [
+          {move: 'aa', moveNumber: 1},
+          {move: 'bb', moveNumber: 2},
+        ],
+        moveCount: 2,
+        lastMove: 'bb',
+        clock: null,
+        chat: [],
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.goToBeginning()
+
+      onlineGame.moves.push({move: 'cc', moveNumber: 3})
+      onlineGame.moveCount = 3
+      onlineGame.lastMove = 'cc'
+      await window.__sabaki.applyOgsGameUpdate(onlineGame)
+    })
+
+    await page.waitForFunction(() => {
+      let {gameTrees, gameIndex, treePosition} = window.__sabaki.state
+      let tree = gameTrees[gameIndex]
+      let sequence = window.__sabaki
+        .getOgsLineNodes(tree)
+        .map((node) => node.data)
+
+      return (
+        treePosition === tree.root.id &&
+        tree.root.children.length === 1 &&
+        sequence.length === 4 &&
+        sequence[1].B?.[0] === 'aa' &&
+        sequence[2].W?.[0] === 'bb' &&
+        sequence[3].B?.[0] === 'cc'
       )
     })
   })

@@ -105,6 +105,16 @@ export default class OgsPanel extends Component {
       this.setState({busy: true, error: null})
 
       try {
+        if (
+          this.state.onlineGame?.gameId === gameId &&
+          this.state.onlineGame?.status === 'connected'
+        ) {
+          let loaded = await this.syncOnlineGameToBoard(this.state.onlineGame)
+          if (loaded) sabaki.setState({activeWorkspace: 'board'})
+          this.setState({busy: false})
+          return
+        }
+
         let result = await window.sabaki.ogs.connectGame(gameId)
         this.declinedOnlineGameId = null
         this.handledOnlineGameErrorKey = null
@@ -198,11 +208,15 @@ export default class OgsPanel extends Component {
       onlineGame.board == null ||
       !Array.isArray(onlineGame.moves)
     ) {
-      return
+      return false
     }
 
-    if (this.declinedOnlineGameId === onlineGame.gameId) return
-    if (this.syncingOnlineGame) return
+    if (onlineGame.phase === 'finished' && sabaki.state.onlineGameId == null) {
+      return false
+    }
+
+    if (this.declinedOnlineGameId === onlineGame.gameId) return false
+    if (this.syncingOnlineGame) return false
 
     let key = getOnlineGameSyncKey(onlineGame)
     if (
@@ -210,12 +224,10 @@ export default class OgsPanel extends Component {
       (sabaki.state.onlineGameId === onlineGame.gameId ||
         (onlineGame.phase === 'finished' && sabaki.state.onlineGameId == null))
     ) {
-      return
+      return true
     }
 
-    let sameGame =
-      sabaki.state.onlineGameId === onlineGame.gameId ||
-      this.syncedOnlineGameKey?.startsWith(`${onlineGame.gameId}:`) === true
+    let sameGame = sabaki.state.onlineGameId === onlineGame.gameId
     let loaded = false
 
     this.syncingOnlineGame = true
@@ -238,6 +250,8 @@ export default class OgsPanel extends Component {
     if (loaded && onlineGame.phase === 'finished') {
       sabaki.detachOgsGame(onlineGame.gameId)
     }
+
+    return loaded
   }
 
   async updateMatchmakingOptions(options) {
@@ -284,7 +298,6 @@ export default class OgsPanel extends Component {
         connected: true,
       })
       await this.handleOnlineGameError(state.onlineGame)
-      await this.syncOnlineGameToBoard(state.onlineGame)
     }
   }
 
@@ -555,7 +568,7 @@ function OnlineGameForm({
                   disabled: busy || !authenticated,
                   onClick: () => onConnectGame(game.id),
                 },
-                onlineGame?.gameId === game.id ? t('Viewing') : t('View'),
+                onlineGame?.gameId === game.id ? t('Open board') : t('View'),
               ),
             ),
           ),

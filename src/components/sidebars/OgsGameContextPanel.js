@@ -1,6 +1,7 @@
 import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
+import sabaki from '../../modules/sabaki.js'
 
 const t = i18n.context('OgsGameContextPanel')
 
@@ -13,6 +14,12 @@ export default class OgsGameContextPanel extends Component {
       onlineGame: null,
       error: null,
       busy: false,
+      revision: 0,
+    }
+    this.syncingOnlineGame = false
+
+    this.handleSabakiChange = () => {
+      this.setState(({revision}) => ({revision: revision + 1}))
     }
 
     this.handlePassButtonClick = async () => {
@@ -51,6 +58,7 @@ export default class OgsGameContextPanel extends Component {
   }
 
   async componentDidMount() {
+    sabaki.on('change', this.handleSabakiChange)
     await this.refreshOgsState()
     this.pollTimer = setInterval(() => this.refreshOgsState(), 2000)
   }
@@ -62,6 +70,7 @@ export default class OgsGameContextPanel extends Component {
   }
 
   componentWillUnmount() {
+    sabaki.removeListener('change', this.handleSabakiChange)
     clearInterval(this.pollTimer)
   }
 
@@ -80,10 +89,48 @@ export default class OgsGameContextPanel extends Component {
       onlineGame: state?.onlineGame || null,
       error: state?.onlineGame?.error || null,
     })
+
+    await this.syncOnlineGameToBoard(state?.onlineGame)
+  }
+
+  async syncOnlineGameToBoard(onlineGame) {
+    let {onlineGameId} = this.props
+
+    if (
+      onlineGameId == null ||
+      onlineGame?.gameId !== onlineGameId ||
+      onlineGame?.status !== 'connected' ||
+      onlineGame.board == null ||
+      !Array.isArray(onlineGame.moves)
+    ) {
+      return
+    }
+    if (this.syncingOnlineGame) return
+
+    let synced = false
+
+    this.syncingOnlineGame = true
+    try {
+      synced = await sabaki.applyOgsGameUpdate(onlineGame)
+
+      if (!synced && sabaki.state.onlineGameId === onlineGameId) {
+        synced = await sabaki.loadOgsGame(onlineGame, {
+          suppressAskForSave: true,
+          clearHistory: false,
+        })
+      }
+    } finally {
+      this.syncingOnlineGame = false
+    }
+
+    if (synced && onlineGame.phase === 'finished') {
+      sabaki.detachOgsGame(onlineGameId)
+    }
   }
 
   render({onlineGameId}, {user, onlineGame, error, busy}) {
     let game = onlineGame?.gameId === onlineGameId ? onlineGame : null
+    game = withOptimisticPendingMove(game)
     let playable = game?.status === 'connected' && game?.phase === 'play'
 
     return h(
@@ -241,4 +288,45 @@ function formatRanked(ranked) {
 
 function getInitial(player) {
   return (player?.username || '?').slice(0, 1).toUpperCase()
+}
+
+function withOptimisticPendingMove(game) {
+  let pendingMove = sabaki.ogsPendingMove
+
+  if (game == null || pendingMove?.gameId !== game.gameId) return game
+
+  let players = game.players || {}
+  let currentPlayer = game.clock?.currentPlayer
+  let nextCurrentPlayer =
+    currentPlayer === players.black?.id
+      ? players.white?.id
+      : currentPlayer === players.white?.id
+        ? players.black?.id
+        : getOpponentFromMoveNumber(pendingMove.moveNumber, game)
+
+  return {
+    ...game,
+    pendingMove: true,
+    moveCount: Math.max(game.moveCount || 0, pendingMove.moveNumber),
+    clock:
+      game.clock == null
+        ? {currentPlayer: nextCurrentPlayer}
+        : {...game.clock, currentPlayer: nextCurrentPlayer},
+  }
+}
+
+function getOpponentFromMoveNumber(moveNumber, game) {
+  let blackId = game.players?.black?.id
+  let whiteId = game.players?.white?.id
+  if (blackId == null || whiteId == null) return null
+
+  let firstPlayer = game.handicap > 1 ? whiteId : blackId
+  let movePlayer =
+    moveNumber % 2 === 1
+      ? firstPlayer
+      : firstPlayer === blackId
+        ? whiteId
+        : blackId
+
+  return movePlayer === blackId ? whiteId : blackId
 }
