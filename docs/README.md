@@ -8,6 +8,7 @@ view older versions of the documentation, you can browse by tag on GitHub.
 - [Building & Tests](guides/building-tests.md)
 - [Debugging](guides/debugging.md)
 - [OGS Integration Roadmap](guides/ogs-integration-roadmap.md)
+- [Seki Workspace And Board Attachment Model](guides/seki-workspaces-and-attachments.md)
 
 ## User Guides
 

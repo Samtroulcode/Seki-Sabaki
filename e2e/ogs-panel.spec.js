@@ -3,6 +3,29 @@ const {test} = require('./fixtures/electron-app')
 const {waitForRender} = require('./helpers')
 
 test.describe('OGS mock panel', () => {
+  test('keeps board attachment and online game compatibility state in sync', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__sabaki.setState({onlineGameId: '42'})
+    })
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.onlineGameId === 42 &&
+        window.__sabaki.state.boardAttachment?.type === 'ogs' &&
+        window.__sabaki.state.boardAttachment?.gameId === 42,
+    )
+
+    await page.evaluate(() => {
+      window.__sabaki.setState({boardAttachment: {type: 'local-document'}})
+    })
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.onlineGameId == null &&
+        window.__sabaki.state.boardAttachment?.type === 'local-document',
+    )
+  })
+
   test('opens from app rail and shows mock connection status', async ({
     page,
   }) => {
@@ -426,6 +449,8 @@ test.describe('OGS mock panel', () => {
     await page.waitForFunction(
       () =>
         window.__sabaki.state.onlineGameId === 42 &&
+        window.__sabaki.state.boardAttachment?.type === 'ogs' &&
+        window.__sabaki.state.boardAttachment?.gameId === 42 &&
         window.__sabaki.state.analyzingEngineSyncerId == null &&
         window.__sabaki.state.analysis == null &&
         window.__sabaki.state.attachedEngineSyncers.length === 0,
@@ -519,7 +544,11 @@ test.describe('OGS mock panel', () => {
       .locator('.ogs-online-game')
       .getByRole('button', {name: 'Disconnect game'})
       .click()
-    await page.waitForFunction(() => window.__sabaki.state.onlineGameId == null)
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.onlineGameId == null &&
+        window.__sabaki.state.boardAttachment?.type === 'local-document',
+    )
 
     await page.evaluate(() => {
       window.__sabaki.clickVertex([5, 5])
@@ -539,7 +568,12 @@ test.describe('OGS mock panel', () => {
     })
 
     await page.locator('.ogs-active-games button').click()
-    await page.waitForFunction(() => window.__sabaki.state.onlineGameId === 42)
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.onlineGameId === 42 &&
+        window.__sabaki.state.boardAttachment?.type === 'ogs' &&
+        window.__sabaki.state.boardAttachment?.gameId === 42,
+    )
 
     await page.locator('#apprail').getByRole('button', {name: 'Board'}).click()
 

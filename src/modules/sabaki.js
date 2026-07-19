@@ -18,6 +18,12 @@ import * as gametree from './gametree.js'
 import * as gobantransformer from './gobantransformer.js'
 import * as gtplogger from './gtplogger.js'
 import * as helper from './helper.js'
+import {
+  createBoardAttachmentState,
+  createLocalDocumentBoardAttachment,
+  createOgsBoardAttachment,
+  isOgsBoardAttachment,
+} from './boardattachment.js'
 import OgsBoardSessionController from './ogsboardsessioncontroller.js'
 import {buildOgsGameTree} from './ogsboard.js'
 import {
@@ -94,6 +100,7 @@ class Sabaki extends EventEmitter {
       gameTrees: [emptyTree],
       gameCurrents: [{}],
       treePosition: emptyTree.root.id,
+      boardAttachment: createLocalDocumentBoardAttachment(),
       onlineGameId: null,
 
       // Bars
@@ -269,6 +276,17 @@ class Sabaki extends EventEmitter {
   setState(change, callback = null) {
     if (typeof change === 'function') {
       change = change(this.state)
+    }
+
+    if ('boardAttachment' in change || 'onlineGameId' in change) {
+      Object.assign(
+        change,
+        createBoardAttachmentState(
+          'boardAttachment' in change
+            ? change.boardAttachment
+            : createOgsBoardAttachment(change.onlineGameId),
+        ),
+      )
     }
 
     Object.assign(this.state, change)
@@ -719,7 +737,12 @@ class Sabaki extends EventEmitter {
 
   async loadGameTrees(
     gameTrees,
-    {suppressAskForSave = false, clearHistory = true, onlineGameId = null} = {},
+    {
+      suppressAskForSave = false,
+      clearHistory = true,
+      onlineGameId = null,
+      boardAttachment = null,
+    } = {},
   ) {
     if (!suppressAskForSave && !(await this.askForSave())) return
 
@@ -730,13 +753,20 @@ class Sabaki extends EventEmitter {
     await helper.wait(setting.get('app.loadgame_delay'))
 
     if (gameTrees.length > 0) {
+      let attachmentState = createBoardAttachmentState(
+        boardAttachment ??
+          (onlineGameId == null
+            ? createLocalDocumentBoardAttachment()
+            : createOgsBoardAttachment(onlineGameId)),
+      )
+
       this.setState({
         representedFilename: null,
         gameIndex: 0,
         gameTrees,
         gameCurrents: gameTrees.map((_) => ({})),
         boardTransformation: '',
-        onlineGameId,
+        ...attachmentState,
       })
 
       let [firstTree] = gameTrees
@@ -777,7 +807,7 @@ class Sabaki extends EventEmitter {
     await this.loadGameTrees([tree], {
       suppressAskForSave: true,
       clearHistory,
-      onlineGameId: onlineGame?.gameId ?? null,
+      boardAttachment: createOgsBoardAttachment(onlineGame?.gameId),
     })
     this.setState({activeWorkspace: 'board'})
     this.ogsBoardSession.invalidateOperations()
@@ -788,14 +818,17 @@ class Sabaki extends EventEmitter {
   detachOgsGame(gameId = null) {
     if (
       gameId != null &&
-      this.state.onlineGameId != null &&
-      this.state.onlineGameId !== gameId
+      isOgsBoardAttachment(this.state.boardAttachment) &&
+      !isOgsBoardAttachment(this.state.boardAttachment, gameId)
     ) {
       return false
     }
 
     this.ogsBoardSession.invalidateOperations()
-    this.setState({onlineGameId: null})
+    this.setState({
+      boardAttachment: createLocalDocumentBoardAttachment(),
+      onlineGameId: null,
+    })
 
     return true
   }
@@ -845,8 +878,7 @@ class Sabaki extends EventEmitter {
 
   async applyOgsGameUpdate(onlineGame) {
     if (
-      this.state.onlineGameId == null ||
-      this.state.onlineGameId !== onlineGame?.gameId ||
+      !isOgsBoardAttachment(this.state.boardAttachment, onlineGame?.gameId) ||
       onlineGame.board == null ||
       !Array.isArray(onlineGame.moves)
     ) {
