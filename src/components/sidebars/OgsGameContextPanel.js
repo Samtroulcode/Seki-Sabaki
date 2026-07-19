@@ -2,6 +2,7 @@ import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
+import * as gametree from '../../modules/gametree.js'
 
 const t = i18n.context('OgsGameContextPanel')
 
@@ -132,6 +133,7 @@ export default class OgsGameContextPanel extends Component {
     let game = onlineGame?.gameId === onlineGameId ? onlineGame : null
     game = withOptimisticPendingMove(game)
     let playable = game?.status === 'connected' && game?.phase === 'play'
+    let captures = getOgsCaptures(game)
 
     return h(
       'div',
@@ -152,6 +154,7 @@ export default class OgsGameContextPanel extends Component {
               player: game.players?.black,
               user,
               currentPlayerId: game.clock?.currentPlayer,
+              captures: captures.black,
             }),
             h(PlayerCard, {
               color: 'white',
@@ -159,6 +162,7 @@ export default class OgsGameContextPanel extends Component {
               player: game.players?.white,
               user,
               currentPlayerId: game.clock?.currentPlayer,
+              captures: captures.white,
             }),
             h(
               'dl',
@@ -224,7 +228,14 @@ export default class OgsGameContextPanel extends Component {
   }
 }
 
-function PlayerCard({color, title, player, user, currentPlayerId}) {
+function PlayerCard({
+  color,
+  title,
+  player,
+  user,
+  currentPlayerId,
+  captures = 0,
+}) {
   let isCurrentUser = user?.id != null && player?.id === Number(user.id)
   let rank = player?.rank || (isCurrentUser ? user.rank : null)
   let iconUrl = player?.iconUrl || (isCurrentUser ? user.iconUrl : null)
@@ -242,9 +253,34 @@ function PlayerCard({color, title, player, user, currentPlayerId}) {
       h('h3', {}, title),
       h('strong', {}, player?.username || t('Unknown')),
       h('span', {}, rank || t('Rank unavailable')),
+      h(
+        'span',
+        {
+          class: 'ogs-game-context-captures',
+          title: t('Captures'),
+        },
+        t('Captures'),
+        ': ',
+        String(captures),
+      ),
     ),
     active && h('span', {class: 'ogs-game-context-turn'}, t('To move')),
   )
+}
+
+function getOgsCaptures(game) {
+  if (game?.gameId == null || sabaki.state.onlineGameId !== game.gameId) {
+    return {black: 0, white: 0}
+  }
+
+  let tree = sabaki.state.gameTrees[sabaki.state.gameIndex]
+  let [lineEnd] = sabaki.getOgsLineNodes(tree).slice(-1)
+  let board = gametree.getBoard(tree, lineEnd.id)
+
+  return {
+    black: board.getCaptures(1),
+    white: board.getCaptures(-1),
+  }
 }
 
 function ChatSection({chat = []}) {

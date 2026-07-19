@@ -530,6 +530,59 @@ test.describe('OGS mock panel', () => {
     })
   })
 
+  test('shows OGS captures from the synchronized Sabaki board', async ({
+    page,
+  }) => {
+    await waitForRender(page)
+    await page.waitForFunction(() => window.__sabaki.state.busy === 0)
+
+    await page.evaluate(async () => {
+      let onlineGame = {
+        status: 'connected',
+        gameId: 42,
+        error: null,
+        gameName: 'Capture Fixture',
+        board: {width: 5, height: 5},
+        handicap: 0,
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'sekibot'},
+          white: {id: 8, username: 'opponent'},
+        },
+        moves: [
+          {move: 'aa', moveNumber: 1},
+          {move: 'ba', moveNumber: 2},
+          {move: 'cc', moveNumber: 3},
+          {move: 'ab', moveNumber: 4},
+        ],
+        moveCount: 4,
+        lastMove: 'ab',
+        clock: null,
+        chat: [],
+      }
+
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        onlineGame,
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+      }
+
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.goToBeginning()
+      window.__sabaki.setState({showLeftSidebar: true})
+    })
+
+    await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
+    await expect(
+      page.locator('.ogs-game-context-player.black .ogs-game-context-captures'),
+    ).toHaveText('Captures: 0')
+    await expect(
+      page.locator('.ogs-game-context-player.white .ogs-game-context-captures'),
+    ).toHaveText('Captures: 1')
+  })
+
   test('ignores stale OGS move rejection when confirmation arrives during dialog', async ({
     page,
   }) => {
