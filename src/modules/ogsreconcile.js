@@ -47,7 +47,7 @@ export function getOgsMovePlayer(moveNumber, handicap) {
 export function getOgsPlayerToMove(onlineGame) {
   if (
     onlineGame.clock?.currentPlayer != null &&
-    onlineGame.clock.lastMove >= onlineGame.moveCount
+    isCurrentClock(onlineGame.clock, onlineGame.moveCount)
   ) {
     return normalizeOgsId(onlineGame.clock.currentPlayer)
   }
@@ -73,6 +73,10 @@ export function normalizeOgsId(value) {
   }
 
   return null
+}
+
+function isCurrentClock(clock, moveCount) {
+  return clock?.lastMove == null || clock.lastMove === moveCount
 }
 
 export function getOgsLineMoves(lineNodes) {

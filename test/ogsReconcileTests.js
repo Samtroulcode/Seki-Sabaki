@@ -159,6 +159,15 @@ describe('OGS reconciliation', () => {
       }),
       8,
     )
+    assert.strictEqual(
+      getOgsPlayerToMove({
+        moveCount: 2,
+        handicap: 0,
+        players: {black: {id: 7}, white: {id: 8}},
+        clock: {currentPlayer: 8, lastMove: 3},
+      }),
+      7,
+    )
     assert.deepStrictEqual(parseOgsStoneString('aabb..bad', 9, 9), [
       [0, 0],
       [1, 1],

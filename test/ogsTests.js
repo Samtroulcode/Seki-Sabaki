@@ -909,6 +909,133 @@ describe('OGS client', () => {
     assert.strictEqual(socket.sent.length, sentCount)
   })
 
+  it('buffers future OGS clock updates until matching moves arrive', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: 'aabb',
+    })
+    socket.receive('game/12345/clock', {
+      current_player: 7,
+      last_move: 2,
+      black_time: {thinking_time: 60},
+      white_time: {thinking_time: 50},
+    })
+    socket.receive('game/12345/clock', {
+      current_player: 8,
+      last_move: 1,
+      black_time: {thinking_time: 59},
+      white_time: {thinking_time: 49},
+    })
+
+    let state = client.getState()
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 7)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 2)
+
+    socket.receive('game/12345/clock', {
+      current_player: 8,
+      last_move: 3,
+      black_time: {thinking_time: 58},
+      white_time: {thinking_time: 50},
+    })
+    socket.receive('game/12345/clock', {
+      current_player: 7,
+      last_move: 2,
+      black_time: {thinking_time: 57},
+      white_time: {thinking_time: 48},
+    })
+
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.moveCount, 2)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 7)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 2)
+
+    socket.receive('game/12345/move', {move_number: 3, move: 'cc'})
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.moveCount, 3)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 3)
+  })
+
+  it('keeps separate buffered OGS clocks for later moves', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: 'aabb',
+    })
+    socket.receive('game/12345/clock', {current_player: 7, last_move: 2})
+    socket.receive('game/12345/clock', {current_player: 7, last_move: 4})
+    socket.receive('game/12345/clock', {current_player: 8, last_move: 3})
+
+    socket.receive('game/12345/move', {move_number: 3, move: 'cc'})
+    let state = client.getState()
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 3)
+
+    socket.receive('game/12345/move', {move_number: 4, move: 'dd'})
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 7)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 4)
+  })
+
+  it('accepts OGS clock updates without move sequence markers', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: 'aabb',
+    })
+    socket.receive('game/12345/clock', {current_player: 7})
+
+    let state = client.getState()
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 7)
+    assert.strictEqual(state.onlineGame.clock.lastMove, null)
+  })
+
   it('clears pending OGS moves when the game reports an error', async () => {
     FakeWebSocket.instances = []
     let client = new OgsClient({

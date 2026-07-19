@@ -363,6 +363,7 @@ class OgsClient {
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
+    this.pendingClocks = new Map()
     this.activeGames = getInitialActiveGamesState()
   }
 
@@ -385,6 +386,7 @@ class OgsClient {
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
+    this.pendingClocks = new Map()
     this.activeGames = getInitialActiveGamesState()
     return true
   }
@@ -540,6 +542,7 @@ class OgsClient {
       status: 'connecting',
       gameId,
     }
+    this.pendingClocks = new Map()
 
     this.socket.send('game/connect', {game_id: gameId, chat: true})
 
@@ -554,6 +557,7 @@ class OgsClient {
 
     if (this.onlineGame.gameId === gameId) {
       this.onlineGame = getInitialOnlineGameState()
+      this.pendingClocks = new Map()
     }
 
     return this.getState()
@@ -768,7 +772,7 @@ class OgsClient {
   getPlayerToMove(gameId) {
     if (
       this.onlineGame.clock?.currentPlayer != null &&
-      this.onlineGame.clock.lastMove >= this.onlineGame.moveCount
+      isCurrentClock(this.onlineGame.clock, this.onlineGame.moveCount)
     ) {
       return this.onlineGame.clock.currentPlayer
     }
@@ -872,6 +876,7 @@ class OgsClient {
           status: 'connected',
           error: null,
         }
+        this.applyPendingClock()
         break
 
       case 'data':
@@ -881,6 +886,7 @@ class OgsClient {
           status: 'connected',
           error: null,
         }
+        this.applyPendingClock()
         break
 
       case 'move':
@@ -902,15 +908,11 @@ class OgsClient {
           pendingMove: false,
           error: null,
         }
+        this.applyPendingClock()
         break
 
       case 'clock':
-        this.onlineGame = {
-          ...this.onlineGame,
-          status: 'connected',
-          clock: sanitizeClock(payload),
-          error: null,
-        }
+        this.applyClock(sanitizeClock(payload))
         break
 
       case 'phase':
@@ -983,6 +985,48 @@ class OgsClient {
     }
   }
 
+  applyClock(clock) {
+    if (isFutureClock(clock, this.onlineGame.moveCount)) {
+      this.pendingClocks.set(clock.lastMove, clock)
+      this.onlineGame = {
+        ...this.onlineGame,
+        status: 'connected',
+        error: null,
+      }
+      return
+    }
+
+    if (!isCurrentClock(clock, this.onlineGame.moveCount)) {
+      this.onlineGame = {
+        ...this.onlineGame,
+        status: 'connected',
+        error: null,
+      }
+      return
+    }
+
+    this.pendingClocks.delete(clock?.lastMove)
+    this.onlineGame = {
+      ...this.onlineGame,
+      status: 'connected',
+      clock,
+      error: null,
+    }
+  }
+
+  applyPendingClock() {
+    for (let lastMove of this.pendingClocks.keys()) {
+      if (lastMove < this.onlineGame.moveCount)
+        this.pendingClocks.delete(lastMove)
+    }
+
+    let clock = this.pendingClocks.get(this.onlineGame.moveCount)
+    if (clock == null) return
+
+    this.pendingClocks.delete(this.onlineGame.moveCount)
+    this.onlineGame = {...this.onlineGame, clock}
+  }
+
   upsertActiveGame(payload) {
     let game = sanitizeActiveGame(payload, this.serverUrl)
     if (game == null) return
@@ -1033,6 +1077,14 @@ function getPlayerToMoveFromHistory(onlineGame) {
   let secondPlayer = firstPlayer === blackId ? whiteId : blackId
 
   return onlineGame.moveCount % 2 === 0 ? firstPlayer : secondPlayer
+}
+
+function isFutureClock(clock, moveCount) {
+  return clock?.lastMove != null && clock.lastMove > moveCount
+}
+
+function isCurrentClock(clock, moveCount) {
+  return clock?.lastMove == null || clock.lastMove === moveCount
 }
 
 function sanitizeGameData(data, serverUrl) {
@@ -1391,13 +1443,17 @@ function sanitizeClock(clock) {
         : null,
     now: sanitizeNumber(clock.now),
     receivedAt: Date.now(),
-    lastMove: sanitizeMoveCount(clock.last_move, null),
+    lastMove: sanitizeOptionalMoveCount(clock.last_move),
     blackTime: sanitizeClockTime(clock.black_time),
     whiteTime: sanitizeClockTime(clock.white_time),
     pause: sanitizeClockPause(clock.pause, clock.paused_since),
     stoneRemovalMode: clock.stone_removal_mode === true,
     stoneRemovalExpiration: sanitizeNumber(clock.stone_removal_expiration),
   }
+}
+
+function sanitizeOptionalMoveCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : null
 }
 
 function sanitizeClockTime(time) {
