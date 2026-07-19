@@ -126,6 +126,7 @@ function getInitialMatchmakingState() {
     status: 'idle',
     options: DEFAULT_MATCHMAKING_OPTIONS,
     payload: null,
+    matchedGameId: null,
     error: null,
   }
 }
@@ -573,28 +574,80 @@ class OgsClient {
   }
 
   setMatchmakingOptions(options) {
+    if (['searching', 'matched'].includes(this.matchmaking.status)) {
+      throw new OgsError(
+        'invalid-state',
+        'Stop OGS automatch before changing matchmaking options.',
+      )
+    }
+
     this.matchmaking = {
       ...this.matchmaking,
       status: 'idle',
       options: sanitizeMatchmakingOptions(options),
       payload: null,
+      matchedGameId: null,
       error: null,
     }
 
     return this.getState()
   }
 
-  logMockAutomatchRequest() {
+  startAutomatch() {
     let payload = buildAutomatchPayload(this.matchmaking.options)
+    this.assertAuthenticatedSocket()
+
+    if (['searching', 'matched'].includes(this.matchmaking.status)) {
+      throw new OgsError('invalid-state', 'OGS automatch is already active.')
+    }
+
+    this.socket.send('automatch/find_match', payload)
 
     this.matchmaking = {
       ...this.matchmaking,
-      status: 'mock-logged',
+      status: 'searching',
       payload,
+      matchedGameId: null,
       error: null,
     }
 
-    console.log('[ogs:automatch] mock find_match', JSON.stringify(payload))
+    console.log('[ogs:automatch] find_match', JSON.stringify(payload))
+
+    return this.getState()
+  }
+
+  cancelAutomatch() {
+    let uuid = sanitizeAutomatchUuid(this.matchmaking.payload?.uuid)
+    this.assertAuthenticatedSocket()
+
+    if (this.matchmaking.status !== 'searching') {
+      throw new OgsError('invalid-state', 'OGS automatch is not searching.')
+    }
+
+    this.socket.send('automatch/cancel', {uuid})
+    this.matchmaking = {
+      ...this.matchmaking,
+      status: 'idle',
+      payload: null,
+      matchedGameId: null,
+      error: null,
+    }
+
+    return this.getState()
+  }
+
+  acknowledgeAutomatchOpen(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+
+    if (this.matchmaking.matchedGameId === gameId) {
+      this.matchmaking = {
+        ...this.matchmaking,
+        status: 'idle',
+        payload: null,
+        matchedGameId: null,
+        error: null,
+      }
+    }
 
     return this.getState()
   }
@@ -858,16 +911,65 @@ class OgsClient {
       return
     }
 
-    if (event === 'automatch/start') {
-      let gameId = sanitizeOptionalGameId(payload?.game_id)
+    if (event === 'automatch/entry') {
+      let entry = sanitizeAutomatchEntry(payload)
+      if (entry == null) return
 
-      if (gameId != null) {
-        this.onlineGame = {
-          ...this.onlineGame,
-          status: 'matched',
-          gameId,
+      if (
+        this.matchmaking.status !== 'searching' ||
+        entry.uuid !== this.matchmaking.payload?.uuid
+      ) {
+        return
+      }
+
+      this.matchmaking = {
+        ...this.matchmaking,
+        status: 'searching',
+        payload: {
+          ...this.matchmaking.payload,
+          timestamp: entry.timestamp ?? this.matchmaking.payload.timestamp,
+        },
+        matchedGameId: null,
+        error: null,
+      }
+      return
+    }
+
+    if (event === 'automatch/cancel') {
+      let uuid = sanitizeOptionalAutomatchUuid(payload?.uuid)
+      if (
+        this.matchmaking.status === 'searching' &&
+        uuid === this.matchmaking.payload?.uuid
+      ) {
+        this.matchmaking = {
+          ...this.matchmaking,
+          status: 'idle',
+          payload: null,
+          matchedGameId: null,
           error: null,
         }
+      }
+      return
+    }
+
+    if (event === 'automatch/start') {
+      let gameId = sanitizeOptionalGameId(payload?.game_id)
+      let uuid = sanitizeOptionalAutomatchUuid(payload?.uuid)
+
+      if (
+        gameId != null &&
+        this.matchmaking.status === 'searching' &&
+        uuid != null &&
+        uuid === this.matchmaking.payload?.uuid
+      ) {
+        this.matchmaking = {
+          ...this.matchmaking,
+          status: 'matched',
+          matchedGameId: gameId,
+          payload: this.matchmaking.payload,
+          error: null,
+        }
+        this.connectGame({gameId})
       }
 
       return
@@ -1647,6 +1749,33 @@ function sanitizeMatchmakingOptions(options = {}) {
   }
 }
 
+function sanitizeAutomatchUuid(value) {
+  let uuid = sanitizeOptionalAutomatchUuid(value)
+  if (uuid == null) {
+    throw new OgsError('invalid-input', 'A valid OGS automatch ID is required.')
+  }
+
+  return uuid
+}
+
+function sanitizeOptionalAutomatchUuid(value) {
+  return typeof value === 'string' && /^[0-9a-f-]{1,80}$/i.test(value)
+    ? value
+    : null
+}
+
+function sanitizeAutomatchEntry(value) {
+  if (value == null || typeof value !== 'object') return null
+
+  let uuid = sanitizeOptionalAutomatchUuid(value.uuid)
+  if (uuid == null) return null
+
+  return {
+    uuid,
+    timestamp: sanitizeNumber(value.timestamp),
+  }
+}
+
 function sanitizeArrayOption(value, allowedValues, fallback) {
   if (!Array.isArray(value)) return [...fallback]
 
@@ -1722,9 +1851,29 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
     client.setMatchmakingOptions(options),
   )
 
-  ipcMain.handle('ogs:logMockAutomatchRequest', () =>
-    client.logMockAutomatchRequest(),
-  )
+  ipcMain.handle('ogs:startAutomatch', () => {
+    try {
+      return {ok: true, state: client.startAutomatch()}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:cancelAutomatch', (evt, input) => {
+    try {
+      return {ok: true, state: client.cancelAutomatch(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:acknowledgeAutomatchOpen', (evt, input) => {
+    try {
+      return {ok: true, state: client.acknowledgeAutomatchOpen(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
 
   ipcMain.handle('ogs:connectGame', (evt, input) => {
     try {

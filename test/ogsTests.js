@@ -293,8 +293,14 @@ describe('OGS client', () => {
     )
   })
 
-  it('builds and logs an official automatch payload without sending it', () => {
-    let client = new OgsClient({webSocketImpl: FakeWebSocket})
+  it('starts, cancels, and handles OGS automatch', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
     client.setMatchmakingOptions({
       boardSizes: [9, 13],
       speeds: ['blitz', 'rapid'],
@@ -305,9 +311,10 @@ describe('OGS client', () => {
       handicap: {condition: 'preferred', value: 'enabled'},
     })
 
-    let state = client.logMockAutomatchRequest()
+    let state = client.startAutomatch()
+    let socket = FakeWebSocket.instances[0]
 
-    assert.strictEqual(state.matchmaking.status, 'mock-logged')
+    assert.strictEqual(state.matchmaking.status, 'searching')
     assert.strictEqual(typeof state.matchmaking.payload.uuid, 'string')
     assert.strictEqual(typeof state.matchmaking.payload.timestamp, 'number')
     assert.deepStrictEqual(state.matchmaking.payload.size_speed_options, [
@@ -326,6 +333,90 @@ describe('OGS client', () => {
       condition: 'preferred',
       value: 'enabled',
     })
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'automatch/find_match',
+      state.matchmaking.payload,
+    ])
+    let sentCount = socket.sent.length
+    assert.throws(
+      () => client.startAutomatch(),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.strictEqual(socket.sent.length, sentCount)
+    assert.throws(
+      () => client.setMatchmakingOptions({boardSizes: [19]}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.deepStrictEqual(
+      client.getState().matchmaking.payload,
+      state.matchmaking.payload,
+    )
+
+    let uuid = state.matchmaking.payload.uuid
+
+    state = client.cancelAutomatch({uuid: 'not-owned'})
+    assert.strictEqual(state.matchmaking.status, 'idle')
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'automatch/cancel',
+      {uuid},
+    ])
+    socket.receive('automatch/entry', {uuid, timestamp: 123})
+    state = client.getState()
+    assert.strictEqual(state.matchmaking.status, 'idle')
+    socket.receive('automatch/start', {uuid, game_id: 99999})
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.gameId, null)
+
+    client.startAutomatch()
+    uuid = client.getState().matchmaking.payload.uuid
+    let localPayload = client.getState().matchmaking.payload
+    socket.receive('automatch/entry', {
+      uuid,
+      size_speed_options: [{size: '19x19', speed: 'live', system: 'byoyomi'}],
+      lower_rank_diff: 9,
+      upper_rank_diff: 9,
+      timestamp: 456,
+    })
+    state = client.getState()
+    assert.deepStrictEqual(state.matchmaking.payload, {
+      ...localPayload,
+      timestamp: 456,
+    })
+    socket.receive('automatch/entry', {uuid: 'foreign-search', timestamp: 789})
+    socket.receive('automatch/start', {uuid: 'foreign-search', game_id: 99999})
+    state = client.getState()
+    assert.strictEqual(state.matchmaking.status, 'searching')
+    assert.strictEqual(state.matchmaking.payload.uuid, uuid)
+    assert.strictEqual(state.onlineGame.gameId, null)
+    socket.receive('automatch/start', {uuid: 'stale-search', game_id: 99999})
+    state = client.getState()
+    assert.strictEqual(state.matchmaking.status, 'searching')
+    assert.strictEqual(state.onlineGame.gameId, null)
+
+    socket.receive('automatch/start', {uuid, game_id: 12345})
+    state = client.getState()
+    assert.strictEqual(state.matchmaking.status, 'matched')
+    assert.strictEqual(state.matchmaking.matchedGameId, 12345)
+    assert.strictEqual(state.onlineGame.status, 'connecting')
+    assert.strictEqual(state.onlineGame.gameId, 12345)
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/connect',
+      {game_id: 12345, chat: true},
+    ])
+    socket.receive('automatch/cancel', {uuid})
+    state = client.getState()
+    assert.strictEqual(state.matchmaking.status, 'matched')
+    assert.strictEqual(state.matchmaking.matchedGameId, 12345)
+    sentCount = socket.sent.length
+    assert.throws(
+      () => client.cancelAutomatch(),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.strictEqual(socket.sent.length, sentCount)
+
+    state = client.acknowledgeAutomatchOpen({gameId: 12345})
+    assert.strictEqual(state.matchmaking.status, 'idle')
+    assert.strictEqual(state.matchmaking.matchedGameId, null)
 
     state = client.setMatchmakingOptions({boardSizes: [19]})
     assert.strictEqual(state.matchmaking.status, 'idle')

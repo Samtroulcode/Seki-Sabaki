@@ -195,15 +195,54 @@ export default class OgsPanel extends Component {
       })
     }
 
-    this.handleLogAutomatchButtonClick = async () => {
-      try {
-        let state = await window.sabaki.ogs.logMockAutomatchRequest()
+    this.handleStartAutomatchButtonClick = async () => {
+      this.setState({busy: true, error: null})
 
-        this.setState({
-          matchmaking: state.matchmaking,
-          socket: state.socket,
-        })
-      } catch (err) {}
+      try {
+        let result = await window.sabaki.ogs.startAutomatch()
+
+        if (result.ok) {
+          this.setState({
+            matchmaking: result.state.matchmaking,
+            socket: result.state.socket,
+          })
+        } else {
+          this.setState({
+            error: result.error?.message || t('Unable to start automatch.'),
+            matchmaking: result.state?.matchmaking || this.state.matchmaking,
+            socket: result.state?.socket || this.state.socket,
+          })
+        }
+      } catch (err) {
+        this.setState({error: t('Unable to start automatch.')})
+      }
+
+      this.setState({busy: false})
+    }
+
+    this.handleCancelAutomatchButtonClick = async () => {
+      this.setState({busy: true, error: null})
+
+      try {
+        let result = await window.sabaki.ogs.cancelAutomatch()
+
+        if (result.ok) {
+          this.setState({
+            matchmaking: result.state.matchmaking,
+            socket: result.state.socket,
+          })
+        } else {
+          this.setState({
+            error: result.error?.message || t('Unable to cancel automatch.'),
+            matchmaking: result.state?.matchmaking || this.state.matchmaking,
+            socket: result.state?.socket || this.state.socket,
+          })
+        }
+      } catch (err) {
+        this.setState({error: t('Unable to cancel automatch.')})
+      }
+
+      this.setState({busy: false})
     }
   }
 
@@ -304,6 +343,20 @@ export default class OgsPanel extends Component {
         connected: true,
       })
       await this.handleOnlineGameError(state.onlineGame)
+
+      if (
+        state.matchmaking?.status === 'matched' &&
+        state.matchmaking?.matchedGameId === state.onlineGame?.gameId &&
+        state.onlineGame?.status === 'connected'
+      ) {
+        if (this.syncingOnlineGame) return
+
+        let opened = await this.syncOnlineGameToBoard(state.onlineGame)
+        if (!opened) this.declinedOnlineGameId = state.onlineGame.gameId
+        await window.sabaki.ogs.acknowledgeAutomatchOpen(
+          state.onlineGame.gameId,
+        )
+      }
     }
   }
 
@@ -443,10 +496,12 @@ export default class OgsPanel extends Component {
                   options: matchmakingOptions,
                   status: matchmaking?.status,
                   authenticated,
+                  busy,
                   onOptionChange: this.handleMatchmakingOptionChange,
                   onConditionChange: this.handleConditionOptionChange,
                   onMultiChange: this.handleMultiOptionChange,
-                  onLogAutomatch: this.handleLogAutomatchButtonClick,
+                  onStartAutomatch: this.handleStartAutomatchButtonClick,
+                  onCancelAutomatch: this.handleCancelAutomatchButtonClick,
                 }),
               ),
             ),
@@ -655,16 +710,21 @@ function AutomatchForm({
   options,
   status,
   authenticated,
+  busy,
   onOptionChange,
   onConditionChange,
   onMultiChange,
-  onLogAutomatch,
+  onStartAutomatch,
+  onCancelAutomatch,
 }) {
+  let searching = status === 'searching'
+  let active = ['searching', 'matched'].includes(status)
+
   return h(
     'section',
     {class: 'ogs-matchmaking'},
     h('h3', {}, t('Automatch')),
-    h('p', {}, t('Prepare an official OGS automatch payload.')),
+    h('p', {}, t('Find an OGS opponent with the selected options.')),
 
     h(CheckboxGroup, {
       title: t('Board sizes'),
@@ -672,6 +732,7 @@ function AutomatchForm({
       values: boardSizes,
       selected: options.boardSizes,
       format: (size) => `${size}x${size}`,
+      disabled: active || busy,
       onChange: onMultiChange,
     }),
 
@@ -680,6 +741,7 @@ function AutomatchForm({
       name: 'speeds',
       values: speeds,
       selected: options.speeds,
+      disabled: active || busy,
       onChange: onMultiChange,
     }),
 
@@ -688,6 +750,7 @@ function AutomatchForm({
       name: 'timeSystem',
       value: options.timeSystem,
       values: timeSystems,
+      disabled: active || busy,
       onChange: onOptionChange,
     }),
 
@@ -695,6 +758,7 @@ function AutomatchForm({
       label: t('Lower rank difference'),
       name: 'lowerRankDiff',
       value: options.lowerRankDiff,
+      disabled: active || busy,
       onInput: onOptionChange,
     }),
 
@@ -702,6 +766,7 @@ function AutomatchForm({
       label: t('Upper rank difference'),
       name: 'upperRankDiff',
       value: options.upperRankDiff,
+      disabled: active || busy,
       onInput: onOptionChange,
     }),
 
@@ -710,6 +775,7 @@ function AutomatchForm({
       group: 'rules',
       option: options.rules,
       values: rules,
+      disabled: active || busy,
       onChange: onConditionChange,
     }),
 
@@ -718,24 +784,41 @@ function AutomatchForm({
       group: 'handicap',
       option: options.handicap,
       values: handicapValues,
+      disabled: active || busy,
       onChange: onConditionChange,
     }),
 
-    status === 'mock-logged' &&
-      h('p', {class: 'ogs-matchmaking-status'}, t('Automatch payload logged.')),
+    status === 'searching' &&
+      h('p', {class: 'ogs-matchmaking-status'}, t('Searching for opponent…')),
+    status === 'matched' &&
+      h(
+        'p',
+        {class: 'ogs-matchmaking-status'},
+        t('Match found. Opening board…'),
+      ),
 
-    h(
-      'button',
-      {
-        type: 'button',
-        disabled: !authenticated,
-        title: !authenticated
-          ? t('OGS socket must be authenticated first.')
-          : t('Log the payload without sending it to OGS.'),
-        onClick: onLogAutomatch,
-      },
-      t('Log automatch request'),
-    ),
+    searching
+      ? h(
+          'button',
+          {
+            type: 'button',
+            disabled: busy,
+            onClick: onCancelAutomatch,
+          },
+          t('Cancel automatch'),
+        )
+      : h(
+          'button',
+          {
+            type: 'button',
+            disabled: busy || !authenticated || active,
+            title: !authenticated
+              ? t('OGS socket must be authenticated first.')
+              : t('Start OGS automatch.'),
+            onClick: onStartAutomatch,
+          },
+          t('Start automatch'),
+        ),
   )
 }
 
@@ -854,6 +937,7 @@ function CheckboxGroup({
   values,
   selected,
   format = (x) => x,
+  disabled,
   onChange,
 }) {
   return h(
@@ -869,6 +953,7 @@ function CheckboxGroup({
           name,
           value,
           checked: selected.includes(value),
+          disabled,
           onChange,
         }),
         h('span', {}, format(value)),
@@ -877,29 +962,44 @@ function CheckboxGroup({
   )
 }
 
-function SelectField({label, name, value, values, onChange}) {
+function SelectField({label, name, value, values, disabled, onChange}) {
   return h(
     'label',
     {},
     h('span', {}, label),
     h(
       'select',
-      {name, value, onChange},
+      {name, value, disabled, onChange},
       values.map((item) => h('option', {value: item}, item)),
     ),
   )
 }
 
-function NumberField({label, name, value, onInput}) {
+function NumberField({label, name, value, disabled, onInput}) {
   return h(
     'label',
     {},
     h('span', {}, label),
-    h('input', {name, type: 'number', min: 0, max: 9, value, onInput}),
+    h('input', {
+      name,
+      type: 'number',
+      min: 0,
+      max: 9,
+      value,
+      disabled,
+      onInput,
+    }),
   )
 }
 
-function ConditionValueField({title, group, option, values, onChange}) {
+function ConditionValueField({
+  title,
+  group,
+  option,
+  values,
+  disabled,
+  onChange,
+}) {
   return h(
     'fieldset',
     {},
@@ -909,6 +1009,7 @@ function ConditionValueField({title, group, option, values, onChange}) {
       name: `${group}.condition`,
       value: option.condition,
       values: conditions,
+      disabled,
       onChange,
     }),
     h(SelectField, {
@@ -916,6 +1017,7 @@ function ConditionValueField({title, group, option, values, onChange}) {
       name: `${group}.value`,
       value: option.value,
       values,
+      disabled,
       onChange,
     }),
   )

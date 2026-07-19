@@ -142,8 +142,10 @@ window.sabaki = {
       ipcRenderer.invoke('ogs:login', {username, password}),
     setMatchmakingOptions: (options) =>
       ipcRenderer.invoke('ogs:setMatchmakingOptions', options),
-    logMockAutomatchRequest: () =>
-      ipcRenderer.invoke('ogs:logMockAutomatchRequest'),
+    startAutomatch: () => ipcRenderer.invoke('ogs:startAutomatch'),
+    cancelAutomatch: () => ipcRenderer.invoke('ogs:cancelAutomatch'),
+    acknowledgeAutomatchOpen: (gameId) =>
+      ipcRenderer.invoke('ogs:acknowledgeAutomatchOpen', {gameId}),
     connectGame: (gameId) => ipcRenderer.invoke('ogs:connectGame', {gameId}),
     disconnectGame: (gameId) =>
       ipcRenderer.invoke('ogs:disconnectGame', {gameId}),

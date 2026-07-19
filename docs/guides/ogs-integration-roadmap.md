@@ -43,10 +43,9 @@ accounts.
 
 ### 4. Play And Matchmaking
 
-- Replace the current automatch payload mock with real automatch start/cancel
-  behavior once the protocol is verified.
-- Show clear searching, matched, cancelled, and error states.
-- Offer direct transition to the board when a match is found.
+- Real automatch start/cancel is wired to the verified OGS socket protocol.
+- Keep clear searching, matched, cancelled, and error states.
+- Auto-transition to the board when a match is found and the game connects.
 
 ### 5. Custom Challenges
 
@@ -86,5 +85,11 @@ accounts.
   <https://docs.online-go.com/goban/interfaces/protocol.ClientToServer.html>,
   `game/removed_stones/set` and `game/removed_stones/accept`, verified
   2026-07-19.
+- Automatch starts with `automatch/find_match`, cancels with `automatch/cancel`,
+  and reports matches with `automatch/start` carrying `{uuid, game_id}`. Source:
+  OGS Goban protocol docs,
+  <https://docs.online-go.com/goban/interfaces/protocol.ClientToServer.html> and
+  <https://docs.online-go.com/goban/interfaces/protocol.ServerToClient.html>,
+  verified 2026-07-19.
 
 Keep this section updated as new protocol assumptions are verified.

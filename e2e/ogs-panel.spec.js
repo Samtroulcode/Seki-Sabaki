@@ -93,9 +93,15 @@ test.describe('OGS mock panel', () => {
           window.__ogsTestState.matchmaking.options = options
           return window.__ogsTestState
         },
-        logMockAutomatchRequest: async () => {
-          window.__ogsTestState.matchmaking.status = 'mock-logged'
-          return window.__ogsTestState
+        startAutomatch: async () => {
+          window.__ogsTestState.matchmaking.status = 'searching'
+          window.__ogsTestState.matchmaking.payload = {uuid: 'fixture-search'}
+          return {ok: true, state: window.__ogsTestState}
+        },
+        cancelAutomatch: async () => {
+          window.__ogsTestState.matchmaking.status = 'idle'
+          window.__ogsTestState.matchmaking.payload = null
+          return {ok: true, state: window.__ogsTestState}
         },
         connectGame: async (gameId) => {
           let now = Date.now()
@@ -265,8 +271,12 @@ test.describe('OGS mock panel', () => {
       .selectOption('disabled')
     await page.locator('.ogs-matchmaking button').click()
     await expect(page.locator('.ogs-matchmaking')).toContainText(
-      'Automatch payload logged.',
+      'Searching for opponent…',
     )
+    await page.getByRole('button', {name: 'Cancel automatch'}).click()
+    await expect(
+      page.getByRole('button', {name: 'Start automatch'}),
+    ).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toContainText('Active games')
     await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
@@ -557,6 +567,72 @@ test.describe('OGS mock panel', () => {
         sequence[1].B?.[0] === 'cc'
       )
     })
+  })
+
+  test('opens the board automatically when automatch finds a game', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__ogsAcknowledgedAutomatchGame = null
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        socket: {status: 'authenticated', authenticated: true, error: null},
+        matchmaking: {
+          status: 'matched',
+          payload: {uuid: 'matched-fixture'},
+          matchedGameId: 42,
+          options: {
+            boardSizes: [19],
+            speeds: ['rapid'],
+            timeSystem: 'byoyomi',
+            lowerRankDiff: 3,
+            upperRankDiff: 3,
+            rules: {condition: 'required', value: 'japanese'},
+            handicap: {condition: 'preferred', value: 'enabled'},
+          },
+        },
+        onlineGame: {
+          status: 'connected',
+          gameId: 42,
+          error: null,
+          gameName: 'Automatch Fixture',
+          board: {width: 19, height: 19},
+          handicap: 0,
+          komi: 6.5,
+          rules: 'japanese',
+          ranked: true,
+          phase: 'play',
+          players: {
+            black: {id: 7, username: 'sekibot'},
+            white: {id: 8, username: 'opponent'},
+          },
+          moves: [{move: 'aa', moveNumber: 1}],
+          moveCount: 1,
+          lastMove: 'aa',
+          clock: null,
+          chat: [],
+        },
+        activeGames: [],
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        acknowledgeAutomatchOpen: async (gameId) => {
+          window.__ogsAcknowledgedAutomatchGame = gameId
+          window.__ogsTestState.matchmaking.status = 'idle'
+          window.__ogsTestState.matchmaking.matchedGameId = null
+          return {ok: true, state: window.__ogsTestState}
+        },
+      }
+      window.__sabaki.setState({activeWorkspace: 'online'})
+    })
+
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.onlineGameId === 42 &&
+        window.__ogsAcknowledgedAutomatchGame === 42,
+    )
+    await expect(page.locator('#goban')).toBeVisible()
   })
 
   test('uses Sabaki scoring UI to accept OGS dead stones', async ({page}) => {
