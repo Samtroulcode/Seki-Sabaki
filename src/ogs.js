@@ -707,6 +707,21 @@ class OgsClient {
     return this.getState()
   }
 
+  sendChat(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+    let body = sanitizeOutgoingChatBody(input.body)
+
+    this.assertCanChat(gameId)
+    this.socket.send('game/chat', {
+      game_id: gameId,
+      type: 'main',
+      move_number: sanitizeMoveCount(this.onlineGame.moveCount, 0),
+      body,
+    })
+
+    return this.getState()
+  }
+
   assertAuthenticatedSocket() {
     let state = this.socket.getState()
 
@@ -782,6 +797,28 @@ class OgsClient {
         'invalid-state',
         'OGS game is not in stone removal phase.',
       )
+    }
+
+    let userId = sanitizeOptionalGameId(this.session?.user?.id)
+    let blackId = this.onlineGame.players?.black?.id
+    let whiteId = this.onlineGame.players?.white?.id
+
+    if (userId == null || ![blackId, whiteId].includes(userId)) {
+      throw new OgsError(
+        'invalid-state',
+        'OGS user is not a player in this game.',
+      )
+    }
+  }
+
+  assertCanChat(gameId) {
+    this.assertAuthenticatedSocket()
+
+    if (
+      this.onlineGame.gameId !== gameId ||
+      this.onlineGame.status !== 'connected'
+    ) {
+      throw new OgsError('invalid-state', 'OGS game is not connected.')
     }
 
     let userId = sanitizeOptionalGameId(this.session?.user?.id)
@@ -1247,6 +1284,23 @@ function sanitizeRemovedFlag(value) {
   if (typeof value === 'boolean') return value
 
   throw new OgsError('invalid-input', 'Invalid OGS removed-stones flag.')
+}
+
+function sanitizeOutgoingChatBody(value) {
+  if (typeof value !== 'string') {
+    throw new OgsError('invalid-input', 'A valid OGS chat message is required.')
+  }
+
+  let body = value.trim()
+  if (body === '') {
+    throw new OgsError('invalid-input', 'A valid OGS chat message is required.')
+  }
+
+  if (body.length > 1000) {
+    throw new OgsError('invalid-input', 'OGS chat message is too long.')
+  }
+
+  return body
 }
 
 function sanitizeRemovedStones(payload, board = null) {
@@ -1723,6 +1777,14 @@ function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
   ipcMain.handle('ogs:acceptRemovedStones', (evt, input) => {
     try {
       return {ok: true, state: client.acceptRemovedStones(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:sendChat', (evt, input) => {
+    try {
+      return {ok: true, state: client.sendChat(input || {})}
     } catch (err) {
       return {ok: false, error: serializeError(err), state: client.getState()}
     }

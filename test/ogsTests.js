@@ -699,6 +699,20 @@ describe('OGS client', () => {
     )
 
     socket.receive('game/12345/move', {move_number: 2, move: 'dd'})
+    client.sendChat({gameId: 12345, body: ' hello '})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/chat',
+      {game_id: 12345, type: 'main', move_number: 2, body: 'hello'},
+    ])
+    assert.throws(
+      () => client.sendChat({gameId: 12345, body: '   '}),
+      (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+    assert.throws(
+      () => client.sendChat({gameId: 12345, body: 'x'.repeat(1001)}),
+      (err) => err instanceof OgsError && err.code === 'invalid-input',
+    )
+
     client.pass({gameId: 12345})
     assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
       'game/move',
@@ -797,6 +811,10 @@ describe('OGS client', () => {
       () => client.playMove({gameId: 12345, x: 2, y: 3}),
       (err) => err instanceof OgsError && err.code === 'invalid-state',
     )
+    assert.throws(
+      () => client.sendChat({gameId: 12345, body: 'hello'}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
     assert.strictEqual(socket.sent.length, sentCount)
   })
 
@@ -857,6 +875,26 @@ describe('OGS client', () => {
     )
     assert.throws(
       () => client.resign({gameId: 12345}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.throws(
+      () => client.sendChat({gameId: 12345, body: 'hello'}),
+      (err) => err instanceof OgsError && err.code === 'invalid-state',
+    )
+    assert.strictEqual(socket.sent.length, sentCount)
+
+    socket.receive('game/12345/gamedata', {
+      width: 9,
+      height: 9,
+      phase: 'play',
+      players: {
+        black: {id: 8, username: 'gote'},
+        white: {id: 9, username: 'other'},
+      },
+      moves: [],
+    })
+    assert.throws(
+      () => client.sendChat({gameId: 12345, body: 'hello'}),
       (err) => err instanceof OgsError && err.code === 'invalid-state',
     )
     assert.strictEqual(socket.sent.length, sentCount)

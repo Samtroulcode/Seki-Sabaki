@@ -159,6 +159,8 @@ window.sabaki = {
       ipcRenderer.invoke('ogs:setRemovedStones', {gameId, stones, removed}),
     acceptRemovedStones: (gameId) =>
       ipcRenderer.invoke('ogs:acceptRemovedStones', {gameId}),
+    sendChat: (gameId, body) =>
+      ipcRenderer.invoke('ogs:sendChat', {gameId, body}),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 

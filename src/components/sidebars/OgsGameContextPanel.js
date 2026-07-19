@@ -16,6 +16,7 @@ export default class OgsGameContextPanel extends Component {
       onlineGame: null,
       error: null,
       busy: false,
+      chatBody: '',
       revision: 0,
     }
     this.syncingOnlineGame = false
@@ -65,6 +66,41 @@ export default class OgsGameContextPanel extends Component {
         }
       } catch (err) {
         this.setState({error: t('Unable to disconnect game.')})
+      }
+
+      this.setState({busy: false})
+      await this.refreshOgsState()
+    }
+
+    this.handleChatInput = (evt) => {
+      this.setState({chatBody: evt.currentTarget.value})
+    }
+
+    this.handleChatSubmit = async (evt) => {
+      evt.preventDefault()
+
+      let {onlineGameId} = this.props
+      let body = this.state.chatBody.trim()
+      if (onlineGameId == null || body === '') return
+
+      this.setState({busy: true, error: null})
+
+      try {
+        let result = await window.sabaki.ogs.sendChat(onlineGameId, body)
+
+        if (result?.ok === false) {
+          this.setState({
+            error: result.error?.message || t('Unable to send chat message.'),
+          })
+          this.setState({busy: false})
+          return
+        } else {
+          this.setState({chatBody: ''})
+        }
+      } catch (err) {
+        this.setState({error: t('Unable to send chat message.')})
+        this.setState({busy: false})
+        return
       }
 
       this.setState({busy: false})
@@ -152,7 +188,7 @@ export default class OgsGameContextPanel extends Component {
     }
   }
 
-  render({onlineGameId}, {user, onlineGame, error, busy}) {
+  render({onlineGameId}, {user, onlineGame, error, busy, chatBody}) {
     let game = onlineGame?.gameId === onlineGameId ? onlineGame : null
     game = withOptimisticPendingMove(game)
     let playable = game?.status === 'connected' && game?.phase === 'play'
@@ -226,7 +262,13 @@ export default class OgsGameContextPanel extends Component {
                 {class: 'ogs-stone-removal-hint'},
                 t('Click stones on the board to mark dead groups.'),
               ),
-            h(ChatSection, {chat: game.chat}),
+            h(ChatSection, {
+              chat: game.chat,
+              body: chatBody,
+              disabled: busy || game?.status !== 'connected',
+              onInput: this.handleChatInput,
+              onSubmit: this.handleChatSubmit,
+            }),
           ],
 
       error != null && h('p', {class: 'ogs-error'}, error),
@@ -348,7 +390,7 @@ function getOgsCaptures(game) {
   }
 }
 
-function ChatSection({chat = []}) {
+function ChatSection({chat = [], body = '', disabled, onInput, onSubmit}) {
   return h(
     'section',
     {class: 'ogs-game-context-chat'},
@@ -370,6 +412,27 @@ function ChatSection({chat = []}) {
               ),
             ),
         ),
+    h(
+      'form',
+      {class: 'ogs-game-context-chat-form', onSubmit},
+      h('input', {
+        type: 'text',
+        name: 'ogsChatMessage',
+        value: body,
+        maxlength: 1000,
+        placeholder: t('Send a message…'),
+        disabled,
+        onInput,
+      }),
+      h(
+        'button',
+        {
+          type: 'submit',
+          disabled: disabled || body.trim() === '',
+        },
+        t('Send'),
+      ),
+    ),
   )
 }
 

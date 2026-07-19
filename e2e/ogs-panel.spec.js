@@ -23,6 +23,7 @@ test.describe('OGS mock panel', () => {
       window.__ogsTestSession = null
       window.__ogsPlayedMoves = []
       window.__ogsRemovedStonesCommands = []
+      window.__ogsChatMessages = []
       window.__ogsTestState = {
         user: null,
         socket: {
@@ -180,6 +181,14 @@ test.describe('OGS mock panel', () => {
           })
           return {ok: true, state: window.__ogsTestState}
         },
+        sendChat: async (gameId, body) => {
+          window.__ogsChatMessages.push({gameId, body})
+          window.__ogsTestState.onlineGame.chat.push({
+            username: 'sekibot',
+            body,
+          })
+          return {ok: true, state: window.__ogsTestState}
+        },
         logout: async () => {
           window.__ogsTestSession = null
           window.__ogsTestState.user = null
@@ -310,7 +319,17 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-game-context-chat')).toContainText(
       'good luck',
     )
-    await expect(page.locator('.ogs-game-context-chat input')).toHaveCount(0)
+    await page.locator('.ogs-game-context-chat input').fill('hello from Sabaki')
+    await page.locator('.ogs-game-context-chat button').click()
+    await page.waitForFunction(
+      () =>
+        window.__ogsChatMessages.length === 1 &&
+        window.__ogsChatMessages[0].gameId === 42 &&
+        window.__ogsChatMessages[0].body === 'hello from Sabaki',
+    )
+    await expect(page.locator('.ogs-game-context-chat')).toContainText(
+      'hello from Sabaki',
+    )
     await expect(page.locator('.gtp-console')).toHaveCount(0)
 
     await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
