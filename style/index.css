@@ -487,6 +487,14 @@ header .menu img {
 #leftsidebar .left-sidebar-content {
   min-height: 0;
 }
+.left-sidebar-title {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  background: #292a2d;
+  color: #eee;
+  font-weight: bold;
+}
 
 .gtp-console {
   display: grid;
@@ -1594,7 +1602,7 @@ button:active {
   z-index: 2;
 }
 
-.online-context-placeholder {
+.ogs-game-context-panel {
   display: grid;
   align-content: start;
   gap: 0.7rem;
@@ -1605,12 +1613,101 @@ button:active {
   color: #d0d0d0;
   overflow: auto;
 }
-.online-context-placeholder h2,
-.online-context-placeholder p {
+.ogs-game-context-panel h2,
+.ogs-game-context-panel h3,
+.ogs-game-context-panel p {
   margin: 0;
 }
-.online-context-placeholder h2 {
+.ogs-game-context-panel h2,
+.ogs-game-context-panel h3 {
   color: white;
+}
+.ogs-game-context-header,
+.ogs-game-context-chat {
+  display: grid;
+  gap: 0.4rem;
+}
+.ogs-game-context-player {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.55rem;
+  background: #111;
+  border-left: 3px solid #555;
+}
+.ogs-game-context-player.black {
+  border-left-color: #111;
+}
+.ogs-game-context-player.white {
+  border-left-color: #ddd;
+}
+.ogs-game-context-player.active {
+  background: #202020;
+}
+.ogs-game-context-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 3px;
+  background: #292a2d;
+  color: white;
+  font-weight: bold;
+}
+.ogs-game-context-player-info {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.ogs-game-context-player-info strong,
+.ogs-game-context-player-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ogs-game-context-player-info span,
+.ogs-game-context-status dt,
+.ogs-game-context-turn,
+.ogs-game-context-chat strong {
+  color: #aaa;
+}
+.ogs-game-context-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.6rem;
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid #292a2d;
+}
+.ogs-game-context-status dd {
+  margin: 0;
+}
+.ogs-game-context-chat {
+  padding-top: 0.7rem;
+  border-top: 1px solid #292a2d;
+}
+.ogs-game-context-chat ol {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.ogs-game-context-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding-top: 0.7rem;
+  border-top: 1px solid #292a2d;
+}
+.ogs-game-context-actions button {
+  padding: 0.35rem 0.7rem;
+  background: #292a2d;
+  color: #eee;
+}
+.ogs-game-context-actions button:disabled {
+  opacity: 0.5;
 }
 .engine-peer-list.no-tool-bar {
   grid-template: 100% / 100%;

@@ -215,7 +215,24 @@ test.describe('OGS mock panel', () => {
       )
     })
     await expect(page.locator('#goban')).toBeVisible()
-    await expect(page.locator('.online-context-placeholder')).toBeVisible()
+    await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'Fixture Game',
+    )
+    await expect(page.locator('.ogs-game-context-panel')).toContainText('#42')
+    await expect(page.locator('.ogs-game-context-panel')).toContainText('19x19')
+    await expect(page.locator('.ogs-game-context-panel')).toContainText('play')
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'sekibot',
+    )
+    await expect(page.locator('.ogs-game-context-panel')).toContainText('1d')
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'opponent',
+    )
+    await expect(page.locator('.ogs-game-context-chat')).toContainText(
+      'good luck',
+    )
+    await expect(page.locator('.ogs-game-context-chat input')).toHaveCount(0)
     await expect(page.locator('.gtp-console')).toHaveCount(0)
 
     await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
@@ -326,7 +343,10 @@ test.describe('OGS mock panel', () => {
     })
 
     await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
-    await page.getByRole('button', {name: 'Disconnect game'}).click()
+    await page
+      .locator('.ogs-online-game')
+      .getByRole('button', {name: 'Disconnect game'})
+      .click()
     await page.waitForFunction(() => window.__sabaki.state.onlineGameId == null)
 
     await page.evaluate(() => {
@@ -352,7 +372,7 @@ test.describe('OGS mock panel', () => {
     await page.locator('#apprail').getByRole('button', {name: 'Board'}).click()
 
     await expect(page.locator('.ogs-panel')).toHaveCount(0)
-    await expect(page.locator('.online-context-placeholder')).toBeVisible()
+    await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
     await expect(page.locator('.engine-peer-list')).toHaveCount(0)
     await expect(page.locator('.gtp-console')).toHaveCount(0)
   })

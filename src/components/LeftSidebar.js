@@ -5,6 +5,7 @@ import i18n from '../i18n.js'
 import SplitContainer from './helpers/SplitContainer.js'
 import ToolBar, {ToolBarButton} from './ToolBar.js'
 import GtpConsole from './sidebars/GtpConsole.js'
+import OgsGameContextPanel from './sidebars/OgsGameContextPanel.js'
 import {EnginePeerList} from './sidebars/PeerList.js'
 
 const t = i18n.context('LeftSidebar')
@@ -79,6 +80,20 @@ export default class LeftSidebar extends Component {
     this.handleStartStopGameButtonClick = () => {
       sabaki.startStopEngineGame(sabaki.state.treePosition)
     }
+
+    this.handleOgsPassButtonClick = () => sabaki.makePass()
+
+    this.handleOgsResignButtonClick = () => sabaki.makeResign()
+
+    this.handleOgsDisconnectGame = async (gameId) => {
+      let result = await window.sabaki.ogs.disconnectGame(gameId)
+
+      if (result.ok) {
+        sabaki.detachOgsGame(gameId)
+      }
+
+      return result
+    }
   }
 
   shouldComponentUpdate(nextProps) {
@@ -108,48 +123,40 @@ export default class LeftSidebar extends Component {
         id: 'leftsidebar',
       },
 
-      h(
-        ToolBar,
-        {},
+      onlineGameId != null
+        ? h('div', {class: 'left-sidebar-title'}, t('OGS'))
+        : h(
+            ToolBar,
+            {},
 
-        h(ToolBarButton, {
-          icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
-          tooltip:
-            onlineGameId == null
-              ? t('Attach Engine…')
-              : t('Engine attachment is disabled during online games.'),
-          menu: true,
-          disabled: onlineGameId != null,
-          onClick: this.handleAttachEngineButtonClick,
-        }),
+            h(ToolBarButton, {
+              icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
+              tooltip: t('Attach Engine…'),
+              menu: true,
+              onClick: this.handleAttachEngineButtonClick,
+            }),
 
-        h(ToolBarButton, {
-          icon: './node_modules/@primer/octicons/build/svg/zap-16.svg',
-          tooltip: !engineGameOngoing
-            ? t('Start Engine vs. Engine Game')
-            : t('Stop Engine vs. Engine Game'),
-          checked: !!engineGameOngoing,
-          disabled: engineGameOngoing == null && onlineGameId != null,
-          onClick: this.handleStartStopGameButtonClick,
-        }),
-      ),
+            h(ToolBarButton, {
+              icon: './node_modules/@primer/octicons/build/svg/zap-16.svg',
+              tooltip: !engineGameOngoing
+                ? t('Start Engine vs. Engine Game')
+                : t('Stop Engine vs. Engine Game'),
+              checked: !!engineGameOngoing,
+              onClick: this.handleStartStopGameButtonClick,
+            }),
+          ),
 
       h(
         'div',
         {class: 'left-sidebar-content'},
 
         onlineGameId != null
-          ? h(
-              'div',
-              {class: 'online-context-placeholder'},
-              h('h2', {}, t('Online game')),
-              h(
-                'p',
-                {},
-                t('Engine controls are disabled while an OGS game is loaded.'),
-              ),
-              h('p', {}, t('OGS game details and chat will appear here.')),
-            )
+          ? h(OgsGameContextPanel, {
+              onlineGameId,
+              onPass: this.handleOgsPassButtonClick,
+              onResign: this.handleOgsResignButtonClick,
+              onDisconnectGame: this.handleOgsDisconnectGame,
+            })
           : h(SplitContainer, {
               vertical: true,
               invert: true,
