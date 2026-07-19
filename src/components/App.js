@@ -8,9 +8,12 @@ import influence from '@sabaki/influence'
 import TripleSplitContainer from './helpers/TripleSplitContainer.js'
 import ThemeManager from './ThemeManager.js'
 import MainMenu from './MainMenu.js'
+import AppRail from './AppRail.js'
+import HomeView from './HomeView.js'
 import MainView from './MainView.js'
 import LeftSidebar from './LeftSidebar.js'
 import Sidebar from './Sidebar.js'
+import OgsPanel from './sidebars/OgsPanel.js'
 import DrawerManager from './DrawerManager.js'
 import InputBox from './InputBox.js'
 import BusyScreen from './BusyScreen.js'
@@ -52,6 +55,7 @@ class App extends Component {
     })
 
     let bind = (f) => f.bind(this)
+    this.handleWheel = bind(this.handleWheel)
     this.handleMainLayoutSplitChange = bind(this.handleMainLayoutSplitChange)
     this.handleMainLayoutSplitFinish = bind(this.handleMainLayoutSplitFinish)
   }
@@ -68,10 +72,9 @@ class App extends Component {
     })
 
     ipcRenderer.on('load-file', (evt, ...args) => {
-      setTimeout(
-        () => sabaki.loadFile(...args),
-        setting.get('app.loadgame_delay'),
-      )
+      setTimeout(() => {
+        sabaki.loadFile(...args)
+      }, setting.get('app.loadgame_delay'))
     })
 
     sabaki.window.on('focus', () => {
@@ -97,24 +100,7 @@ class App extends Component {
 
     // Handle mouse wheel
 
-    for (let el of document.querySelectorAll(
-      '#main main, #graph, #winrategraph',
-    )) {
-      el.addEventListener('wheel', (evt) => {
-        evt.preventDefault()
-
-        if (this.residueDeltaY == null) this.residueDeltaY = 0
-        this.residueDeltaY += evt.deltaY
-
-        if (
-          Math.abs(this.residueDeltaY) >=
-          setting.get('game.navigation_sensitivity')
-        ) {
-          sabaki.goStep(Math.sign(this.residueDeltaY))
-          this.residueDeltaY = 0
-        }
-      })
-    }
+    document.addEventListener('wheel', this.handleWheel, {passive: false})
 
     // Handle file drag & drop
 
@@ -182,6 +168,16 @@ class App extends Component {
       if (['ArrowUp', 'ArrowDown'].includes(evt.key)) {
         sabaki.stopAutoscrolling()
       }
+    })
+
+    document.addEventListener('keydown', (evt) => {
+      if (!evt.ctrlKey && !evt.metaKey) return
+
+      if (evt.key !== 'Home') return
+      if (helper.isTextLikeElement(document.activeElement)) return
+
+      evt.preventDefault()
+      sabaki.setState({activeWorkspace: 'home'})
     })
 
     // Handle window closing
@@ -286,6 +282,24 @@ class App extends Component {
 
   // User Interface
 
+  handleWheel(evt) {
+    if (evt.target.closest('#main main, #graph, #winrategraph') == null) {
+      return
+    }
+
+    evt.preventDefault()
+
+    if (this.residueDeltaY == null) this.residueDeltaY = 0
+    this.residueDeltaY += evt.deltaY
+
+    if (
+      Math.abs(this.residueDeltaY) >= setting.get('game.navigation_sensitivity')
+    ) {
+      sabaki.goStep(Math.sign(this.residueDeltaY))
+      this.residueDeltaY = 0
+    }
+  }
+
   handleMainLayoutSplitChange({beginSideSize, endSideSize}) {
     sabaki.setState(
       ({leftSidebarWidth, sidebarWidth, showLeftSidebar}) => ({
@@ -375,14 +389,22 @@ class App extends Component {
         engineGameOngoing: state.engineGameOngoing,
       }),
 
+      h(AppRail, {activeWorkspace: state.activeWorkspace}),
+
       h(TripleSplitContainer, {
         id: 'mainlayout',
 
-        beginSideSize: state.showLeftSidebar ? state.leftSidebarWidth : 0,
-        endSideSize: state.showSidebar ? state.sidebarWidth : 0,
+        beginSideSize:
+          state.activeWorkspace === 'board' && state.showLeftSidebar
+            ? state.leftSidebarWidth
+            : 0,
+        endSideSize:
+          state.activeWorkspace === 'board' && state.showSidebar
+            ? state.sidebarWidth
+            : 0,
 
         beginSideContent: h(LeftSidebar, state),
-        mainContent: h(MainView, state),
+        mainContent: renderWorkspace(state),
         endSideContent: h(Sidebar, state),
 
         onChange: this.handleMainLayoutSplitChange,
@@ -405,6 +427,51 @@ class App extends Component {
       }),
     )
   }
+}
+
+function renderWorkspace(state) {
+  switch (state.activeWorkspace) {
+    case 'home':
+      return h(HomeView, state)
+    case 'online':
+      return h(OgsPanel)
+    case 'sgf-explorer':
+      return h(WorkspacePlaceholder, {
+        id: 'sgf-explorer',
+        title: t('SGF Explorer'),
+        description: t(
+          'Folder browsing and mini goban previews will live here.',
+        ),
+      })
+    case 'analysis':
+      return h(WorkspacePlaceholder, {
+        id: 'analysis',
+        title: t('Analysis Manager'),
+        description: t(
+          'Batch analysis jobs and analyzed game libraries will live here.',
+        ),
+      })
+    case 'board':
+    default:
+      return h(MainView, state)
+  }
+}
+
+function WorkspacePlaceholder({id, title, description}) {
+  return h(
+    'section',
+    {id, class: 'workspace-placeholder'},
+    h('h1', {}, title),
+    h('p', {}, description),
+    h(
+      'button',
+      {
+        type: 'button',
+        onClick: () => sabaki.setState({activeWorkspace: 'home'}),
+      },
+      t('Back to Home'),
+    ),
+  )
 }
 
 // Render

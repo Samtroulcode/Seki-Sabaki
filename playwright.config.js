@@ -89,5 +89,10 @@ module.exports = defineConfig({
       testMatch: /ogs-panel\.spec\.js/,
       dependencies: ['smoke'],
     },
+    {
+      name: 'home-panel',
+      testMatch: /home-panel\.spec\.js/,
+      dependencies: ['smoke'],
+    },
   ],
 })

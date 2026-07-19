@@ -214,6 +214,7 @@ export default class OgsPanel extends Component {
     }
 
     let sameGame =
+      sabaki.state.onlineGameId === onlineGame.gameId ||
       this.syncedOnlineGameKey?.startsWith(`${onlineGame.gameId}:`) === true
     let loaded = false
 

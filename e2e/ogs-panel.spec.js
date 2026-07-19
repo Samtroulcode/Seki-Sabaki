@@ -7,7 +7,10 @@ test.describe('OGS mock panel', () => {
     page,
   }) => {
     await page.evaluate(() => {
-      window.__sabaki.setState({showLeftSidebar: true})
+      window.__sabaki.setState({
+        activeWorkspace: 'board',
+        showLeftSidebar: true,
+      })
     })
     await waitForRender(page)
 

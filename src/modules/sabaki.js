@@ -51,6 +51,7 @@ class Sabaki extends EventEmitter {
       fullScreen: false,
       showMenuBar: null,
       zoomFactor: null,
+      activeWorkspace: 'home',
 
       representedFilename: null,
       gameIndex: 0,
@@ -637,7 +638,7 @@ class Sabaki extends EventEmitter {
         clearHistory,
       })
 
-      this.setState({representedFilename: filename})
+      this.setState({activeWorkspace: 'board', representedFilename: filename})
       this.fileHash = this.generateFileHash()
 
       if (setting.get('game.goto_end_after_loading')) {
@@ -673,6 +674,7 @@ class Sabaki extends EventEmitter {
 
     if (success) {
       await this.loadGameTrees(gameTrees, options)
+      this.setState({activeWorkspace: 'board'})
     }
 
     this.setBusy(false)
@@ -737,6 +739,7 @@ class Sabaki extends EventEmitter {
       clearHistory,
       onlineGameId: onlineGame?.gameId ?? null,
     })
+    this.setState({activeWorkspace: 'board'})
     this.ogsPendingMove = null
     this.ogsSubmittingMove = false
     this.ogsSubmissionId++

@@ -14,7 +14,13 @@ test.describe('Smoke Tests', () => {
     expect(title).toContain('Sabaki')
   })
 
-  test('no black screen — goban renders', async ({page}) => {
+  test('no black screen — home renders and goban remains reachable', async ({
+    page,
+  }) => {
+    await expect(page.locator('#home')).toBeVisible()
+
+    await page.getByTitle('Board').click()
+
     const goban = page.locator('#goban')
     await expect(goban).toBeVisible()
 
@@ -25,8 +31,8 @@ test.describe('Smoke Tests', () => {
   })
 
   test('main layout elements present', async ({page}) => {
-    await expect(page.locator('#main')).toBeVisible()
-    await expect(page.locator('#bar')).toBeVisible()
+    await expect(page.locator('#apprail')).toBeVisible()
+    await expect(page.locator('#home')).toBeVisible()
     await expect(page.locator('#mainlayout')).toBeVisible()
   })
 

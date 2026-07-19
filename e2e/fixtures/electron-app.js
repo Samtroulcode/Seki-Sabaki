@@ -94,7 +94,7 @@ const test = base.extend({
     }
   },
 
-  page: async ({electronApp}, use) => {
+  page: async ({electronApp}, use, testInfo) => {
     // Wait for the first window
     const page =
       electronApp.windows().length > 0
@@ -108,8 +108,18 @@ const test = base.extend({
       await dialog.accept()
     })
 
-    // Wait for the app to fully render
-    await page.waitForSelector('#goban', {timeout: 30000})
+    // Wait for the app shell to fully render. The default workspace can be the
+    // central Home view, so don't require the goban to be mounted here.
+    await page.waitForSelector('#apprail', {timeout: 30000})
+
+    // Most legacy E2E suites are board-centric and predate the Home workspace.
+    // Keep their starting point stable while smoke/home specs cover Home itself.
+    if (!['smoke', 'home-panel'].includes(testInfo.project.name)) {
+      await page.evaluate(() => {
+        window.__sabaki.setState({activeWorkspace: 'board'})
+      })
+      await page.waitForSelector('#goban', {timeout: 30000})
+    }
 
     await use(page)
   },
