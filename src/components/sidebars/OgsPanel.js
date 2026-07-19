@@ -342,8 +342,8 @@ export default class OgsPanel extends Component {
       {id: 'ogs-dashboard', class: 'ogs-panel ogs-dashboard'},
 
       h(
-        'header',
-        {class: 'ogs-dashboard-hero'},
+        'div',
+        {class: 'ogs-dashboard-hero', role: 'banner'},
         h(
           'div',
           {class: 'ogs-dashboard-title'},
@@ -410,7 +410,7 @@ export default class OgsPanel extends Component {
 
           connected &&
             h(
-              'main',
+              'div',
               {class: 'ogs-dashboard-main'},
               h(
                 'section',
