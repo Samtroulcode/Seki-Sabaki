@@ -35,6 +35,7 @@ export default class OgsPanel extends Component {
       matchmaking: {options: defaultMatchmakingOptions},
       onlineGame: null,
       activeGames: [],
+      activeSection: 'overview',
     }
 
     this.syncedOnlineGameKey = null
@@ -44,6 +45,10 @@ export default class OgsPanel extends Component {
 
     this.handleUsernameInput = (evt) => {
       this.setState({username: evt.currentTarget.value})
+    }
+
+    this.handleSectionButtonClick = (activeSection) => {
+      this.setState({activeSection})
     }
 
     this.handleSubmit = async (evt) => {
@@ -325,111 +330,313 @@ export default class OgsPanel extends Component {
       matchmaking,
       onlineGame,
       activeGames,
+      activeSection,
     },
   ) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
     let authenticated = socket?.status === 'authenticated'
+    let connectedGame = onlineGame?.status === 'connected' ? onlineGame : null
 
     return h(
-      'div',
-      {class: 'ogs-panel'},
+      'section',
+      {id: 'ogs-dashboard', class: 'ogs-panel ogs-dashboard'},
 
       h(
-        'div',
-        {class: 'ogs-panel-branding'},
-        h('div', {class: 'ogs-panel-logo'}, 'OGS'),
-        h('h2', {}, t('Online Go Server')),
-        h('p', {}, t('Connect to online-go.com.')),
-      ),
-
-      !connected
-        ? h(
-            'form',
-            {class: 'ogs-login-form', onSubmit: this.handleSubmit},
-
-            h(
-              'label',
-              {},
-              h('span', {}, t('Username')),
-              h('input', {
-                name: 'username',
-                type: 'text',
-                value: username,
-                autocomplete: 'off',
-                disabled: busy,
-                onInput: this.handleUsernameInput,
-              }),
-            ),
-
-            h(
-              'label',
-              {},
-              h('span', {}, t('Password')),
-              h('input', {
-                ref: (el) => (this.passwordInputElement = el),
-                name: 'password',
-                type: 'password',
-                autocomplete: 'off',
-                disabled: busy,
-              }),
-            ),
-
-            error != null && h('p', {class: 'ogs-error'}, error),
-
-            h(
-              'button',
-              {type: 'submit', disabled: busy || username.trim() === ''},
-              busy ? t('Connecting…') : t('Connect'),
-            ),
-          )
-        : h(
+        'header',
+        {class: 'ogs-dashboard-hero'},
+        h(
+          'div',
+          {class: 'ogs-dashboard-title'},
+          h('div', {class: 'ogs-panel-logo'}, 'OGS'),
+          h(
             'div',
-            {class: 'ogs-status'},
-
-            h('h3', {}, t('Connected')),
-            user?.iconUrl != null &&
-              h('img', {class: 'ogs-avatar', src: user.iconUrl, alt: ''}),
-            h(
-              'dl',
-              {},
-              h('dt', {}, t('Username')),
-              h(
-                'dd',
-                {class: 'ogs-status-username'},
-                user?.username || username,
-              ),
-              h('dt', {}, t('Status')),
-              h('dd', {}, t('Online')),
-              h('dt', {}, t('Rank')),
-              h('dd', {}, user?.rank || t('Unknown')),
-              h('dt', {}, t('Socket')),
-              h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket)),
-            ),
-            h(OnlineGameForm, {
-              onlineGame,
-              activeGames,
-              authenticated,
-              busy,
-              onConnectGame: this.handleActiveGameButtonClick,
-              onDisconnectGame: this.handleDisconnectGameButtonClick,
-            }),
-            h(AutomatchForm, {
-              options: matchmakingOptions,
-              status: matchmaking?.status,
-              authenticated,
-              onOptionChange: this.handleMatchmakingOptionChange,
-              onConditionChange: this.handleConditionOptionChange,
-              onMultiChange: this.handleMultiOptionChange,
-              onLogAutomatch: this.handleLogAutomatchButtonClick,
-            }),
+            {},
+            h('p', {class: 'ogs-dashboard-kicker'}, t('Online workspace')),
+            h('h2', {}, t('Online Go Server')),
+            h('p', {}, t('Play, follow games, and manage your OGS account.')),
+          ),
+        ),
+        h(
+          'div',
+          {class: 'ogs-dashboard-hero-actions'},
+          h(
+            'span',
+            {
+              class: `ogs-dashboard-status-pill ${authenticated ? 'online' : ''}`,
+            },
+            getSocketLabel(socket),
+          ),
+          connected &&
             h(
               'button',
               {type: 'button', onClick: this.handleDisconnectButtonClick},
               t('Disconnect'),
             ),
+        ),
+      ),
+
+      h(OgsDashboardNav, {
+        activeSection,
+        onSectionClick: this.handleSectionButtonClick,
+      }),
+
+      h(
+        'div',
+        {class: 'ogs-dashboard-content'},
+        h(
+          'div',
+          {
+            class: `ogs-dashboard-grid ${!connected ? 'logged-out' : ''}`,
+          },
+          h(
+            'aside',
+            {class: 'ogs-dashboard-column ogs-dashboard-account'},
+            h(
+              'section',
+              {class: 'ogs-dashboard-card'},
+              !connected
+                ? h(LoginForm, {
+                    username,
+                    busy,
+                    error,
+                    passwordRef: (el) => (this.passwordInputElement = el),
+                    onUsernameInput: this.handleUsernameInput,
+                    onSubmit: this.handleSubmit,
+                  })
+                : h(AccountStatus, {user, username, socket}),
+            ),
+            h(QuickLinksCard, {connected, connectedGame}),
           ),
+
+          connected &&
+            h(
+              'main',
+              {class: 'ogs-dashboard-main'},
+              h(
+                'section',
+                {class: 'ogs-dashboard-card ogs-dashboard-primary-card'},
+                h(OnlineGameForm, {
+                  onlineGame,
+                  activeGames,
+                  authenticated,
+                  busy,
+                  onConnectGame: this.handleActiveGameButtonClick,
+                  onDisconnectGame: this.handleDisconnectGameButtonClick,
+                }),
+              ),
+              h(SectionDetail, {activeSection, connected}),
+            ),
+
+          !connected && h(SectionDetail, {activeSection, connected}),
+
+          connected &&
+            h(
+              'aside',
+              {class: 'ogs-dashboard-column ogs-dashboard-secondary'},
+              h(
+                'section',
+                {class: 'ogs-dashboard-card'},
+                h(AutomatchForm, {
+                  options: matchmakingOptions,
+                  status: matchmaking?.status,
+                  authenticated,
+                  onOptionChange: this.handleMatchmakingOptionChange,
+                  onConditionChange: this.handleConditionOptionChange,
+                  onMultiChange: this.handleMultiOptionChange,
+                  onLogAutomatch: this.handleLogAutomatchButtonClick,
+                }),
+              ),
+            ),
+        ),
+      ),
     )
   }
+}
+
+function LoginForm({
+  username,
+  busy,
+  error,
+  passwordRef,
+  onUsernameInput,
+  onSubmit,
+}) {
+  return h(
+    'form',
+    {class: 'ogs-login-form', onSubmit},
+
+    h('h3', {}, t('Connect account')),
+    h('p', {}, t('Sign in to unlock OGS play and account features.')),
+
+    h(
+      'label',
+      {},
+      h('span', {}, t('Username')),
+      h('input', {
+        name: 'username',
+        type: 'text',
+        value: username,
+        autocomplete: 'off',
+        disabled: busy,
+        onInput: onUsernameInput,
+      }),
+    ),
+
+    h(
+      'label',
+      {},
+      h('span', {}, t('Password')),
+      h('input', {
+        ref: passwordRef,
+        name: 'password',
+        type: 'password',
+        autocomplete: 'off',
+        disabled: busy,
+      }),
+    ),
+
+    error != null && h('p', {class: 'ogs-error'}, error),
+
+    h(
+      'button',
+      {type: 'submit', disabled: busy || username.trim() === ''},
+      busy ? t('Connecting…') : t('Connect'),
+    ),
+  )
+}
+
+function AccountStatus({user, username, socket}) {
+  return h(
+    'div',
+    {class: 'ogs-status'},
+
+    h('h3', {}, t('Account')),
+    user?.iconUrl != null &&
+      h('img', {class: 'ogs-avatar', src: user.iconUrl, alt: ''}),
+    h(
+      'dl',
+      {},
+      h('dt', {}, t('Username')),
+      h('dd', {class: 'ogs-status-username'}, user?.username || username),
+      h('dt', {}, t('Status')),
+      h('dd', {}, t('Online')),
+      h('dt', {}, t('Rank')),
+      h('dd', {}, user?.rank || t('Unknown')),
+      h('dt', {}, t('Socket')),
+      h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket)),
+    ),
+  )
+}
+
+function OgsDashboardNav({activeSection, onSectionClick}) {
+  let sections = [
+    ['overview', t('Overview')],
+    ['play', t('Play')],
+    ['games', t('Games')],
+    ['social', t('Social')],
+    ['community', t('Community')],
+    ['settings', t('Settings')],
+  ]
+
+  return h(
+    'nav',
+    {class: 'ogs-dashboard-nav', 'aria-label': t('OGS sections')},
+    sections.map(([id, label]) =>
+      h(
+        'button',
+        {
+          key: id,
+          type: 'button',
+          class: activeSection === id ? 'selected' : '',
+          'aria-current': activeSection === id ? 'page' : null,
+          onClick: () => onSectionClick(id),
+        },
+        label,
+      ),
+    ),
+  )
+}
+
+function QuickLinksCard({connected, connectedGame}) {
+  return h(
+    'section',
+    {class: 'ogs-dashboard-card ogs-dashboard-quick-links'},
+    h('h3', {}, t('Quick access')),
+    h(
+      'dl',
+      {},
+      h('dt', {}, t('Session')),
+      h('dd', {}, connected ? t('Ready') : t('Disconnected')),
+      h('dt', {}, t('Current game')),
+      h(
+        'dd',
+        {},
+        connectedGame == null
+          ? t('None')
+          : connectedGame.gameName || `#${connectedGame.gameId}`,
+      ),
+      h('dt', {}, t('Next')),
+      h(
+        'dd',
+        {},
+        connected
+          ? t('Open a game, start automatch, or browse OGS sections.')
+          : t('Connect your account to continue.'),
+      ),
+    ),
+  )
+}
+
+function SectionDetail({activeSection, connected}) {
+  let details = {
+    overview: {
+      title: t('Dashboard overview'),
+      text: connected
+        ? t(
+            'Your account, active games, and automatch controls stay visible here.',
+          )
+        : t('Connect first, then the dashboard fills with OGS activity.'),
+    },
+    play: {
+      title: t('Play center'),
+      text: t(
+        'Automatch, custom challenges, and live game entry points will live here.',
+      ),
+    },
+    games: {
+      title: t('Games library'),
+      text: t(
+        'History, reviews, observed games, and correspondence queues will live here.',
+      ),
+    },
+    social: {
+      title: t('Social'),
+      text: t(
+        'Friends, direct chats, invitations, and presence will live here.',
+      ),
+    },
+    community: {
+      title: t('Community'),
+      text: t(
+        'Groups, ladders, tournaments, and public rooms can grow into this space.',
+      ),
+    },
+    settings: {
+      title: t('OGS settings'),
+      text: t(
+        'Account preferences, server settings, and debug tools will live here.',
+      ),
+    },
+  }
+  let detail = details[activeSection] || details.overview
+
+  return h(
+    'section',
+    {class: 'ogs-dashboard-card ogs-dashboard-section-detail'},
+    h('p', {class: 'ogs-dashboard-kicker'}, t('Section')),
+    h('h3', {}, detail.title),
+    h('p', {}, detail.text),
+  )
 }
 
 function getOnlineGameSyncKey(onlineGame) {

@@ -191,6 +191,13 @@ test.describe('OGS mock panel', () => {
     await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
 
     await expect(page.locator('.ogs-panel')).toBeVisible()
+    await expect(page.locator('#ogs-dashboard')).toBeVisible()
+    await expect(page.locator('.ogs-dashboard-hero')).toContainText(
+      'Online Go Server',
+    )
+    await expect(page.locator('.ogs-dashboard-nav')).toContainText('Overview')
+    await expect(page.locator('.ogs-dashboard-nav')).toContainText('Play')
+    await expect(page.locator('.ogs-dashboard-nav')).toContainText('Games')
     await expect(
       page.locator('#apprail').getByRole('button', {name: 'OGS'}),
     ).toHaveAttribute('aria-current', 'page')
@@ -209,6 +216,19 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-socket-status')).toContainText(
       'Authenticated',
     )
+    await expect(page.locator('.ogs-dashboard-status-pill')).toContainText(
+      'Authenticated',
+    )
+    await page
+      .locator('.ogs-dashboard-nav')
+      .getByRole('button', {name: 'Social'})
+      .click()
+    await expect(page.locator('.ogs-dashboard-section-detail')).toContainText(
+      'Friends, direct chats, invitations, and presence will live here.',
+    )
+    await expect(
+      page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Social'}),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('.ogs-matchmaking')).toBeVisible()
     await page
       .locator('.ogs-matchmaking input[name="boardSizes"][value="9"]')
