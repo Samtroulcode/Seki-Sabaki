@@ -387,6 +387,7 @@ class App extends Component {
         showCommentBox: state.showCommentBox,
         showLeftSidebar: state.showLeftSidebar,
         engineGameOngoing: state.engineGameOngoing,
+        onlineGameId: state.onlineGameId,
       }),
 
       h(AppRail, {activeWorkspace: state.activeWorkspace}),

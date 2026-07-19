@@ -44,6 +44,7 @@ exports.get = function (props = {}) {
     showCommentBox,
     showLeftSidebar,
     engineGameOngoing,
+    onlineGameId,
   } = props
 
   let data = [
@@ -497,6 +498,7 @@ exports.get = function (props = {}) {
         {
           label: i18n.t('menu.engines', 'Toggle &Analysis'),
           accelerator: 'F4',
+          enabled: onlineGameId == null,
           click: () => {
             let syncerId =
               sabaki.lastAnalyzingEngineSyncerId ||
@@ -531,6 +533,7 @@ exports.get = function (props = {}) {
             ? i18n.t('menu.engines', 'Start Engine vs. Engine &Game')
             : i18n.t('menu.engines', 'Stop Engine vs. Engine &Game'),
           accelerator: 'F5',
+          enabled: engineGameOngoing != null || onlineGameId == null,
           click: () => {
             sabaki.startStopEngineGame(sabaki.state.treePosition)
           },
@@ -538,7 +541,7 @@ exports.get = function (props = {}) {
         {
           label: i18n.t('menu.engines', 'Generate &Move'),
           accelerator: 'F10',
-          enabled: !engineGameOngoing,
+          enabled: !engineGameOngoing && onlineGameId == null,
           click: () => {
             let sign = sabaki.getPlayer(sabaki.state.treePosition)
             let syncerId =

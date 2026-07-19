@@ -3,7 +3,7 @@ const {test} = require('./fixtures/electron-app')
 const {waitForRender} = require('./helpers')
 
 test.describe('OGS mock panel', () => {
-  test('toggles from engine sidebar and shows mock connection status', async ({
+  test('opens from app rail and shows mock connection status', async ({
     page,
   }) => {
     await page.evaluate(() => {
@@ -17,6 +17,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('#leftsidebar')).toBeVisible()
     await expect(page.locator('.engine-peer-list')).toBeVisible()
     await expect(page.locator('.gtp-console')).toBeVisible()
+    await expect(page.getByTitle('Show OGS Panel')).toHaveCount(0)
 
     await page.evaluate(() => {
       window.__ogsTestSession = null
@@ -150,11 +151,12 @@ test.describe('OGS mock panel', () => {
       }
     })
 
-    await page.getByTitle('Show OGS Panel').click()
+    await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
 
     await expect(page.locator('.ogs-panel')).toBeVisible()
-    await expect(page.locator('.engine-peer-list')).toHaveCount(0)
-    await expect(page.locator('.gtp-console')).toHaveCount(0)
+    await expect(
+      page.locator('#apprail').getByRole('button', {name: 'OGS'}),
+    ).toHaveAttribute('aria-current', 'page')
 
     await page.locator('.ogs-login-form input[name="username"]').fill('sekibot')
     await page.locator('.ogs-login-form input[name="password"]').fill('secret')
@@ -197,10 +199,6 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
     await expect(page.locator('.ogs-online-game')).toContainText('sekibot')
     await page.locator('.ogs-active-games button').click()
-    await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
-    await expect(page.locator('.ogs-online-game')).toContainText('19x19')
-    await expect(page.locator('.ogs-online-game')).toContainText('opponent')
-    await expect(page.locator('.ogs-online-game')).toContainText('good luck')
     await page.waitForFunction(() => {
       let {gameTrees, gameIndex, treePosition} = window.__sabaki.state
       let tree = gameTrees[gameIndex]
@@ -216,6 +214,33 @@ test.describe('OGS mock panel', () => {
         treePosition === [...tree.getSequence(tree.root.id)].at(-1).id
       )
     })
+    await expect(page.locator('#goban')).toBeVisible()
+    await expect(page.locator('.online-context-placeholder')).toBeVisible()
+    await expect(page.locator('.gtp-console')).toHaveCount(0)
+
+    await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
+    await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
+    await expect(page.locator('.ogs-online-game')).toContainText('19x19')
+    await expect(page.locator('.ogs-online-game')).toContainText('opponent')
+    await expect(page.locator('.ogs-online-game')).toContainText('good luck')
+
+    await page.evaluate(async () => {
+      window.__sabaki.setState({
+        analyzingEngineSyncerId: 'fake-analyzer',
+        analysis: {sign: 1, winrate: 50, scoreLead: 0},
+        analysisTreePosition: window.__sabaki.state.treePosition,
+      })
+
+      await window.__sabaki.startAnalysis('fake-analyzer')
+      window.__sabaki.attachEngines([{path: '/missing/fake-engine', args: []}])
+    })
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.onlineGameId === 42 &&
+        window.__sabaki.state.analyzingEngineSyncerId == null &&
+        window.__sabaki.state.analysis == null &&
+        window.__sabaki.state.attachedEngineSyncers.length === 0,
+    )
 
     await page.evaluate(() => {
       window.__sabaki.clickVertex([2, 2])
@@ -300,6 +325,7 @@ test.describe('OGS mock panel', () => {
       )
     })
 
+    await page.locator('#apprail').getByRole('button', {name: 'OGS'}).click()
     await page.getByRole('button', {name: 'Disconnect game'}).click()
     await page.waitForFunction(() => window.__sabaki.state.onlineGameId == null)
 
@@ -323,11 +349,12 @@ test.describe('OGS mock panel', () => {
     await page.locator('.ogs-active-games button').click()
     await page.waitForFunction(() => window.__sabaki.state.onlineGameId === 42)
 
-    await page.getByTitle('Show OGS Panel').click()
+    await page.locator('#apprail').getByRole('button', {name: 'Board'}).click()
 
     await expect(page.locator('.ogs-panel')).toHaveCount(0)
-    await expect(page.locator('.engine-peer-list')).toBeVisible()
-    await expect(page.locator('.gtp-console')).toBeVisible()
+    await expect(page.locator('.online-context-placeholder')).toBeVisible()
+    await expect(page.locator('.engine-peer-list')).toHaveCount(0)
+    await expect(page.locator('.gtp-console')).toHaveCount(0)
   })
 
   test('ignores stale OGS move rejection after server confirmation', async ({

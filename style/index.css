@@ -1593,6 +1593,25 @@ button:active {
   color: #d0d0d0;
   z-index: 2;
 }
+
+.online-context-placeholder {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1rem;
+  background: #181818;
+  color: #d0d0d0;
+  overflow: auto;
+}
+.online-context-placeholder h2,
+.online-context-placeholder p {
+  margin: 0;
+}
+.online-context-placeholder h2 {
+  color: white;
+}
 .engine-peer-list.no-tool-bar {
   grid-template: 100% / 100%;
 }
@@ -1827,6 +1846,11 @@ button:active {
 }
 .tool-bar-button a:hover img {
   opacity: 1;
+}
+.tool-bar-button.disabled a,
+.tool-bar-button.disabled a:hover {
+  background: transparent;
+  opacity: 0.4;
 }
 .tool-bar-button img {
   filter: invert(100%);

@@ -95,7 +95,9 @@ export default class InfoDrawer extends Component {
             syncer = sabaki.attachEngines([engine])[0]
           }
 
-          playerSyncerId = syncer.id
+          if (syncer != null) {
+            playerSyncerId = syncer.id
+          }
         }
 
         sabaki.setState({

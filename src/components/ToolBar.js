@@ -8,23 +8,30 @@ export class ToolBarButton extends Component {
     this.handleClick = (evt) => {
       evt.preventDefault()
 
+      if (this.props.disabled) return
+
       let {onClick = () => {}} = this.props
       onClick(evt)
     }
   }
 
   render() {
-    let {tooltip, icon, checked, menu} = this.props
+    let {tooltip, icon, checked, menu, disabled} = this.props
 
     return h(
       'li',
       {
-        class: classnames('tool-bar-button', {menu, checked}),
+        class: classnames('tool-bar-button', {menu, checked, disabled}),
       },
 
       h(
         'a',
-        {href: '#', title: tooltip, onClick: this.handleClick},
+        {
+          href: '#',
+          title: tooltip,
+          'aria-disabled': disabled ? 'true' : undefined,
+          onClick: this.handleClick,
+        },
 
         h('img', {
           class: 'icon',

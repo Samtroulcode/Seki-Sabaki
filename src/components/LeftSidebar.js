@@ -5,7 +5,6 @@ import i18n from '../i18n.js'
 import SplitContainer from './helpers/SplitContainer.js'
 import ToolBar, {ToolBarButton} from './ToolBar.js'
 import GtpConsole from './sidebars/GtpConsole.js'
-import OgsPanel from './sidebars/OgsPanel.js'
 import {EnginePeerList} from './sidebars/PeerList.js'
 
 const t = i18n.context('LeftSidebar')
@@ -22,7 +21,6 @@ export default class LeftSidebar extends Component {
     this.state = {
       peerListHeight: setting.get('view.peerlist_height'),
       selectedEngineSyncerId: null,
-      showOgsPanel: false,
     }
 
     this.handlePeerListHeightChange = ({sideSize}) => {
@@ -61,6 +59,8 @@ export default class LeftSidebar extends Component {
     }
 
     this.handleCommandSubmit = ({command}) => {
+      if (this.props.onlineGameId != null) return
+
       let syncer = this.props.attachedEngineSyncers.find(
         (syncer) => syncer.id === this.state.selectedEngineSyncerId,
       )
@@ -68,10 +68,6 @@ export default class LeftSidebar extends Component {
       if (syncer != null) {
         syncer.queueCommand(command)
       }
-    }
-
-    this.handleOgsPanelToggle = () => {
-      this.setState(({showOgsPanel}) => ({showOgsPanel: !showOgsPanel}))
     }
 
     this.handleAttachEngineButtonClick = (evt) => {
@@ -99,10 +95,11 @@ export default class LeftSidebar extends Component {
       blackEngineSyncerId,
       whiteEngineSyncerId,
       engineGameOngoing,
+      onlineGameId,
       showLeftSidebar,
       consoleLog,
     },
-    {peerListHeight, selectedEngineSyncerId, showOgsPanel},
+    {peerListHeight, selectedEngineSyncerId},
   ) {
     return h(
       'section',
@@ -116,16 +113,13 @@ export default class LeftSidebar extends Component {
         {},
 
         h(ToolBarButton, {
-          icon: './node_modules/@primer/octicons/build/svg/globe-16.svg',
-          tooltip: t('Show OGS Panel'),
-          checked: showOgsPanel,
-          onClick: this.handleOgsPanelToggle,
-        }),
-
-        h(ToolBarButton, {
           icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
-          tooltip: t('Attach Engine…'),
+          tooltip:
+            onlineGameId == null
+              ? t('Attach Engine…')
+              : t('Engine attachment is disabled during online games.'),
           menu: true,
+          disabled: onlineGameId != null,
           onClick: this.handleAttachEngineButtonClick,
         }),
 
@@ -135,6 +129,7 @@ export default class LeftSidebar extends Component {
             ? t('Start Engine vs. Engine Game')
             : t('Stop Engine vs. Engine Game'),
           checked: !!engineGameOngoing,
+          disabled: engineGameOngoing == null && onlineGameId != null,
           onClick: this.handleStartStopGameButtonClick,
         }),
       ),
@@ -143,8 +138,18 @@ export default class LeftSidebar extends Component {
         'div',
         {class: 'left-sidebar-content'},
 
-        showOgsPanel
-          ? h(OgsPanel)
+        onlineGameId != null
+          ? h(
+              'div',
+              {class: 'online-context-placeholder'},
+              h('h2', {}, t('Online game')),
+              h(
+                'p',
+                {},
+                t('Engine controls are disabled while an OGS game is loaded.'),
+              ),
+              h('p', {}, t('OGS game details and chat will appear here.')),
+            )
           : h(SplitContainer, {
               vertical: true,
               invert: true,
@@ -157,6 +162,7 @@ export default class LeftSidebar extends Component {
                 whiteEngineSyncerId,
                 selectedEngineSyncerId,
                 engineGameOngoing,
+                onlineGameId,
                 showToolBar: false,
 
                 onEngineSelect: this.handleEngineSelect,

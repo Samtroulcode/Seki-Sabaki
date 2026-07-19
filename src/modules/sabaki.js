@@ -729,6 +729,9 @@ class Sabaki extends EventEmitter {
   ) {
     if (!suppressAskForSave && !(await this.askForSave())) return false
 
+    this.stopEngineGame()
+    this.stopAnalysis()
+
     let tree = buildOgsGameTree(onlineGame, {
       appName: this.appName,
       version: this.version,
@@ -2329,6 +2332,16 @@ class Sabaki extends EventEmitter {
   }
 
   attachEngines(engines) {
+    if (this.state.onlineGameId != null) {
+      this.flashInfoOverlay(
+        i18n.t(
+          'sabaki.engine',
+          'Engine attachment is disabled during online games.',
+        ),
+      )
+      return []
+    }
+
     let attaching = []
     let getEngineName = (name) => {
       let counter = 1
@@ -2516,6 +2529,7 @@ class Sabaki extends EventEmitter {
   async generateMove(syncerId, treePosition, {commit = () => true} = {}) {
     if (this.state.onlineGameId != null) return
 
+    let originalGameTree = this.inferredState.gameTree
     let t = i18n.context('sabaki.engine')
     let sign = this.getPlayer(treePosition)
     let color = sign > 0 ? 'B' : 'W'
@@ -2569,6 +2583,13 @@ class Sabaki extends EventEmitter {
     }
 
     if (coord == null) return
+    if (
+      this.state.onlineGameId != null ||
+      this.inferredState.gameTree.root.id !== originalGameTree.root.id
+    ) {
+      return
+    }
+
     coord = coord.toLowerCase().trim()
 
     if (coord === 'resign') {
@@ -2635,6 +2656,16 @@ class Sabaki extends EventEmitter {
   }
 
   async startEngineGame(treePosition) {
+    if (this.state.onlineGameId != null) {
+      this.flashInfoOverlay(
+        i18n.t(
+          'sabaki.engine',
+          'Engine games are disabled during online games.',
+        ),
+      )
+      return
+    }
+
     let t = i18n.context('sabaki.engine')
     let {engineGameOngoing, attachedEngineSyncers} = this.state
     let engineCount = attachedEngineSyncers.length
@@ -2712,12 +2743,21 @@ class Sabaki extends EventEmitter {
   async startStopEngineGame(treePosition) {
     if (this.state.engineGameOngoing != null) {
       this.stopEngineGame()
+    } else if (this.state.onlineGameId != null) {
+      this.flashInfoOverlay(
+        i18n.t(
+          'sabaki.engine',
+          'Engine games are disabled during online games.',
+        ),
+      )
     } else {
       this.startEngineGame(treePosition)
     }
   }
 
   async analyzeMove(treePosition) {
+    if (this.state.onlineGameId != null) return
+
     let sign = this.getPlayer(treePosition)
     let color = sign > 0 ? 'B' : 'W'
     let syncer = this.inferredState.analyzingEngineSyncer
@@ -2742,6 +2782,17 @@ class Sabaki extends EventEmitter {
   }
 
   async startAnalysis(syncerId) {
+    if (this.state.onlineGameId != null) {
+      this.stopAnalysis()
+      this.flashInfoOverlay(
+        i18n.t(
+          'sabaki.engine',
+          'Engine analysis is disabled during online games.',
+        ),
+      )
+      return
+    }
+
     if (this.state.analyzingEngineSyncerId === syncerId) return
 
     let t = i18n.context('sabaki.engine')
@@ -3486,6 +3537,16 @@ class Sabaki extends EventEmitter {
   }
 
   openEnginesMenu({x, y} = {}) {
+    if (this.state.onlineGameId != null) {
+      this.flashInfoOverlay(
+        i18n.t(
+          'sabaki.engine',
+          'Engine attachment is disabled during online games.',
+        ),
+      )
+      return
+    }
+
     let t = i18n.context('menu.engines')
     let engines = setting.get('engines.list')
 
@@ -3543,9 +3604,10 @@ class Sabaki extends EventEmitter {
         {
           label: t('&Generate Move'),
           enabled:
-            !this.state.engineGameOngoing ||
-            (this.state.blackEngineSyncerId !== syncerId &&
-              this.state.whiteEngineSyncerId !== syncerId),
+            this.state.onlineGameId == null &&
+            (!this.state.engineGameOngoing ||
+              (this.state.blackEngineSyncerId !== syncerId &&
+                this.state.whiteEngineSyncerId !== syncerId)),
           click: async () => {
             this.generateMove(syncerId, this.state.treePosition)
           },
@@ -3555,6 +3617,7 @@ class Sabaki extends EventEmitter {
           label: t('Set as &Analyzer'),
           type: 'checkbox',
           checked: this.state.analyzingEngineSyncerId === syncerId,
+          enabled: this.state.onlineGameId == null,
           click: () => {
             if (this.state.analyzingEngineSyncerId === syncerId) {
               this.stopAnalysis()

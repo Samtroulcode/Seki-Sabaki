@@ -164,6 +164,7 @@ export class EnginePeerList extends Component {
     whiteEngineSyncerId,
     analyzingEngineSyncerId,
     engineGameOngoing,
+    onlineGameId,
     showToolBar = true,
   }) {
     return h(
@@ -179,8 +180,12 @@ export class EnginePeerList extends Component {
 
           h(ToolBarButton, {
             icon: './node_modules/@primer/octicons/build/svg/play-16.svg',
-            tooltip: t('Attach Engine…'),
+            tooltip:
+              onlineGameId == null
+                ? t('Attach Engine…')
+                : t('Engine attachment is disabled during online games.'),
             menu: true,
+            disabled: onlineGameId != null,
             onClick: this.handleAttachEngineButtonClick,
           }),
 
@@ -190,6 +195,7 @@ export class EnginePeerList extends Component {
               ? t('Start Engine vs. Engine Game')
               : t('Stop Engine vs. Engine Game'),
             checked: !!engineGameOngoing,
+            disabled: engineGameOngoing == null && onlineGameId != null,
             onClick: this.handleStartStopGameButtonClick,
           }),
         ),
