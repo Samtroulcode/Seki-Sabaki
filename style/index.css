@@ -1818,12 +1818,20 @@ button:active {
   overflow-x: auto;
 }
 .ogs-dashboard-nav button {
-  border-radius: 999px;
+  border: 1px solid #3a3b40;
+  border-radius: 4px;
   white-space: nowrap;
 }
-.ogs-dashboard-nav button.selected {
+.ogs-dashboard-nav button.selected,
+.ogs-dashboard-nav button.selected:hover,
+.ogs-dashboard-nav button.selected:focus,
+.ogs-dashboard-nav button.selected:active {
+  border-color: #0082f0;
   background: #0082f0;
   color: white;
+}
+.ogs-dashboard-nav button:disabled {
+  opacity: 0.45;
 }
 .ogs-dashboard-content {
   min-height: 0;
@@ -1838,7 +1846,10 @@ button:active {
   align-items: start;
 }
 .ogs-dashboard-grid.logged-out {
-  grid-template-columns: minmax(260px, 380px) minmax(320px, 1fr);
+  grid-template-columns: minmax(260px, 420px);
+}
+.ogs-dashboard-login-card {
+  max-width: 420px;
 }
 .ogs-dashboard-column,
 .ogs-dashboard-main {
@@ -1952,6 +1963,14 @@ button:active {
 }
 .ogs-panel button:disabled {
   opacity: 0.5;
+}
+.ogs-panel .ogs-dashboard-nav button.selected,
+.ogs-panel .ogs-dashboard-nav button.selected:hover,
+.ogs-panel .ogs-dashboard-nav button.selected:focus,
+.ogs-panel .ogs-dashboard-nav button.selected:active {
+  border-color: #0082f0;
+  background: #0082f0;
+  color: white;
 }
 .ogs-status dl {
   display: grid;

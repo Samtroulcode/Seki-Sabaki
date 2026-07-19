@@ -377,6 +377,7 @@ export default class OgsPanel extends Component {
 
       h(OgsDashboardNav, {
         activeSection,
+        disabled: !connected,
         onSectionClick: this.handleSectionButtonClick,
       }),
 
@@ -388,25 +389,29 @@ export default class OgsPanel extends Component {
           {
             class: `ogs-dashboard-grid ${!connected ? 'logged-out' : ''}`,
           },
-          h(
-            'aside',
-            {class: 'ogs-dashboard-column ogs-dashboard-account'},
-            h(
-              'section',
-              {class: 'ogs-dashboard-card'},
-              !connected
-                ? h(LoginForm, {
-                    username,
-                    busy,
-                    error,
-                    passwordRef: (el) => (this.passwordInputElement = el),
-                    onUsernameInput: this.handleUsernameInput,
-                    onSubmit: this.handleSubmit,
-                  })
-                : h(AccountStatus, {user, username, socket}),
-            ),
-            h(QuickLinksCard, {connected, connectedGame}),
-          ),
+          !connected
+            ? h(
+                'section',
+                {class: 'ogs-dashboard-card ogs-dashboard-login-card'},
+                h(LoginForm, {
+                  username,
+                  busy,
+                  error,
+                  passwordRef: (el) => (this.passwordInputElement = el),
+                  onUsernameInput: this.handleUsernameInput,
+                  onSubmit: this.handleSubmit,
+                }),
+              )
+            : h(
+                'aside',
+                {class: 'ogs-dashboard-column ogs-dashboard-account'},
+                h(
+                  'section',
+                  {class: 'ogs-dashboard-card'},
+                  h(AccountStatus, {user, username, socket}),
+                ),
+                h(QuickLinksCard, {connected, connectedGame}),
+              ),
 
           connected &&
             h(
@@ -426,8 +431,6 @@ export default class OgsPanel extends Component {
               ),
               h(SectionDetail, {activeSection, connected}),
             ),
-
-          !connected && h(SectionDetail, {activeSection, connected}),
 
           connected &&
             h(
@@ -528,7 +531,7 @@ function AccountStatus({user, username, socket}) {
   )
 }
 
-function OgsDashboardNav({activeSection, onSectionClick}) {
+function OgsDashboardNav({activeSection, disabled, onSectionClick}) {
   let sections = [
     ['overview', t('Overview')],
     ['play', t('Play')],
@@ -548,8 +551,9 @@ function OgsDashboardNav({activeSection, onSectionClick}) {
           key: id,
           type: 'button',
           class: activeSection === id ? 'selected' : '',
+          disabled,
           'aria-current': activeSection === id ? 'page' : null,
-          onClick: () => onSectionClick(id),
+          onClick: disabled ? null : () => onSectionClick(id),
         },
         label,
       ),

@@ -199,6 +199,10 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-dashboard-nav')).toContainText('Play')
     await expect(page.locator('.ogs-dashboard-nav')).toContainText('Games')
     await expect(
+      page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Play'}),
+    ).toBeDisabled()
+    await expect(page.locator('.ogs-dashboard-section-detail')).toHaveCount(0)
+    await expect(
       page.locator('#apprail').getByRole('button', {name: 'OGS'}),
     ).toHaveAttribute('aria-current', 'page')
 
@@ -216,6 +220,9 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-socket-status')).toContainText(
       'Authenticated',
     )
+    await expect(
+      page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Play'}),
+    ).toBeEnabled()
     await expect(page.locator('.ogs-dashboard-status-pill')).toContainText(
       'Authenticated',
     )
