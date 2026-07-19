@@ -63,8 +63,8 @@ test.describe('OGS mock panel', () => {
             board: {width: 19, height: 19},
             phase: 'play',
             moveNumber: 2,
-            black: {id: 7, username: 'sekibot'},
-            white: {id: 8, username: 'opponent'},
+            black: {id: 7, username: 'sekibot', rank: '1d'},
+            white: {id: 8, username: 'opponent', rank: '3k'},
           },
         ],
       }
@@ -102,10 +102,14 @@ test.describe('OGS mock panel', () => {
             error: null,
             gameName: 'Fixture Game',
             board: {width: 19, height: 19},
+            handicap: 0,
+            komi: 6.5,
+            rules: 'chinese',
+            ranked: true,
             phase: 'play',
             players: {
-              black: {id: 7, username: 'sekibot'},
-              white: {id: 8, username: 'opponent'},
+              black: {id: 7, username: 'sekibot', rank: '1d'},
+              white: {id: 8, username: 'opponent', rank: '3k'},
             },
             moves: [
               {move: 'aa', moveNumber: 1},
@@ -222,6 +226,13 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-game-context-panel')).toContainText('#42')
     await expect(page.locator('.ogs-game-context-panel')).toContainText('19x19')
     await expect(page.locator('.ogs-game-context-panel')).toContainText('play')
+    await expect(page.locator('.ogs-game-context-panel')).toContainText('6.5')
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'chinese',
+    )
+    await expect(page.locator('.ogs-game-context-panel')).toContainText(
+      'Ranked',
+    )
     await expect(page.locator('.ogs-game-context-panel')).toContainText(
       'sekibot',
     )
@@ -229,6 +240,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-game-context-panel')).toContainText(
       'opponent',
     )
+    await expect(page.locator('.ogs-game-context-panel')).toContainText('3k')
     await expect(page.locator('.ogs-game-context-chat')).toContainText(
       'good luck',
     )

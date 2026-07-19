@@ -129,6 +129,21 @@ describe('OGS client', () => {
         online: true,
       },
     )
+    assert.deepStrictEqual(
+      sanitizeUser('https://online-go.com', {
+        id: 124,
+        username: 'gote',
+        ranking: 27,
+      }),
+      {
+        id: '124',
+        username: 'gote',
+        rank: '3k',
+        rating: null,
+        iconUrl: null,
+        online: true,
+      },
+    )
   })
 
   it('rejects non-OGS avatar URLs', () => {
@@ -334,8 +349,14 @@ describe('OGS client', () => {
       move_number: 2,
       player_to_move: 7,
       clock_expiration: 1784381000000,
-      black: {id: 7, username: 'sente'},
-      white: {id: 8, username: 'gote'},
+      ranked: true,
+      rules: 'japanese',
+      handicap: 0,
+      komi: 6.5,
+      time_per_move: 300,
+      time_control: {system: 'fischer', speed: 'rapid', time_per_move: 300},
+      black: {id: 7, username: 'sente', ratings: {overall: {rating: 1500}}},
+      white: {id: 8, username: 'gote', ranking: 27},
       jwt: 'must-not-leak',
     })
 
@@ -346,11 +367,36 @@ describe('OGS client', () => {
         name: 'Friendly game',
         board: {width: 19, height: 19},
         phase: 'play',
+        ranked: true,
+        rules: 'japanese',
+        handicap: 0,
+        komi: 6.5,
+        timePerMove: 300,
+        timeControl: {
+          system: 'fischer',
+          speed: 'rapid',
+          timePerMove: 300,
+          mainTime: null,
+          periodTime: null,
+          periods: null,
+        },
         moveNumber: 2,
         playerToMove: 7,
         clockExpiration: 1784381000000,
-        black: {id: 7, username: 'sente'},
-        white: {id: 8, username: 'gote'},
+        black: {
+          id: 7,
+          username: 'sente',
+          rank: '6k',
+          rating: 1500,
+          iconUrl: null,
+        },
+        white: {
+          id: 8,
+          username: 'gote',
+          rank: '3k',
+          rating: null,
+          iconUrl: null,
+        },
       },
     ])
     assert.strictEqual(JSON.stringify(state).includes('must-not-leak'), false)
@@ -370,10 +416,26 @@ describe('OGS client', () => {
       width: 19,
       height: 19,
       handicap: 0,
+      komi: 6.5,
+      rules: 'chinese',
+      ranked: true,
+      time_per_move: 30,
+      time_control: {
+        system: 'byoyomi',
+        speed: 'live',
+        main_time: 600,
+        period_time: 30,
+        periods: 5,
+      },
       phase: 'play',
       players: {
-        black: {id: 7, username: 'sente'},
-        white: {id: 8, username: 'gote'},
+        black: {
+          id: 7,
+          username: 'sente',
+          ratings: {overall: {rating: 1500}},
+          icon: '/user/icon/sente.png',
+        },
+        white: {id: 8, username: 'gote', rank: 27},
       },
       moves: 'aabb',
     })
@@ -402,8 +464,27 @@ describe('OGS client', () => {
     assert.strictEqual(state.onlineGame.gameName, 'Friendly game')
     assert.deepStrictEqual(state.onlineGame.board, {width: 19, height: 19})
     assert.strictEqual(state.onlineGame.handicap, 0)
+    assert.strictEqual(state.onlineGame.komi, 6.5)
+    assert.strictEqual(state.onlineGame.rules, 'chinese')
+    assert.strictEqual(state.onlineGame.ranked, true)
+    assert.deepStrictEqual(state.onlineGame.timeControl, {
+      system: 'byoyomi',
+      speed: 'live',
+      timePerMove: null,
+      mainTime: 600,
+      periodTime: 30,
+      periods: 5,
+    })
+    assert.strictEqual(state.onlineGame.timePerMove, 30)
     assert.strictEqual(state.onlineGame.players.black.username, 'sente')
+    assert.strictEqual(state.onlineGame.players.black.rank, '6k')
+    assert.strictEqual(state.onlineGame.players.black.rating, 1500)
+    assert.strictEqual(
+      state.onlineGame.players.black.iconUrl,
+      'https://online-go.com/user/icon/sente.png',
+    )
     assert.strictEqual(state.onlineGame.players.white.username, 'gote')
+    assert.strictEqual(state.onlineGame.players.white.rank, '3k')
     assert.strictEqual(state.onlineGame.phase, 'stone removal')
     assert.strictEqual(state.onlineGame.moveCount, 3)
     assert.strictEqual(state.onlineGame.lastMove, 'cc')

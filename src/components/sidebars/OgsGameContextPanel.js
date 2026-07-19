@@ -130,6 +130,12 @@ export default class OgsGameContextPanel extends Component {
                 {},
                 game.handicap == null ? t('None') : String(game.handicap),
               ),
+              h('dt', {}, t('Komi')),
+              h('dd', {}, game.komi == null ? t('Unknown') : String(game.komi)),
+              h('dt', {}, t('Rules')),
+              h('dd', {}, game.rules || t('Unknown')),
+              h('dt', {}, t('Ranked')),
+              h('dd', {}, formatRanked(game.ranked)),
             ),
             h(ChatSection, {chat: game.chat}),
           ],
@@ -173,8 +179,8 @@ export default class OgsGameContextPanel extends Component {
 
 function PlayerCard({color, title, player, user, currentPlayerId}) {
   let isCurrentUser = user?.id != null && player?.id === Number(user.id)
-  let rank = isCurrentUser ? user.rank : null
-  let iconUrl = isCurrentUser ? user.iconUrl : null
+  let rank = player?.rank || (isCurrentUser ? user.rank : null)
+  let iconUrl = player?.iconUrl || (isCurrentUser ? user.iconUrl : null)
   let active = currentPlayerId != null && currentPlayerId === player?.id
 
   return h(
@@ -226,6 +232,11 @@ function formatGameId(gameId) {
 function formatBoard(board) {
   if (board == null) return t('Unknown')
   return `${board.width}x${board.height}`
+}
+
+function formatRanked(ranked) {
+  if (ranked == null) return t('Unknown')
+  return ranked ? t('Ranked') : t('Unranked')
 }
 
 function getInitial(player) {

@@ -71,6 +71,13 @@ function ratingToRank(rating) {
   return `${rank - 29}d`
 }
 
+function rankNumberToRank(rank) {
+  if (!Number.isInteger(rank) || rank < 0 || rank > 38) return null
+
+  if (rank < 30) return `${30 - rank}k`
+  return `${rank - 29}d`
+}
+
 function resolveOgsUrl(serverUrl, value) {
   if (typeof value !== 'string' || value.trim() === '') return null
 
@@ -91,13 +98,14 @@ function sanitizeUser(serverUrl, user) {
     throw new OgsError('invalid-response', 'OGS login response is invalid.')
   }
 
-  let rating = user.ratings?.overall?.rating ?? user.ranking
+  let rating = user.ratings?.overall?.rating ?? user.rating ?? user.elo
+  let rank = sanitizeString(user.rank, 20) || rankNumberToRank(user.ranking)
   let icon = user.icon || user.icon_url || user.picture || user.avatar || null
 
   return {
     id: user.id == null ? null : String(user.id),
     username: typeof user.username === 'string' ? user.username : '',
-    rank: ratingToRank(rating),
+    rank: rank || ratingToRank(rating),
     rating:
       typeof rating === 'number' && Number.isFinite(rating) ? rating : null,
     iconUrl: resolveOgsUrl(serverUrl, icon),
@@ -130,6 +138,11 @@ function getInitialOnlineGameState() {
     gameName: null,
     board: null,
     handicap: null,
+    komi: null,
+    rules: null,
+    ranked: null,
+    timeControl: null,
+    timePerMove: null,
     phase: null,
     players: null,
     moves: [],
@@ -143,6 +156,14 @@ function getInitialOnlineGameState() {
 
 function getInitialActiveGamesState() {
   return []
+}
+
+function sanitizeBoolean(value) {
+  return typeof value === 'boolean' ? value : null
+}
+
+function sanitizeNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function getWebSocketUrl(serverUrl) {
@@ -471,7 +492,7 @@ class OgsClient {
       socket: this.socket.getState(),
       matchmaking: {...this.matchmaking},
       onlineGame: cloneOnlineGameState(this.onlineGame),
-      activeGames: this.activeGames.map((game) => ({...game})),
+      activeGames: this.activeGames.map(cloneActiveGameState),
     }
   }
 
@@ -753,7 +774,7 @@ class OgsClient {
       case 'gamedata':
         this.onlineGame = {
           ...this.onlineGame,
-          ...sanitizeGameData(payload),
+          ...sanitizeGameData(payload, this.serverUrl),
           status: 'connected',
           error: null,
         }
@@ -825,7 +846,7 @@ class OgsClient {
   }
 
   upsertActiveGame(payload) {
-    let game = sanitizeActiveGame(payload)
+    let game = sanitizeActiveGame(payload, this.serverUrl)
     if (game == null) return
 
     this.activeGames = [
@@ -835,7 +856,7 @@ class OgsClient {
   }
 }
 
-function sanitizeActiveGame(data) {
+function sanitizeActiveGame(data, serverUrl) {
   let id = sanitizeOptionalGameId(data?.id)
   let width = sanitizeBoardSize(data?.width)
   let height = sanitizeBoardSize(data?.height)
@@ -847,6 +868,12 @@ function sanitizeActiveGame(data) {
     name: sanitizeString(data?.name, 200),
     board: width == null || height == null ? null : {width, height},
     phase: sanitizeGamePhase(data?.phase),
+    ranked: sanitizeBoolean(data?.ranked),
+    rules: sanitizeString(data?.rules, 80),
+    timeControl: sanitizeTimeControl(data?.time_control),
+    handicap: sanitizeHandicap(data?.handicap),
+    komi: sanitizeNumber(data?.komi),
+    timePerMove: sanitizeNumber(data?.time_per_move),
     moveNumber: sanitizeMoveCount(data?.move_number, 0),
     playerToMove: sanitizeOptionalGameId(data?.player_to_move),
     clockExpiration:
@@ -854,17 +881,8 @@ function sanitizeActiveGame(data) {
       Number.isFinite(data.clock_expiration)
         ? data.clock_expiration
         : null,
-    black: sanitizeActiveGamePlayer(data?.black),
-    white: sanitizeActiveGamePlayer(data?.white),
-  }
-}
-
-function sanitizeActiveGamePlayer(player) {
-  if (player == null || typeof player !== 'object') return null
-
-  return {
-    id: sanitizeOptionalGameId(player.id),
-    username: sanitizeString(player.username || player.name, 80),
+    black: sanitizePlayer(data?.black, serverUrl),
+    white: sanitizePlayer(data?.white, serverUrl),
   }
 }
 
@@ -902,7 +920,7 @@ function sanitizeOptionalGameId(value) {
   return null
 }
 
-function sanitizeGameData(data) {
+function sanitizeGameData(data, serverUrl) {
   let width = sanitizeBoardSize(data?.width)
   let height = sanitizeBoardSize(data?.height)
   let board = width == null || height == null ? null : {width, height}
@@ -912,8 +930,13 @@ function sanitizeGameData(data) {
     gameName: sanitizeString(data?.game_name, 200),
     board,
     handicap: sanitizeHandicap(data?.handicap),
+    komi: sanitizeNumber(data?.komi),
+    rules: sanitizeString(data?.rules, 80),
+    ranked: sanitizeBoolean(data?.ranked),
+    timeControl: sanitizeTimeControl(data?.time_control),
+    timePerMove: sanitizeNumber(data?.time_per_move),
     phase: sanitizeGamePhase(data?.phase),
-    players: sanitizePlayers(data?.players),
+    players: sanitizePlayers(data?.players, serverUrl),
     moves,
     moveCount: moves.length,
     lastMove: moves.at(-1)?.move || null,
@@ -1043,21 +1066,49 @@ function sanitizeHandicap(value) {
   return Number.isInteger(value) && value >= 0 && value <= 9 ? value : null
 }
 
-function sanitizePlayers(players) {
+function sanitizePlayers(players, serverUrl) {
   if (players == null || typeof players !== 'object') return null
 
   return {
-    black: sanitizePlayer(players.black),
-    white: sanitizePlayer(players.white),
+    black: sanitizePlayer(players.black, serverUrl),
+    white: sanitizePlayer(players.white, serverUrl),
   }
 }
 
-function sanitizePlayer(player) {
+function sanitizePlayer(player, serverUrl) {
   if (player == null || typeof player !== 'object') return null
+
+  let rating = player.ratings?.overall?.rating ?? player.rating ?? player.elo
+  let rank =
+    sanitizeString(player.rank, 20) ||
+    rankNumberToRank(player.ranking) ||
+    rankNumberToRank(player.rank) ||
+    ratingToRank(rating)
+  let icon =
+    player.icon || player.icon_url || player.picture || player.avatar || null
 
   return {
     id: sanitizeOptionalGameId(player.id),
-    username: sanitizeString(player.username, 80),
+    username: sanitizeString(player.username || player.name, 80),
+    rank,
+    rating: sanitizeNumber(rating),
+    iconUrl: resolveOgsUrl(serverUrl, icon),
+  }
+}
+
+function sanitizeTimeControl(value) {
+  if (value == null || typeof value !== 'object') return null
+
+  return {
+    system: sanitizeString(value.system, 80),
+    speed: sanitizeString(value.speed, 80),
+    timePerMove: sanitizeNumber(value.time_per_move),
+    mainTime: sanitizeNumber(value.main_time),
+    periodTime: sanitizeNumber(value.period_time),
+    periods:
+      Number.isInteger(value.periods) && value.periods >= 0
+        ? value.periods
+        : null,
   }
 }
 
@@ -1122,6 +1173,11 @@ function cloneOnlineGameState(state) {
     ...state,
     board: state.board == null ? null : {...state.board},
     handicap: state.handicap,
+    komi: state.komi,
+    rules: state.rules,
+    ranked: state.ranked,
+    timeControl: state.timeControl == null ? null : {...state.timeControl},
+    timePerMove: state.timePerMove,
     players:
       state.players == null
         ? null
@@ -1134,6 +1190,16 @@ function cloneOnlineGameState(state) {
     clock: state.clock == null ? null : {...state.clock},
     moves: state.moves.map((move) => ({...move})),
     chat: state.chat.map((line) => ({...line})),
+  }
+}
+
+function cloneActiveGameState(game) {
+  return {
+    ...game,
+    board: game.board == null ? null : {...game.board},
+    timeControl: game.timeControl == null ? null : {...game.timeControl},
+    black: game.black == null ? null : {...game.black},
+    white: game.white == null ? null : {...game.white},
   }
 }
 
