@@ -8,51 +8,22 @@ import {
   updateScalarMatchmakingOption,
 } from '../../modules/ogsmatchmakingoptions.js'
 import OgsPanelSyncController from '../../modules/ogspanelsync.js'
+import {
+  boardSizes,
+  conditions,
+  createOgsPanelLabels,
+  defaultMatchmakingOptions,
+  formatBoard,
+  formatPlayers,
+  getSocketLabel,
+  handicapValues,
+  rules,
+  speeds,
+  timeSystems,
+} from './ogsPanelData.js'
 
 const t = i18n.context('OgsPanel')
-
-const boardSizes = [9, 13, 19]
-const speeds = ['blitz', 'rapid', 'live', 'correspondence']
-const timeSystems = ['byoyomi', 'fischer']
-const conditions = ['required', 'preferred', 'no-preference']
-const rules = ['japanese', 'chinese', 'aga', 'korean', 'ing', 'nz']
-const handicapValues = ['enabled', 'disabled']
-const conditionLabels = {
-  required: t('Required'),
-  preferred: t('Preferred'),
-  'no-preference': t('No preference'),
-}
-const speedLabels = {
-  blitz: t('Blitz'),
-  rapid: t('Rapid'),
-  live: t('Live'),
-  correspondence: t('Correspondence'),
-}
-const timeSystemLabels = {
-  byoyomi: t('Byo-yomi'),
-  fischer: t('Fischer'),
-}
-const ruleLabels = {
-  japanese: t('Japanese'),
-  chinese: t('Chinese'),
-  aga: t('AGA'),
-  korean: t('Korean'),
-  ing: t('Ing'),
-  nz: t('New Zealand'),
-}
-const handicapLabels = {
-  enabled: t('Enabled'),
-  disabled: t('Disabled'),
-}
-const defaultMatchmakingOptions = {
-  boardSizes: [19],
-  speeds: ['rapid'],
-  timeSystem: 'byoyomi',
-  lowerRankDiff: 3,
-  upperRankDiff: 3,
-  rules: {condition: 'required', value: 'japanese'},
-  handicap: {condition: 'preferred', value: 'enabled'},
-}
+const ogsPanelLabels = createOgsPanelLabels(t)
 
 export default class OgsPanel extends Component {
   constructor(props) {
@@ -388,7 +359,7 @@ export default class OgsPanel extends Component {
             {
               class: `ogs-dashboard-status-pill ${authenticated ? 'online' : ''}`,
             },
-            getSocketLabel(socket),
+            getSocketLabel(socket, t),
           ),
           connected &&
             h(
@@ -552,7 +523,7 @@ function AccountStatus({user, username, socket}) {
       h('dt', {}, t('Rank')),
       h('dd', {}, user?.rank || t('Unknown')),
       h('dt', {}, t('Socket')),
-      h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket)),
+      h('dd', {class: 'ogs-socket-status'}, getSocketLabel(socket, t)),
     ),
   )
 }
@@ -704,7 +675,7 @@ function AutomatchForm({
       name: 'speeds',
       values: speeds,
       selected: options.speeds,
-      format: (speed) => speedLabels[speed] || speed,
+      format: (speed) => ogsPanelLabels.speeds[speed] || speed,
       disabled: active || busy,
       onChange: onMultiChange,
     }),
@@ -714,7 +685,8 @@ function AutomatchForm({
       name: 'timeSystem',
       value: options.timeSystem,
       values: timeSystems,
-      format: (timeSystem) => timeSystemLabels[timeSystem] || timeSystem,
+      format: (timeSystem) =>
+        ogsPanelLabels.timeSystems[timeSystem] || timeSystem,
       disabled: active || busy,
       onChange: onOptionChange,
     }),
@@ -742,7 +714,7 @@ function AutomatchForm({
       group: 'rules',
       option: options.rules,
       values: rules,
-      formatValue: (rule) => ruleLabels[rule] || rule,
+      formatValue: (rule) => ogsPanelLabels.rules[rule] || rule,
       disabled: active || busy,
       onChange: onConditionChange,
     }),
@@ -754,7 +726,7 @@ function AutomatchForm({
       group: 'handicap',
       option: options.handicap,
       values: handicapValues,
-      formatValue: (value) => handicapLabels[value] || value,
+      formatValue: (value) => ogsPanelLabels.handicap[value] || value,
       disabled: active || busy,
       onChange: onConditionChange,
     }),
@@ -822,10 +794,10 @@ function OnlineGameForm({
                 'div',
                 {class: 'ogs-active-game-summary'},
                 h('strong', {}, game.name || `#${game.id}`),
-                h('span', {}, formatBoard(game.board)),
+                h('span', {}, formatBoard(game.board, t)),
                 h('span', {}, game.phase || t('Unknown')),
                 h('span', {}, t('Move'), ' ', String(game.moveNumber || 0)),
-                h('span', {}, formatPlayers(game.black, game.white)),
+                h('span', {}, formatPlayers(game.black, game.white, t)),
               ),
               h(
                 'button',
@@ -849,7 +821,7 @@ function OnlineGameForm({
       h('dt', {}, t('Name')),
       h('dd', {}, onlineGame?.gameName || t('Unknown')),
       h('dt', {}, t('Board')),
-      h('dd', {}, formatBoard(onlineGame?.board)),
+      h('dd', {}, formatBoard(onlineGame?.board, t)),
       h('dt', {}, t('Phase')),
       h('dd', {}, onlineGame?.phase || t('Unknown')),
       h('dt', {}, t('Moves')),
@@ -891,15 +863,6 @@ function OnlineGameForm({
         t('Disconnect game'),
       ),
   )
-}
-
-function formatBoard(board) {
-  if (board == null) return t('Unknown')
-  return `${board.width}x${board.height}`
-}
-
-function formatPlayers(black, white) {
-  return `${black?.username || t('Black')} vs ${white?.username || t('White')}`
 }
 
 function CheckboxGroup({
@@ -991,7 +954,7 @@ function ConditionValueField({
       name: `${group}.condition`,
       selected: option.condition,
       values: conditions,
-      format: (condition) => conditionLabels[condition] || condition,
+      format: (condition) => ogsPanelLabels.conditions[condition] || condition,
       disabled,
       onChange,
     }),
@@ -1040,21 +1003,4 @@ function RadioGroup({
       ),
     ),
   )
-}
-
-function getSocketLabel(socket) {
-  switch (socket?.status) {
-    case 'authentication-sent':
-      return t('Authentication sent')
-    case 'authenticated':
-      return t('Authenticated')
-    case 'connected':
-      return t('Connected')
-    case 'connecting':
-      return t('Connecting')
-    case 'error':
-      return socket.error || t('Connection error')
-    default:
-      return t('Disconnected')
-  }
 }
