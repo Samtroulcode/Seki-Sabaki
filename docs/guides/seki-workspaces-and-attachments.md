@@ -102,8 +102,9 @@ Implemented:
 - Detaching an OGS game preserves the projected SGF as a local board document.
 - OGS rejected moves clear the board's pending optimistic move through the same
   error path used by the OGS workspace.
-- OGS rank, error, and automatch option/payload helpers are extracted under
-  `src/ogs/` while `src/ogs.js` remains the public client facade.
+- OGS rank, error, auth, primitive sanitizer, user/player, and automatch
+  option/payload helpers are extracted under `src/ogs/` while `src/ogs.js`
+  remains the public client facade.
 
 Partially complete:
 
