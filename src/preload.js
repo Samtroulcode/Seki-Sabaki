@@ -208,6 +208,10 @@ window.sabaki = {
     selectInputFile: () => ipcRenderer.invoke('analysis:selectInputFile'),
     selectOutputDirectory: () =>
       ipcRenderer.invoke('analysis:selectOutputDirectory'),
+    selectKatagoExecutable: () =>
+      ipcRenderer.invoke('analysis:selectKatagoExecutable'),
+    selectKatagoModel: () => ipcRenderer.invoke('analysis:selectKatagoModel'),
+    selectKatagoConfig: () => ipcRenderer.invoke('analysis:selectKatagoConfig'),
     showInFolder: (path) => ipcRenderer.invoke('analysis:showInFolder', path),
     openAnalyzedGame: (path) =>
       ipcRenderer.invoke('analysis:openAnalyzedGame', path),

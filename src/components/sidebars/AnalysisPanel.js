@@ -33,6 +33,18 @@ export default class AnalysisPanel extends Component {
       await analysisStore.selectOutputDirectory()
     }
 
+    this.handleKatagoExecutableButtonClick = async () => {
+      await analysisStore.selectKatagoExecutable()
+    }
+
+    this.handleKatagoModelButtonClick = async () => {
+      await analysisStore.selectKatagoModel()
+    }
+
+    this.handleKatagoConfigButtonClick = async () => {
+      await analysisStore.selectKatagoConfig()
+    }
+
     this.handleConfigInput = (evt) => {
       let {name, value} = evt.currentTarget
 
@@ -167,6 +179,9 @@ export default class AnalysisPanel extends Component {
           onSelectInputFile: this.handleSelectInputFile,
           onStartAnalysis: this.handleStartAnalysis,
           onOutputDirectoryClick: this.handleOutputDirectoryButtonClick,
+          onKatagoExecutableClick: this.handleKatagoExecutableButtonClick,
+          onKatagoModelClick: this.handleKatagoModelButtonClick,
+          onKatagoConfigClick: this.handleKatagoConfigButtonClick,
           onConfigInput: this.handleConfigInput,
           onApplyConfig: this.handleApplyConfig,
           onResetConfig: this.handleResetConfig,
@@ -194,6 +209,9 @@ function SourceCard({
   onSelectInputFile,
   onStartAnalysis,
   onOutputDirectoryClick,
+  onKatagoExecutableClick,
+  onKatagoModelClick,
+  onKatagoConfigClick,
   onConfigInput,
   onApplyConfig,
   onResetConfig,
@@ -231,7 +249,9 @@ function SourceCard({
       h(
         'p',
         {class: 'analysis-warning'},
-        t('Configure KataGo and an output folder before starting.'),
+        t(
+          'Configure KataGo, model, config, and output folder before starting.',
+        ),
       ),
     configDirty &&
       h(
@@ -245,6 +265,9 @@ function SourceCard({
       configDirty,
       busy,
       onOutputDirectoryClick,
+      onKatagoExecutableClick,
+      onKatagoModelClick,
+      onKatagoConfigClick,
       onConfigInput,
       onApplyConfig,
       onResetConfig,
@@ -258,6 +281,9 @@ function ConfigSummary({
   configDirty,
   busy,
   onOutputDirectoryClick,
+  onKatagoExecutableClick,
+  onKatagoModelClick,
+  onKatagoConfigClick,
   onConfigInput,
   onApplyConfig,
   onResetConfig,
@@ -286,16 +312,43 @@ function ConfigSummary({
       }),
     ),
     h(
+      'button',
+      {type: 'button', disabled: busy, onClick: onKatagoExecutableClick},
+      t('Choose KataGo...'),
+    ),
+    h(
       'label',
       {},
-      h('span', {}, t('KataGo arguments')),
+      h('span', {}, t('Neural network model')),
       h('input', {
         type: 'text',
-        name: 'katagoArguments',
-        value: displayedConfig.katagoArguments || '',
-        placeholder: t('analysis -config ... -model ...'),
+        name: 'katagoModelPath',
+        value: displayedConfig.katagoModelPath || '',
+        placeholder: t('Path to model.bin.gz'),
         onInput: onConfigInput,
       }),
+    ),
+    h(
+      'button',
+      {type: 'button', disabled: busy, onClick: onKatagoModelClick},
+      t('Choose model...'),
+    ),
+    h(
+      'label',
+      {},
+      h('span', {}, t('KataGo analysis config')),
+      h('input', {
+        type: 'text',
+        name: 'katagoConfigPath',
+        value: displayedConfig.katagoConfigPath || '',
+        placeholder: t('Path to analysis.cfg'),
+        onInput: onConfigInput,
+      }),
+    ),
+    h(
+      'button',
+      {type: 'button', disabled: busy, onClick: onKatagoConfigClick},
+      t('Choose config...'),
     ),
     h(
       'label',
@@ -482,7 +535,12 @@ function ResultListItem({game, busy, onOpenGame}) {
 function getMissingConfigFields(config) {
   if (config == null) return ['config']
 
-  return ['katagoPath', 'katagoArguments', 'outputDirectory'].filter(
+  return [
+    'katagoPath',
+    'katagoModelPath',
+    'katagoConfigPath',
+    'outputDirectory',
+  ].filter(
     (field) => typeof config[field] !== 'string' || config[field].trim() === '',
   )
 }

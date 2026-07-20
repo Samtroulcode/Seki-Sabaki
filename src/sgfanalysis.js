@@ -7,7 +7,12 @@ const {
   resolveAnalyzeSgfPath,
 } = require('./sgfanalysisbinary.js')
 
-const USER_CONFIG_KEYS = ['katagoPath', 'katagoArguments', 'outputDirectory']
+const USER_CONFIG_KEYS = [
+  'katagoPath',
+  'katagoModelPath',
+  'katagoConfigPath',
+  'outputDirectory',
+]
 
 function setupSgfAnalysisIpcHandlers(
   ipcMain,
@@ -112,6 +117,48 @@ function setupSgfAnalysisIpcHandlers(
     return result.filePaths[0]
   })
 
+  ipcMain.handle('analysis:selectKatagoExecutable', async (evt) => {
+    if (dialog == null) return null
+
+    let result = await dialog.showOpenDialog(getWindow(evt), {
+      properties: ['openFile'],
+      filters: [{name: 'KataGo Executable', extensions: ['*']}],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('analysis:selectKatagoModel', async (evt) => {
+    if (dialog == null) return null
+
+    let result = await dialog.showOpenDialog(getWindow(evt), {
+      properties: ['openFile'],
+      filters: [
+        {name: 'KataGo Models', extensions: ['bin', 'gz', 'txt']},
+        {name: 'All Files', extensions: ['*']},
+      ],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('analysis:selectKatagoConfig', async (evt) => {
+    if (dialog == null) return null
+
+    let result = await dialog.showOpenDialog(getWindow(evt), {
+      properties: ['openFile'],
+      filters: [
+        {name: 'KataGo Config', extensions: ['cfg', 'conf', 'txt']},
+        {name: 'All Files', extensions: ['*']},
+      ],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
   ipcMain.handle('analysis:showInFolder', (evt, path) => {
     if (shell == null || !isKnownAnalyzedGamePath(service, path)) return false
 
@@ -147,9 +194,30 @@ function loadUserSgfAnalysisConfig(setting) {
 
   return {
     katagoPath: setting.get('analysis.katago_path') || '',
-    katagoArguments: setting.get('analysis.katago_arguments') || '',
+    katagoModelPath:
+      setting.get('analysis.katago_model_path') ||
+      parseKatagoArgumentPath(
+        setting.get('analysis.katago_arguments'),
+        'model',
+      ),
+    katagoConfigPath:
+      setting.get('analysis.katago_config_path') ||
+      parseKatagoArgumentPath(
+        setting.get('analysis.katago_arguments'),
+        'config',
+      ),
     outputDirectory: setting.get('analysis.output_directory') || '',
   }
+}
+
+function parseKatagoArgumentPath(argumentsText, option) {
+  if (typeof argumentsText !== 'string' || argumentsText === '') return ''
+
+  let match = argumentsText.match(
+    new RegExp(`(?:^|\\s)-${option}\\s+(?:"([^"]+)"|'([^']+)'|(\\S+))`),
+  )
+
+  return match == null ? '' : match[1] || match[2] || match[3] || ''
 }
 
 function persistUserSgfAnalysisConfig(setting, config) {
@@ -157,7 +225,8 @@ function persistUserSgfAnalysisConfig(setting, config) {
 
   setting
     .set('analysis.katago_path', config.katagoPath || '')
-    .set('analysis.katago_arguments', config.katagoArguments || '')
+    .set('analysis.katago_model_path', config.katagoModelPath || '')
+    .set('analysis.katago_config_path', config.katagoConfigPath || '')
     .set('analysis.output_directory', config.outputDirectory || '')
 }
 
@@ -194,6 +263,7 @@ module.exports = {
   createSgfAnalysisService,
   filterUserSgfAnalysisConfig,
   loadUserSgfAnalysisConfig,
+  parseKatagoArgumentPath,
   persistUserSgfAnalysisConfig,
   setupSgfAnalysisIpcHandlers,
   serializeError,

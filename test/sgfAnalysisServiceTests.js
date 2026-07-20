@@ -32,14 +32,19 @@ function createService(options = {}) {
         ...createDefaultSgfAnalysisConfig(),
         analyzeSgfPath: 'analyze-sgf',
         katagoPath: '/katago',
-        katagoArguments: 'analysis -model model.bin.gz -config analysis.cfg',
+        katagoModelPath: '/model.bin.gz',
+        katagoConfigPath: '/analysis.cfg',
         outputDirectory: directory,
       },
       runner: options.runner || (async () => {}),
       now: () => 1784540000000,
       createId: () => `id-${++id}`,
       fs: {
-        exists: (path) => path === '/katago' || existsSync(path),
+        exists: (path) =>
+          path === '/katago' ||
+          path === '/model.bin.gz' ||
+          path === '/analysis.cfg' ||
+          existsSync(path),
         ...options.fs,
       },
     }),
@@ -255,7 +260,11 @@ describe('SGF analysis service', () => {
   it('rejects unsupported, non-regular, and oversized source files', () => {
     let {directory, service} = createService({
       fs: {
-        exists: (path) => path === '/katago' || path.startsWith('/tmp/source'),
+        exists: (path) =>
+          path === '/katago' ||
+          path === '/model.bin.gz' ||
+          path === '/analysis.cfg' ||
+          path.startsWith('/tmp/source'),
         stat: (path) => {
           if (path === '/tmp/source-dir.sgf')
             return {isFile: () => false, size: 0}

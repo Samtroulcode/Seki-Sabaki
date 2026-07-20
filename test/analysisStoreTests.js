@@ -13,7 +13,9 @@ function createAnalysisApi(overrides = {}) {
     analyzeSgfPath: 'analyze-sgf',
     analyzeSgfStatus: 'path',
     katagoPath: '',
-    katagoArguments: '',
+    katagoModelPath: '',
+    katagoConfigPath: '',
+    katagoArguments: 'analysis',
     outputDirectory: '',
     maxVisits: 1600,
     rules: 'tromp-taylor',
@@ -31,6 +33,9 @@ function createAnalysisApi(overrides = {}) {
     refreshAnalyzedGames: async () => analyzedGames,
     selectInputFile: async () => '/tmp/game.sgf',
     selectOutputDirectory: async () => '/tmp/analysis',
+    selectKatagoExecutable: async () => '/usr/bin/katago',
+    selectKatagoModel: async () => '/models/model.bin.gz',
+    selectKatagoConfig: async () => '/configs/analysis.cfg',
     setConfig: async (nextConfig) => {
       config = nextConfig
       return {ok: true, config}
@@ -185,6 +190,29 @@ describe('AnalysisStore', () => {
     ])
   })
 
+  it('selects KataGo executable, model, and config into draft settings', async () => {
+    let store = new AnalysisStore({analysis: () => createAnalysisApi()})
+
+    await store.initialize()
+    await store.selectKatagoExecutable()
+    await store.selectKatagoModel()
+    await store.selectKatagoConfig()
+
+    assert.strictEqual(
+      store.getState().draftConfig.katagoPath,
+      '/usr/bin/katago',
+    )
+    assert.strictEqual(
+      store.getState().draftConfig.katagoModelPath,
+      '/models/model.bin.gz',
+    )
+    assert.strictEqual(
+      store.getState().draftConfig.katagoConfigPath,
+      '/configs/analysis.cfg',
+    )
+    assert.strictEqual(store.getState().configDirty, true)
+  })
+
   it('reverts draft settings', async () => {
     let store = new AnalysisStore({analysis: () => createAnalysisApi()})
 
@@ -204,7 +232,9 @@ describe('AnalysisStore', () => {
       analyzeSgfPath: 'analyze-sgf',
       analyzeSgfStatus: 'path',
       katagoPath: '',
-      katagoArguments: '',
+      katagoModelPath: '',
+      katagoConfigPath: '',
+      katagoArguments: 'analysis',
       outputDirectory: '',
       maxVisits: 1600,
       rules: 'tromp-taylor',

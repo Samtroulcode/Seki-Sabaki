@@ -56,9 +56,12 @@ separately.
 KataGo is not bundled. Install KataGo separately, then configure:
 
 - KataGo executable: path to the `katago` binary
-- KataGo arguments: for example
-  `analysis -model /path/to/model.bin.gz -config /path/to/analysis.cfg`
+- Neural network model: path to the KataGo model, for example
+  `/path/to/model.bin.gz`
+- KataGo analysis config: path to the KataGo analysis config, for example
+  `/path/to/analysis.cfg`
 - Output folder: destination for analyzed SGF files
 
 Click **Apply settings**, choose an SGF file, then click **Start analysis**. The
-KataGo path, arguments, and output folder are saved for future sessions.
+KataGo path, model, config, and output folder are saved for future sessions.
+Seki-Sabaki generates the KataGo analysis arguments from those fields.

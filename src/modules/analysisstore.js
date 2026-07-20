@@ -157,6 +157,50 @@ export class AnalysisStore {
     }
   }
 
+  async selectKatagoExecutable() {
+    return await this.selectConfigPath({
+      select: () => this.analysis().selectKatagoExecutable(),
+      field: 'katagoPath',
+      fallback: t('Unable to choose KataGo executable.'),
+    })
+  }
+
+  async selectKatagoModel() {
+    return await this.selectConfigPath({
+      select: () => this.analysis().selectKatagoModel(),
+      field: 'katagoModelPath',
+      fallback: t('Unable to choose KataGo model.'),
+    })
+  }
+
+  async selectKatagoConfig() {
+    return await this.selectConfigPath({
+      select: () => this.analysis().selectKatagoConfig(),
+      field: 'katagoConfigPath',
+      fallback: t('Unable to choose KataGo config.'),
+    })
+  }
+
+  async selectConfigPath({select, field, fallback}) {
+    this.setState({busy: true, error: null})
+
+    try {
+      let path = await select()
+      if (path == null || path === '') {
+        this.setState({busy: false})
+        return null
+      }
+
+      this.updateConfigDraft({[field]: path})
+      this.setState({busy: false})
+
+      return path
+    } catch (err) {
+      this.setState({busy: false, error: getErrorMessage(err, fallback)})
+      return null
+    }
+  }
+
   updateConfigDraft(change) {
     let draftConfig = {...(this.state.draftConfig || {}), ...change}
     this.setState({

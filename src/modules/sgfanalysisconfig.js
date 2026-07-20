@@ -7,7 +7,10 @@ function createDefaultSgfAnalysisConfig() {
     analyzeSgfPath: 'analyze-sgf',
     analyzeSgfStatus: 'path',
     katagoPath: '',
-    katagoArguments: '',
+    katagoModelPath: '',
+    katagoConfigPath: '',
+    katagoShellQuoting: process.platform === 'win32' ? 'cmd' : 'posix',
+    katagoArguments: 'analysis',
     outputDirectory: '',
     maxVisits: 1600,
     rules: 'tromp-taylor',
@@ -23,7 +26,7 @@ function createDefaultSgfAnalysisConfig() {
 function normalizeSgfAnalysisConfig(config = {}) {
   let defaults = createDefaultSgfAnalysisConfig()
 
-  return {
+  let normalized = {
     ...defaults,
     ...pickKnownConfigKeys(config),
     maxVisits: normalizeInteger(config.maxVisits, defaults.maxVisits),
@@ -37,6 +40,30 @@ function normalizeSgfAnalysisConfig(config = {}) {
       defaults.minWinrateDropForVariations,
     ),
   }
+
+  normalized.katagoArguments = buildKatagoArguments(normalized)
+
+  return normalized
+}
+
+function buildKatagoArguments(config = {}) {
+  let katagoModelPath = config.katagoModelPath || ''
+  let katagoConfigPath = config.katagoConfigPath || ''
+  let parts = ['analysis']
+
+  if (katagoModelPath !== '') {
+    parts.push('-model', quoteKatagoArgument(katagoModelPath, config))
+  }
+
+  if (katagoConfigPath !== '') {
+    parts.push('-config', quoteKatagoArgument(katagoConfigPath, config))
+  }
+
+  return parts.join(' ')
+}
+
+function quoteKatagoArgument(value, config = {}) {
+  return config.katagoShellQuoting === 'cmd' ? value : `'${value}'`
 }
 
 function validateSgfAnalysisConfig(
@@ -56,10 +83,15 @@ function validateSgfAnalysisConfig(
     code: 'katago-not-configured',
     message: 'KataGo executable is not configured.',
   })
-  requireNonEmptyString(errors, normalized.katagoArguments, {
-    field: 'katagoArguments',
-    code: 'katago-arguments-missing',
-    message: 'KataGo arguments are not configured.',
+  requireNonEmptyString(errors, normalized.katagoModelPath, {
+    field: 'katagoModelPath',
+    code: 'katago-model-not-configured',
+    message: 'KataGo neural network model is not configured.',
+  })
+  requireNonEmptyString(errors, normalized.katagoConfigPath, {
+    field: 'katagoConfigPath',
+    code: 'katago-config-not-configured',
+    message: 'KataGo analysis config is not configured.',
   })
   requireNonEmptyString(errors, normalized.outputDirectory, {
     field: 'outputDirectory',
@@ -80,9 +112,32 @@ function validateSgfAnalysisConfig(
     code: 'katago-not-found',
     message: 'KataGo executable was not found.',
   })
+  validateFileExists(errors, normalized.katagoModelPath, fileExists, {
+    field: 'katagoModelPath',
+    code: 'katago-model-not-found',
+    message: 'KataGo neural network model was not found.',
+  })
+  validateFileExists(errors, normalized.katagoConfigPath, fileExists, {
+    field: 'katagoConfigPath',
+    code: 'katago-config-not-found',
+    message: 'KataGo analysis config was not found.',
+  })
 
   validateBadJsonString(errors, normalized.katagoPath, 'katagoPath')
-  validateBadJsonString(errors, normalized.katagoArguments, 'katagoArguments')
+  validateBadJsonString(errors, normalized.katagoModelPath, 'katagoModelPath')
+  validateBadJsonString(errors, normalized.katagoConfigPath, 'katagoConfigPath')
+  validateKatagoShellPathString(errors, normalized.katagoPath, 'katagoPath')
+  validateKatagoShellPathString(
+    errors,
+    normalized.katagoModelPath,
+    'katagoModelPath',
+  )
+  validateKatagoShellPathString(
+    errors,
+    normalized.katagoConfigPath,
+    'katagoConfigPath',
+  )
+  validateKatagoShellQuoting(errors, normalized)
   validateBadJsonString(errors, normalized.rules, 'rules')
 
   if (
@@ -186,7 +241,7 @@ function buildAnalyzeSgfArguments({inputPath, config, fileSuffix}) {
   return [
     '-k',
     serializeAnalyzeSgfOptions({
-      path: normalized.katagoPath,
+      path: quoteKatagoArgument(normalized.katagoPath, normalized),
       arguments: normalized.katagoArguments,
     }),
     '-a',
@@ -217,10 +272,26 @@ function serializeAnalyzeSgfValue(value) {
 }
 
 function quoteAnalyzeSgfString(value) {
+  if (!value.includes('"')) return JSON.stringify(value)
+  value = value.replace(/\\/g, '\\\\')
   if (!value.includes("'")) return `'${value}'`
   if (!value.includes('"')) return `"${value}"`
 
   throw new TypeError('Cannot serialize strings containing both quote types.')
+}
+
+function validateKatagoShellQuoting(errors, config) {
+  if (config.katagoShellQuoting !== 'cmd') return
+
+  for (let field of ['katagoPath', 'katagoModelPath', 'katagoConfigPath']) {
+    if (typeof config[field] !== 'string' || !/\s/.test(config[field])) continue
+
+    errors.push({
+      field,
+      code: 'unsupported-katago-path-whitespace',
+      message: 'KataGo paths cannot contain whitespace on Windows.',
+    })
+  }
 }
 
 function pickKnownConfigKeys(config) {
@@ -275,6 +346,17 @@ function validateBadJsonString(errors, value, field) {
   })
 }
 
+function validateKatagoShellPathString(errors, value, field) {
+  if (typeof value !== 'string') return
+  if (!/["'$`%\r\n&|<>^;#]/.test(value) && !value.endsWith('\\')) return
+
+  errors.push({
+    field,
+    code: 'unsupported-katago-path-characters',
+    message: 'KataGo path contains unsupported shell characters.',
+  })
+}
+
 function shouldValidateAnalyzeSgfPath(path) {
   return path !== createDefaultSgfAnalysisConfig().analyzeSgfPath
 }
@@ -289,4 +371,5 @@ exports.createDefaultSgfAnalysisConfig = createDefaultSgfAnalysisConfig
 exports.normalizeSgfAnalysisConfig = normalizeSgfAnalysisConfig
 exports.validateSgfAnalysisConfig = validateSgfAnalysisConfig
 exports.buildAnalyzeSgfArguments = buildAnalyzeSgfArguments
+exports.buildKatagoArguments = buildKatagoArguments
 exports.serializeAnalyzeSgfOptions = serializeAnalyzeSgfOptions

@@ -3,6 +3,7 @@ import assert from 'assert'
 import {
   createSgfAnalysisService,
   filterUserSgfAnalysisConfig,
+  parseKatagoArgumentPath,
   setupSgfAnalysisIpcHandlers,
 } from '../src/sgfanalysis.js'
 
@@ -108,7 +109,7 @@ describe('SGF analysis IPC handlers', () => {
     })
   })
 
-  it('returns selected file and output directory paths', async () => {
+  it('returns selected analysis file and configuration paths', async () => {
     let calls = []
     let dialog = {
       showOpenDialog: async (win, options) => {
@@ -139,6 +140,33 @@ describe('SGF analysis IPC handlers', () => {
       'openDirectory',
       'createDirectory',
     ])
+
+    dialog.showOpenDialog = async (win, options) => {
+      calls.push(options)
+      return {canceled: false, filePaths: ['/usr/bin/katago']}
+    }
+    assert.strictEqual(
+      await handlers['analysis:selectKatagoExecutable']({sender: {}}),
+      '/usr/bin/katago',
+    )
+
+    dialog.showOpenDialog = async (win, options) => {
+      calls.push(options)
+      return {canceled: false, filePaths: ['/models/model.bin.gz']}
+    }
+    assert.strictEqual(
+      await handlers['analysis:selectKatagoModel']({sender: {}}),
+      '/models/model.bin.gz',
+    )
+
+    dialog.showOpenDialog = async (win, options) => {
+      calls.push(options)
+      return {canceled: false, filePaths: ['/configs/analysis.cfg']}
+    }
+    assert.strictEqual(
+      await handlers['analysis:selectKatagoConfig']({sender: {}}),
+      '/configs/analysis.cfg',
+    )
   })
 
   it('only shows known analyzed games in folder', async () => {
@@ -193,13 +221,16 @@ describe('SGF analysis IPC handlers', () => {
       filterUserSgfAnalysisConfig({
         analyzeSgfPath: '/tmp/evil',
         katagoPath: '/usr/bin/katago',
-        katagoArguments: 'analysis',
+        katagoModelPath: '/models/model.bin.gz',
+        katagoConfigPath: '/configs/analysis.cfg',
+        katagoArguments: 'ignored',
         outputDirectory: '/analysis',
         maxVisits: 1,
       }),
       {
         katagoPath: '/usr/bin/katago',
-        katagoArguments: 'analysis',
+        katagoModelPath: '/models/model.bin.gz',
+        katagoConfigPath: '/configs/analysis.cfg',
         outputDirectory: '/analysis',
       },
     )
@@ -208,7 +239,8 @@ describe('SGF analysis IPC handlers', () => {
   it('initializes and persists user analysis settings', () => {
     let values = {
       'analysis.katago_path': '/bin/sh',
-      'analysis.katago_arguments': 'analysis -model model.bin.gz',
+      'analysis.katago_model_path': '/bin/sh',
+      'analysis.katago_config_path': '/bin/sh',
       'analysis.output_directory': '/tmp',
     }
     let setCalls = []
@@ -234,7 +266,8 @@ describe('SGF analysis IPC handlers', () => {
       {
         analyzeSgfPath: '/tmp/ignored',
         katagoPath: '/bin/sh',
-        katagoArguments: 'analysis -model next.bin.gz',
+        katagoModelPath: '/bin/sh',
+        katagoConfigPath: '/bin/sh',
         outputDirectory: '/tmp',
       },
     )
@@ -242,8 +275,26 @@ describe('SGF analysis IPC handlers', () => {
     assert.strictEqual(service.getConfig().analyzeSgfPath, 'analyze-sgf')
     assert.deepStrictEqual(setCalls, [
       ['analysis.katago_path', '/bin/sh'],
-      ['analysis.katago_arguments', 'analysis -model next.bin.gz'],
+      ['analysis.katago_model_path', '/bin/sh'],
+      ['analysis.katago_config_path', '/bin/sh'],
       ['analysis.output_directory', '/tmp'],
     ])
+  })
+
+  it('migrates existing raw KataGo arguments into model and config paths', () => {
+    assert.strictEqual(
+      parseKatagoArgumentPath(
+        'analysis -model "/models/model path.bin.gz" -config /configs/analysis.cfg',
+        'model',
+      ),
+      '/models/model path.bin.gz',
+    )
+    assert.strictEqual(
+      parseKatagoArgumentPath(
+        'analysis -model "/models/model path.bin.gz" -config /configs/analysis.cfg',
+        'config',
+      ),
+      '/configs/analysis.cfg',
+    )
   })
 })

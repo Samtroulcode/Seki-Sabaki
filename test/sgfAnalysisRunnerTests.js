@@ -93,7 +93,7 @@ describe('SGF analysis runner', () => {
       assert.strictEqual(spawnCalls[0].options.shell, false)
       assert(spawnCalls[0].args.includes(inputPath))
       assert(
-        spawnCalls[0].args.some((arg) => arg.includes("fileSuffix:'.tmp'")),
+        spawnCalls[0].args.some((arg) => arg.includes('fileSuffix:".tmp"')),
       )
     } finally {
       rmSync(directory, {recursive: true, force: true})

@@ -40,6 +40,8 @@ let defaults = {
   'app.startup_check_updates_delay': 3000,
   'app.zoom_factor': 1,
   'analysis.katago_arguments': '',
+  'analysis.katago_config_path': '',
+  'analysis.katago_model_path': '',
   'analysis.katago_path': '',
   'analysis.output_directory': '',
   'autoplay.max_sec_per_move': 99,
