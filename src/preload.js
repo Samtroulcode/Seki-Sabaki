@@ -209,6 +209,8 @@ window.sabaki = {
     selectOutputDirectory: () =>
       ipcRenderer.invoke('analysis:selectOutputDirectory'),
     showInFolder: (path) => ipcRenderer.invoke('analysis:showInFolder', path),
+    openAnalyzedGame: (path) =>
+      ipcRenderer.invoke('analysis:openAnalyzedGame', path),
     onStateChange: (callback) => {
       if (typeof callback !== 'function') {
         throw new TypeError(

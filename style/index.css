@@ -2062,6 +2062,179 @@ button:active {
   padding-left: 1.2rem;
 }
 
+.analysis-panel {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 1.2rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 2rem;
+  background: #181818;
+  color: #d0d0d0;
+  overflow: auto;
+}
+.analysis-panel h2,
+.analysis-panel h3,
+.analysis-panel h4,
+.analysis-panel p {
+  margin: 0;
+}
+.analysis-dashboard-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.2rem;
+  border: 1px solid #292a2d;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(140, 220, 218, 0.16), transparent 45%), #111;
+}
+.analysis-dashboard-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.analysis-panel-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: #006a68;
+  color: white;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+}
+.analysis-dashboard-kicker,
+.analysis-warning {
+  color: #8cdcda;
+}
+.analysis-dashboard-hero-actions,
+.analysis-config,
+.analysis-current-job,
+.analysis-result-summary {
+  display: grid;
+  gap: 0.6rem;
+}
+.analysis-dashboard-hero-actions {
+  justify-items: end;
+}
+.analysis-dashboard-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0 0.75rem;
+  border: 1px solid #3a3b40;
+  border-radius: 999px;
+  background: #181818;
+  color: #aaa;
+}
+.analysis-dashboard-status-pill.running {
+  border-color: rgba(140, 220, 218, 0.45);
+  color: #8cdcda;
+}
+.analysis-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) minmax(280px, 1fr) minmax(
+      280px,
+      420px
+    );
+  gap: 1rem;
+  align-items: start;
+}
+.analysis-dashboard-card {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #292a2d;
+  border-radius: 12px;
+  background: #111;
+}
+.analysis-source-card label,
+.analysis-config label {
+  display: grid;
+  gap: 0.3rem;
+}
+.analysis-config-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+.analysis-panel input {
+  width: 100%;
+  min-height: 2rem;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #3a3b40;
+  border-radius: 4px;
+  background: #111;
+  color: #eee;
+  line-height: 1.3;
+}
+.analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.analysis-panel button {
+  justify-self: start;
+  padding: 0.35rem 0.7rem;
+  background: #292a2d;
+  color: #eee;
+}
+.analysis-panel button:not(:disabled):hover,
+.analysis-panel button:not(:disabled):focus {
+  background: #222;
+}
+.analysis-panel button:disabled {
+  opacity: 0.5;
+}
+.analysis-error {
+  color: #f25c3d;
+}
+.analysis-empty {
+  color: #aaa;
+}
+.analysis-job-list,
+.analysis-result-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.analysis-job-list li,
+.analysis-result-list li {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+  background: #181818;
+}
+.analysis-job-list li {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+.analysis-current-job dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.8rem;
+  margin: 0;
+}
+.analysis-current-job dt {
+  color: #aaa;
+}
+.analysis-current-job dd {
+  margin: 0;
+}
+.analysis-current-job progress {
+  width: 100%;
+}
+
 @media (max-width: 1180px) {
   .ogs-dashboard-grid {
     grid-template-columns: minmax(220px, 300px) minmax(320px, 1fr);
@@ -2069,23 +2242,37 @@ button:active {
   .ogs-dashboard-secondary {
     grid-column: 1 / -1;
   }
+  .analysis-dashboard-grid {
+    grid-template-columns: minmax(300px, 420px) minmax(320px, 1fr);
+  }
+  .analysis-results-card {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 760px) {
-  .ogs-panel {
+  .ogs-panel,
+  .analysis-panel {
     padding: 1rem;
   }
   .ogs-dashboard-hero,
-  .ogs-dashboard-title {
+  .ogs-dashboard-title,
+  .analysis-dashboard-hero,
+  .analysis-dashboard-title {
     align-items: start;
   }
   .ogs-dashboard-hero,
   .ogs-dashboard-title,
-  .ogs-dashboard-grid {
+  .ogs-dashboard-grid,
+  .analysis-dashboard-hero,
+  .analysis-dashboard-title,
+  .analysis-dashboard-grid,
+  .analysis-config-inline {
     grid-template-columns: 1fr;
     display: grid;
   }
-  .ogs-dashboard-hero-actions {
+  .ogs-dashboard-hero-actions,
+  .analysis-dashboard-hero-actions {
     justify-items: start;
   }
 }

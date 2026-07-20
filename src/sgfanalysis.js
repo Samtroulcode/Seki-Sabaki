@@ -100,6 +100,13 @@ function setupSgfAnalysisIpcHandlers(
     return true
   })
 
+  ipcMain.handle('analysis:openAnalyzedGame', (evt, path) => {
+    if (!isKnownAnalyzedGamePath(service, path)) return false
+
+    evt.sender.send('load-file', path)
+    return true
+  })
+
   return service
 }
 

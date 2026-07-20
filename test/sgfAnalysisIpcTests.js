@@ -148,6 +148,22 @@ describe('SGF analysis IPC handlers', () => {
     assert.deepStrictEqual(shown, ['/analysis/game.sgf'])
   })
 
+  it('only opens known analyzed games', async () => {
+    let sent = []
+    let handlers = setup({service: createService()})
+    let evt = {sender: {send: (...args) => sent.push(args)}}
+
+    assert.strictEqual(
+      await handlers['analysis:openAnalyzedGame'](evt, '/analysis/game.sgf'),
+      true,
+    )
+    assert.strictEqual(
+      await handlers['analysis:openAnalyzedGame'](evt, '/etc/passwd'),
+      false,
+    )
+    assert.deepStrictEqual(sent, [['load-file', '/analysis/game.sgf']])
+  })
+
   it('coalesces state-change notifications', async () => {
     let states = []
     let service = createService()

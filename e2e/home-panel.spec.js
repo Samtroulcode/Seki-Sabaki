@@ -35,7 +35,15 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#sgf-explorer')).toContainText('Folder browsing')
 
     await page.getByTitle('Analysis').click()
-    await expect(page.locator('#analysis')).toBeVisible()
-    await expect(page.locator('#analysis')).toContainText('Batch analysis')
+    await expect(page.locator('#analysis-dashboard')).toBeVisible()
+    await expect(page.locator('#analysis-dashboard')).toContainText(
+      'Analysis Manager',
+    )
+    await expect(page.locator('#analysis-dashboard')).toContainText(
+      'Configure KataGo and an output folder before starting.',
+    )
+    await expect(
+      page.getByRole('button', {name: 'Start analysis'}),
+    ).toBeDisabled()
   })
 })

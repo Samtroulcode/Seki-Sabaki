@@ -13,6 +13,7 @@ import HomeView from './HomeView.js'
 import MainView from './MainView.js'
 import LeftSidebar from './LeftSidebar.js'
 import Sidebar from './Sidebar.js'
+import AnalysisPanel from './sidebars/AnalysisPanel.js'
 import OgsPanel from './sidebars/OgsPanel.js'
 import DrawerManager from './DrawerManager.js'
 import InputBox from './InputBox.js'
@@ -455,13 +456,7 @@ function renderWorkspace(state) {
         ),
       })
     case 'analysis':
-      return h(WorkspacePlaceholder, {
-        id: 'analysis',
-        title: t('Analysis Manager'),
-        description: t(
-          'Batch analysis jobs and analyzed game libraries will live here.',
-        ),
-      })
+      return h(AnalysisPanel)
     case 'board':
     default:
       return h(MainView, state)
