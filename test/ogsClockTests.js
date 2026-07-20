@@ -27,6 +27,58 @@ describe('OGS clock display', () => {
     assert.strictEqual(view.white.label, '1:30')
   })
 
+  it('shows byo-yomi main time separately from overtime reserve', () => {
+    let clock = {
+      currentPlayer: 7,
+      expiration: 1270000,
+      now: 1000000,
+      receivedAt: 5000,
+      blackTime: {thinkingTime: 120, periods: 5, periodTime: 30},
+      whiteTime: {thinkingTime: 120, periods: 5, periodTime: 30},
+    }
+    let view = getOgsClockView(clock, {black: {id: 7}, white: {id: 8}}, 5000)
+
+    assert.strictEqual(view.black.label, '2:00')
+    assert.strictEqual(view.black.detail, '5 × 0:30')
+    assert.strictEqual(view.white.label, '2:00')
+    assert.strictEqual(view.white.detail, '5 × 0:30')
+  })
+
+  it('shows byo-yomi period time while active player is in overtime', () => {
+    let clock = {
+      currentPlayer: 7,
+      expiration: 1145000,
+      now: 1000000,
+      receivedAt: 5000,
+      blackTime: {thinkingTime: 0, periods: 5, periodTime: 30},
+      whiteTime: {
+        thinkingTime: 0,
+        periodTimeLeft: 25,
+        periods: 5,
+        periodTime: 30,
+      },
+    }
+    let view = getOgsClockView(clock, {black: {id: 7}, white: {id: 8}}, 5000)
+
+    assert.strictEqual(view.black.label, '0:25')
+    assert.strictEqual(view.black.detail, '5 × 0:30')
+    assert.strictEqual(view.white.label, '0:25')
+  })
+
+  it('decrements active byo-yomi periods across elapsed overtime', () => {
+    let clock = {
+      currentPlayer: 7,
+      expiration: 1110000,
+      now: 1000000,
+      receivedAt: 5000,
+      blackTime: {thinkingTime: 0, periods: 5, periodTime: 30},
+    }
+    let view = getOgsClockView(clock, {black: {id: 7}}, 5000)
+
+    assert.strictEqual(view.black.label, '0:20')
+    assert.strictEqual(view.black.detail, '4 × 0:30')
+  })
+
   it('uses player ids from clock payload when game players are unavailable', () => {
     let clock = {
       blackPlayerId: 7,

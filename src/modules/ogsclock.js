@@ -28,7 +28,7 @@ function getPlayerClockView(clock, playerId, time, now, options) {
   let active = clock?.currentPlayer != null && clock.currentPlayer === playerId
   let paused = clock?.pause?.paused === true
   let freezeActive = options.freezeActive === true && active
-  let remaining = getRemainingMilliseconds(clock, time, active, now, {
+  let state = getPlayerClockState(clock, time, active, now, {
     freezeActive,
     freezeAt: options.freezeAt,
     drift: options.drift,
@@ -38,16 +38,20 @@ function getPlayerClockView(clock, playerId, time, now, options) {
     active,
     paused,
     stoneRemoval: clock?.stoneRemovalMode === true,
-    label: remaining == null ? '—' : formatClockDuration(remaining),
+    label:
+      state.milliseconds == null
+        ? '—'
+        : formatClockDuration(state.milliseconds),
     detail: getClockDetail(time, {
       paused,
       submitting: freezeActive,
       stoneRemoval: clock?.stoneRemovalMode,
+      periods: state.periods,
     }),
   }
 }
 
-function getRemainingMilliseconds(clock, time, active, now, options = {}) {
+function getPlayerClockState(clock, time, active, now, options = {}) {
   if (
     active &&
     clock?.expiration != null &&
@@ -60,13 +64,36 @@ function getRemainingMilliseconds(clock, time, active, now, options = {}) {
     let serverNow = getServerNow(clock, clockNow, {
       drift: options.drift,
     })
-    return Math.max(0, clock.expiration - serverNow)
+    let remaining = Math.max(0, clock.expiration - serverNow)
+
+    return getActiveStoredTimeState(time, remaining)
   }
 
   let seconds = getStoredTimeSeconds(time)
-  if (seconds != null) return Math.max(0, seconds * 1000)
+  if (seconds != null) return {milliseconds: Math.max(0, seconds * 1000)}
 
-  return null
+  return {milliseconds: null}
+}
+
+function getActiveStoredTimeState(time, remaining) {
+  if (time?.periodTime != null && time?.periods != null) {
+    let periodTime = Math.max(0, time.periodTime * 1000)
+    let overtime = Math.max(0, time.periods * periodTime)
+
+    if (periodTime > 0 && overtime > 0) {
+      let mainTime = Math.max(0, remaining - overtime)
+      if (mainTime > 0) return {milliseconds: mainTime, periods: time.periods}
+
+      let overtimeUsed = Math.max(0, overtime - remaining)
+      let periodsUsed = Math.floor(overtimeUsed / periodTime)
+      let periods = Math.max(0, time.periods - periodsUsed)
+      let periodTimeLeft = periodTime - (overtimeUsed % periodTime)
+
+      return {milliseconds: remaining <= 0 ? 0 : periodTimeLeft, periods}
+    }
+  }
+
+  return {milliseconds: remaining}
 }
 
 function getStoredTimeSeconds(time) {
@@ -91,10 +118,13 @@ function getServerNow(clock, now, {drift = null} = {}) {
   return clock.now + (now - clock.receivedAt)
 }
 
-function getClockDetail(time, {paused, submitting, stoneRemoval}) {
+function getClockDetail(time, {paused, submitting, stoneRemoval, periods}) {
   if (stoneRemoval === true) return 'Stone removal'
   if (submitting === true) return 'Submitting move'
   if (paused === true) return 'Paused'
+  if (periods != null && time?.periodTime != null) {
+    return `${periods} × ${formatClockDuration(time.periodTime * 1000)}`
+  }
   if (time?.periods != null && time.periodTime != null) {
     return `${time.periods} × ${formatClockDuration(time.periodTime * 1000)}`
   }
