@@ -4,17 +4,19 @@ export function getOgsClockView(
   now = Date.now(),
   options = {},
 ) {
+  players = players || {}
+
   return {
     black: getPlayerClockView(
       clock,
-      players.black?.id,
+      players.black?.id ?? clock?.blackPlayerId,
       clock?.blackTime,
       now,
       options,
     ),
     white: getPlayerClockView(
       clock,
-      players.white?.id,
+      players.white?.id ?? clock?.whitePlayerId,
       clock?.whiteTime,
       now,
       options,

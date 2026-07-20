@@ -27,6 +27,23 @@ describe('OGS clock display', () => {
     assert.strictEqual(view.white.label, '1:30')
   })
 
+  it('uses player ids from clock payload when game players are unavailable', () => {
+    let clock = {
+      blackPlayerId: 7,
+      whitePlayerId: 8,
+      currentPlayer: 7,
+      expiration: 1060000,
+      now: 1000000,
+      receivedAt: 5000,
+    }
+    let view = getOgsClockView(clock, null, 35000)
+
+    assert.strictEqual(view.black.active, true)
+    assert.strictEqual(view.black.label, '0:30')
+    assert.strictEqual(view.white.active, false)
+    assert.strictEqual(view.white.label, '—')
+  })
+
   it('uses measured server drift when clock snapshots lack server now', () => {
     let clock = {
       currentPlayer: 7,
