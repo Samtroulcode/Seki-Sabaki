@@ -102,6 +102,18 @@ describe('OGS clock sanitize helpers', () => {
     })
   })
 
+  it('ignores OGS clock last_move timestamps as move sequence markers', () => {
+    let clock = sanitizeClock({
+      game_id: 12345,
+      current_player: 7,
+      last_move: 1784531099035,
+      now: 1784531119532,
+    })
+
+    assert.strictEqual(clock.lastMove, null)
+    assert.strictEqual(isCurrentClock(clock, 102), true)
+  })
+
   it('classifies sequenced clocks against local moves', () => {
     assert.strictEqual(isFutureClock({lastMove: 3}, 2), true)
     assert.strictEqual(isFutureClock({lastMove: 2}, 2), false)

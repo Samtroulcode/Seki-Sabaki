@@ -29,7 +29,7 @@ function sanitizeClock(clock) {
 }
 
 function sanitizeOptionalMoveCount(value) {
-  return Number.isInteger(value) && value >= 0 ? value : null
+  return Number.isInteger(value) && value >= 0 && value <= 10000 ? value : null
 }
 
 function sanitizeClockTime(time) {
