@@ -14,6 +14,7 @@ const setting = require('./setting')
 const updater = require('./updater')
 const {getOpenFileFromArgv} = require('./argv')
 const {setupOgsIpcHandlers} = require('./ogs')
+const {openExternalUrl} = require('./shell')
 
 let windows = []
 let openfile = null
@@ -154,7 +155,8 @@ async function checkForUpdates({showFailDialogs = false} = {}) {
         (response) => {
           if (response === 2) return
 
-          shell.openExternal(
+          openExternalUrl(
+            shell,
             response === 0 ? info.downloadUrl || info.url : info.url,
           )
         },
@@ -304,7 +306,7 @@ function setupIpcHandlers() {
   })
 
   // Shell
-  ipcMain.handle('shell:openExternal', (_, url) => shell.openExternal(url))
+  ipcMain.handle('shell:openExternal', (_, url) => openExternalUrl(shell, url))
   ipcMain.handle('shell:showItemInFolder', (_, p) => shell.showItemInFolder(p))
 
   // Clipboard
