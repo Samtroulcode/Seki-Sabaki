@@ -29,6 +29,7 @@ function getPlayerClockView(clock, playerId, time, now, options) {
   let remaining = getRemainingMilliseconds(clock, time, active, now, {
     freezeActive,
     freezeAt: options.freezeAt,
+    drift: options.drift,
   })
 
   return {
@@ -54,7 +55,9 @@ function getRemainingMilliseconds(clock, time, active, now, options = {}) {
     let clockNow = options.freezeActive
       ? Math.max(options.freezeAt || now, clock.receivedAt || 0)
       : now
-    let serverNow = getServerNow(clock, clockNow)
+    let serverNow = getServerNow(clock, clockNow, {
+      drift: options.drift,
+    })
     return Math.max(0, clock.expiration - serverNow)
   }
 
@@ -76,8 +79,13 @@ function getStoredTimeSeconds(time) {
   return null
 }
 
-function getServerNow(clock, now) {
-  if (clock?.now == null || clock?.receivedAt == null) return now
+function getServerNow(clock, now, {drift = null} = {}) {
+  if (clock?.now == null || clock?.receivedAt == null) {
+    return typeof drift === 'number' && Number.isFinite(drift)
+      ? now - drift
+      : now
+  }
+
   return clock.now + (now - clock.receivedAt)
 }
 

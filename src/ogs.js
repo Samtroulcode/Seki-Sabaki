@@ -23,6 +23,7 @@ const {
   getInitialMatchmakingState,
   getInitialOnlineGameState,
   getInitialActiveGamesState,
+  getInitialNetworkState,
   cloneOnlineGameState,
   cloneActiveGameState,
 } = require('./ogs/state.js')
@@ -365,9 +366,11 @@ class OgsClient {
     serverUrl = DEFAULT_SERVER_URL,
     fetchImpl = globalThis.fetch,
     webSocketImpl = globalThis.WebSocket,
+    now = () => Date.now(),
   } = {}) {
     this.serverUrl = serverUrl.replace(/\/$/, '')
     this.fetch = fetchImpl
+    this.now = now
     this.socket = new OgsSocket({
       serverUrl: this.serverUrl,
       webSocketImpl,
@@ -378,6 +381,10 @@ class OgsClient {
     this.onlineGame = getInitialOnlineGameState()
     this.pendingClocks = new Map()
     this.activeGames = getInitialActiveGamesState()
+    this.network = getInitialNetworkState()
+    this.pendingNetworkPings = new Set()
+    this.lastNetworkPingClient = null
+    this.lastNetworkPongClient = null
   }
 
   getSession() {
@@ -388,6 +395,7 @@ class OgsClient {
     return {
       user: this.getSession(),
       socket: this.socket.getState(),
+      network: {...this.network},
       matchmaking: {...this.matchmaking},
       onlineGame: cloneOnlineGameState(this.onlineGame),
       activeGames: this.activeGames.map(cloneActiveGameState),
@@ -401,6 +409,10 @@ class OgsClient {
     this.onlineGame = getInitialOnlineGameState()
     this.pendingClocks = new Map()
     this.activeGames = getInitialActiveGamesState()
+    this.network = getInitialNetworkState()
+    this.pendingNetworkPings = new Set()
+    this.lastNetworkPingClient = null
+    this.lastNetworkPongClient = null
     return true
   }
 
@@ -461,6 +473,7 @@ class OgsClient {
     let user = sanitizeUser(this.serverUrl, loginData.user)
 
     await this.socket.connect(jwtToken)
+    this.sendNetworkPing()
 
     this.session = {jwtToken, user}
 
@@ -557,6 +570,7 @@ class OgsClient {
     }
     this.pendingClocks = new Map()
 
+    this.sendNetworkPing()
     this.socket.send('game/connect', {game_id: gameId, chat: true})
 
     return this.getState()
@@ -802,6 +816,11 @@ class OgsClient {
   }
 
   handleSocketEvent(event, payload) {
+    if (event === 'net/pong') {
+      this.handleNetworkPong(payload)
+      return
+    }
+
     if (event === 'active_game') {
       this.upsertActiveGame(payload)
       return
@@ -932,6 +951,10 @@ class OgsClient {
         this.applyClock(sanitizeClock(payload))
         break
 
+      case 'latency':
+        this.applyGameLatency(payload)
+        break
+
       case 'phase':
         this.onlineGame = {
           ...this.onlineGame,
@@ -1029,6 +1052,83 @@ class OgsClient {
     this.pendingClocks = result.pendingClocks
     if (result.action === 'applied') {
       this.onlineGame = {...this.onlineGame, clock: result.clock}
+    }
+  }
+
+  handleNetworkPong(payload) {
+    let client = sanitizeNumber(payload?.client)
+    let server = sanitizeNumber(payload?.server)
+    if (client == null || server == null) return
+    if (
+      this.lastNetworkPingClient == null ||
+      client > this.lastNetworkPingClient ||
+      !this.pendingNetworkPings.has(client)
+    ) {
+      return
+    }
+    if (
+      this.lastNetworkPongClient != null &&
+      client < this.lastNetworkPongClient
+    ) {
+      return
+    }
+
+    let now = this.now()
+    let latency = Math.max(0, now - client)
+    let drift = now - latency / 2 - server
+
+    this.lastNetworkPongClient = client
+    this.pendingNetworkPings.delete(client)
+    this.network = {latency, drift, updatedAt: now}
+    this.sendGameLatency(latency)
+  }
+
+  sendNetworkPing() {
+    if (this.socket.getState().status !== 'authenticated') return false
+
+    let now = this.now()
+    let client =
+      this.lastNetworkPingClient == null
+        ? now
+        : Math.max(now, this.lastNetworkPingClient + 1)
+    let {latency, drift} = this.network
+    this.lastNetworkPingClient = client
+    this.pendingNetworkPings.add(client)
+    this.socket.send('net/ping', {
+      client,
+      latency: latency ?? 0,
+      drift: drift ?? 0,
+    })
+
+    return true
+  }
+
+  sendGameLatency(latency = this.network.latency) {
+    if (this.socket.getState().status !== 'authenticated') return false
+    if (this.onlineGame.gameId == null) return false
+
+    let sanitizedLatency = sanitizeLatency(latency)
+    if (sanitizedLatency == null) return false
+
+    this.socket.send('game/latency', {
+      game_id: this.onlineGame.gameId,
+      latency: sanitizedLatency,
+    })
+
+    return true
+  }
+
+  applyGameLatency(payload) {
+    let playerId = sanitizeOptionalGameId(payload?.player_id)
+    let latency = sanitizeLatency(payload?.latency)
+    if (playerId == null || latency == null) return
+
+    this.onlineGame = {
+      ...this.onlineGame,
+      latencies: {
+        ...(this.onlineGame.latencies || {}),
+        [playerId]: latency,
+      },
     }
   }
 
@@ -1142,6 +1242,11 @@ function sanitizePartialGameData(data, serverUrl, previous) {
 
 function hasOwn(value, key) {
   return Object.prototype.hasOwnProperty.call(value || {}, key)
+}
+
+function sanitizeLatency(value) {
+  let latency = sanitizeNumber(value)
+  return latency == null || latency < 0 ? null : latency
 }
 
 function encodeClientOgsStones(value, board = null) {

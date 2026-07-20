@@ -40,9 +40,18 @@ function getInitialOnlineGameState() {
     lastMove: null,
     pendingMove: false,
     clock: null,
+    latencies: {},
     removedStones: '',
     removedStonesAccepted: [],
     chat: [],
+  }
+}
+
+function getInitialNetworkState() {
+  return {
+    latency: null,
+    drift: null,
+    updatedAt: null,
   }
 }
 
@@ -72,6 +81,7 @@ function cloneOnlineGameState(state) {
               state.players.white == null ? null : {...state.players.white},
           },
     clock: cloneClockState(state.clock),
+    latencies: {...(state.latencies || {})},
     removedStones: state.removedStones,
     removedStonesAccepted: [...state.removedStonesAccepted],
     moves: state.moves.map((move) => ({...move})),
@@ -105,6 +115,7 @@ module.exports = {
   getInitialMatchmakingState,
   getInitialOnlineGameState,
   getInitialActiveGamesState,
+  getInitialNetworkState,
   cloneOnlineGameState,
   cloneClockState,
   cloneActiveGameState,

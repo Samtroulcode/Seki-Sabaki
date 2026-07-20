@@ -202,7 +202,185 @@ describe('OGS client', () => {
 
     client.logout()
     assert.strictEqual(client.getSession(), null)
+    assert.deepStrictEqual(client.getState().network, {
+      latency: null,
+      drift: null,
+      updatedAt: null,
+    })
     assert.strictEqual(client.getState().socket.status, 'disconnected')
+  })
+
+  it('tracks OGS network latency, drift, and reports game latency', async () => {
+    FakeWebSocket.instances = []
+    let times = [1000, 1100, 1120, 2000]
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      now: () => times.shift(),
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'net/ping',
+      {client: 1000, latency: 0, drift: 0},
+    ])
+
+    client.connectGame({gameId: 12345})
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-2)), [
+      'net/ping',
+      {client: 1100, latency: 0, drift: 0},
+    ])
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/connect',
+      {game_id: 12345, chat: true},
+    ])
+    socket.receive('net/pong', {client: 1000, server: 1040})
+
+    assert.deepStrictEqual(client.getState().network, {
+      latency: 120,
+      drift: 20,
+      updatedAt: 1120,
+    })
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'game/latency',
+      {game_id: 12345, latency: 120},
+    ])
+
+    client.sendNetworkPing()
+    assert.deepStrictEqual(JSON.parse(socket.sent.at(-1)), [
+      'net/ping',
+      {client: 2000, latency: 120, drift: 20},
+    ])
+  })
+
+  it('ignores invalid network latency payloads', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      now: () => 2000,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+    let sentCount = socket.sent.length
+
+    socket.receive('net/pong', {client: 'bad', server: 1000})
+    socket.receive('net/pong', {client: 1000, server: 'bad'})
+    socket.receive('net/pong', {client: 1, server: 1000})
+    socket.receive('net/pong', {client: 2001, server: 1000})
+
+    assert.deepStrictEqual(client.getState().network, {
+      latency: null,
+      drift: null,
+      updatedAt: null,
+    })
+    assert.strictEqual(socket.sent.length, sentCount)
+  })
+
+  it('ignores stale network pong measurements', async () => {
+    FakeWebSocket.instances = []
+    let times = [1000, 1100, 1110, 1200]
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      now: () => times.shift(),
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+    let socket = FakeWebSocket.instances[0]
+
+    socket.receive('net/pong', {client: 1100, server: 1060})
+    assert.deepStrictEqual(client.getState().network, {
+      latency: 10,
+      drift: 45,
+      updatedAt: 1110,
+    })
+
+    let sentCount = socket.sent.length
+    socket.receive('net/pong', {client: 1000, server: 980})
+
+    assert.deepStrictEqual(client.getState().network, {
+      latency: 10,
+      drift: 45,
+      updatedAt: 1110,
+    })
+    assert.strictEqual(socket.sent.length, sentCount)
+  })
+
+  it('ignores duplicate network pong measurements', async () => {
+    FakeWebSocket.instances = []
+    let times = [1000, 1010, 1200]
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      now: () => times.shift(),
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+
+    socket.receive('net/pong', {client: 1000, server: 1005})
+    assert.deepStrictEqual(client.getState().network, {
+      latency: 10,
+      drift: 0,
+      updatedAt: 1010,
+    })
+
+    let sentCount = socket.sent.length
+    socket.receive('net/pong', {client: 1000, server: 1005})
+
+    assert.deepStrictEqual(client.getState().network, {
+      latency: 10,
+      drift: 0,
+      updatedAt: 1010,
+    })
+    assert.strictEqual(socket.sent.length, sentCount)
+  })
+
+  it('keeps OGS network ping identifiers monotonic', async () => {
+    FakeWebSocket.instances = []
+    let times = [1000, 1000, 1000]
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      now: () => times.shift(),
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+
+    client.connectGame({gameId: 12345})
+    client.sendNetworkPing()
+
+    assert.deepStrictEqual(
+      socket.sent
+        .map((message) => JSON.parse(message))
+        .filter(([event]) => event === 'net/ping')
+        .map(([, payload]) => payload.client),
+      [1000, 1001, 1002],
+    )
+  })
+
+  it('stores OGS game latency per player', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+    let socket = FakeWebSocket.instances[0]
+
+    socket.receive('game/12345/latency', {player_id: 7, latency: 80})
+    socket.receive('game/12345/latency', {player_id: 8, latency: -1})
+    socket.receive('game/99999/latency', {player_id: 8, latency: 120})
+
+    assert.deepStrictEqual(client.getState().onlineGame.latencies, {7: 80})
   })
 
   it('does not keep a session after socket login failure', async () => {

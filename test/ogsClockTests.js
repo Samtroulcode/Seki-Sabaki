@@ -27,6 +27,20 @@ describe('OGS clock display', () => {
     assert.strictEqual(view.white.label, '1:30')
   })
 
+  it('uses measured server drift when clock snapshots lack server now', () => {
+    let clock = {
+      currentPlayer: 7,
+      expiration: 1006000,
+      blackTime: {thinkingTime: 120},
+      whiteTime: {thinkingTime: 90},
+    }
+    let view = getOgsClockView(clock, {black: {id: 7}, white: {id: 8}}, 7000, {
+      drift: 1000,
+    })
+
+    assert.strictEqual(view.black.label, '16:40')
+  })
+
   it('shows pause and byo-yomi details without ticking', () => {
     let clock = {
       currentPlayer: 7,

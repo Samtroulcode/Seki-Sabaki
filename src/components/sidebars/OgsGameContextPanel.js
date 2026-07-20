@@ -14,6 +14,7 @@ export default class OgsGameContextPanel extends Component {
 
     this.state = {
       user: null,
+      network: null,
       onlineGame: null,
       error: null,
       busy: false,
@@ -141,6 +142,7 @@ export default class OgsGameContextPanel extends Component {
 
     this.setState({
       user: state?.user || null,
+      network: state?.network || null,
       onlineGame: state?.onlineGame || null,
       error: state?.onlineGame?.error || null,
     })
@@ -155,7 +157,7 @@ export default class OgsGameContextPanel extends Component {
     }
   }
 
-  render({onlineGameId}, {user, onlineGame, error, busy, chatBody}) {
+  render({onlineGameId}, {user, network, onlineGame, error, busy, chatBody}) {
     let game = onlineGame?.gameId === onlineGameId ? onlineGame : null
     game = withOptimisticPendingMove(game)
     let playable = game?.status === 'connected' && game?.phase === 'play'
@@ -165,6 +167,7 @@ export default class OgsGameContextPanel extends Component {
     let captures = getOgsCaptures(game)
     let pendingMove = sabaki.ogsPendingMove?.gameId === game?.gameId
     let clockView = getOgsClockView(game?.clock, game?.players, Date.now(), {
+      drift: network?.drift,
       freezeActive: pendingMove,
       freezeAt: sabaki.ogsPendingMove?.submittedAt,
     })

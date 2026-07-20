@@ -11,6 +11,7 @@ export function createInitialOnlineState() {
     error: null,
     connected: false,
     socket: null,
+    network: null,
     matchmaking: {options: defaultMatchmakingOptions},
     onlineGame: null,
     activeGames: [],
@@ -92,6 +93,7 @@ export class OnlineStore {
       connected: false,
       error: null,
       socket: null,
+      network: null,
       onlineGame: null,
       activeGames: [],
     })
@@ -197,6 +199,7 @@ export class OnlineStore {
       username: state?.user?.username || this.state.username,
       user: state?.user || null,
       socket: state?.socket || null,
+      network: state?.network || null,
       matchmaking: state?.matchmaking || this.state.matchmaking,
       onlineGame: state?.onlineGame || null,
       activeGames: state?.activeGames || [],
@@ -208,6 +211,7 @@ export class OnlineStore {
   applyCommandState(state) {
     this.setState({
       socket: state.socket,
+      network: state.network || this.state.network,
       matchmaking: state.matchmaking,
       onlineGame: state.onlineGame,
       activeGames: state.activeGames || this.state.activeGames,
@@ -220,6 +224,7 @@ function cloneOnlineState(state) {
     ...state,
     user: cloneObject(state.user),
     socket: cloneObject(state.socket),
+    network: cloneObject(state.network),
     matchmaking: cloneMatchmaking(state.matchmaking),
     onlineGame: cloneObject(state.onlineGame),
     activeGames: Array.isArray(state.activeGames)
