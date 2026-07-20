@@ -685,6 +685,8 @@ describe('OGS client', () => {
     assert.strictEqual(state.onlineGame.phase, 'finished')
     assert.strictEqual(state.onlineGame.outcome, 'Resignation')
     assert.strictEqual(state.onlineGame.winner, 7)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 3)
     assert.deepStrictEqual(state.onlineGame.board, {width: 19, height: 19})
     assert.deepStrictEqual(state.onlineGame.moves, [
       {move: 'aa', moveNumber: 1},
@@ -712,6 +714,8 @@ describe('OGS client', () => {
       {move: 'bb', moveNumber: 2},
       {move: '..', moveNumber: 3},
     ])
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 3)
 
     socket.receive('game/12345/reset-chats')
     assert.deepStrictEqual(client.getState().onlineGame.chat, [])
@@ -970,6 +974,68 @@ describe('OGS client', () => {
     assert.strictEqual(state.onlineGame.moveCount, 3)
     assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
     assert.strictEqual(state.onlineGame.clock.lastMove, 3)
+  })
+
+  it('uses OGS gamedata clocks before the first clock event is current', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    client.connectGame({gameId: 12345})
+
+    let socket = FakeWebSocket.instances[0]
+    socket.receive('game/12345/gamedata', {
+      width: 13,
+      height: 13,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: '',
+      clock: {
+        game_id: 12345,
+        title: 'Byo-Yomi',
+        black_player_id: 7,
+        white_player_id: 8,
+        current_player: 7,
+        expiration: 1784522520000,
+        now: 1784522460000,
+        last_move: 0,
+        black_time: {thinking_time: 600},
+        white_time: {thinking_time: 600},
+      },
+    })
+
+    let state = client.getState()
+    assert.strictEqual(state.onlineGame.moveCount, 0)
+    assert.strictEqual(state.onlineGame.clock.gameId, 12345)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 7)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 0)
+    assert.strictEqual(state.onlineGame.clock.blackTime.thinkingTime, 600)
+
+    socket.receive('game/12345/data', {
+      clock: {
+        current_player: 8,
+        last_move: 1,
+        black_time: {thinking_time: 590},
+        white_time: {thinking_time: 600},
+      },
+    })
+
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.moveCount, 0)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 7)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 0)
+
+    socket.receive('game/12345/move', {move_number: 1, move: 'aa'})
+    state = client.getState()
+    assert.strictEqual(state.onlineGame.moveCount, 1)
+    assert.strictEqual(state.onlineGame.clock.currentPlayer, 8)
+    assert.strictEqual(state.onlineGame.clock.lastMove, 1)
   })
 
   it('keeps separate buffered OGS clocks for later moves', async () => {

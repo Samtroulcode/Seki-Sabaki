@@ -884,6 +884,8 @@ class OgsClient {
           status: 'connected',
           error: null,
         }
+        if (hasOwn(payload, 'clock'))
+          this.applyClock(sanitizeClock(payload.clock))
         this.applyPendingClock()
         break
 
@@ -894,6 +896,8 @@ class OgsClient {
           status: 'connected',
           error: null,
         }
+        if (hasOwn(payload, 'clock'))
+          this.applyClock(sanitizeClock(payload.clock))
         this.applyPendingClock()
         break
 
@@ -1114,7 +1118,7 @@ function sanitizeGameData(data, serverUrl) {
 
 function sanitizePartialGameData(data, serverUrl, previous) {
   let sanitized = sanitizeGameData(data, serverUrl)
-  let has = (key) => Object.prototype.hasOwnProperty.call(data || {}, key)
+  let has = (key) => hasOwn(data, key)
   let hasBoard = has('width') && has('height')
   let hasMoves = has('moves')
   let board = hasBoard ? sanitized.board : previous.board
@@ -1141,6 +1145,10 @@ function sanitizePartialGameData(data, serverUrl, previous) {
     moveCount: hasMoves ? moves.length : previous.moveCount,
     lastMove: hasMoves ? moves.at(-1)?.move || null : previous.lastMove,
   }
+}
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value || {}, key)
 }
 
 function encodeClientOgsStones(value, board = null) {
