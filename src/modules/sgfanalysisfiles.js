@@ -1,13 +1,11 @@
-import {basename, extname, join, resolve} from 'path'
-import {existsSync, statSync, readdirSync, readFileSync} from 'fs'
-
-import * as sgf from './fileformats/sgf.js'
-import * as gametree from './gametree.js'
+const {basename, extname, join, resolve} = require('path')
+const {existsSync, statSync, readdirSync, readFileSync} = require('fs')
+const sgf = require('@sabaki/sgf')
 
 const DEFAULT_ANALYSIS_NAME = 'partie'
 const MAX_SLUG_LENGTH = 80
 
-export function slugifyAnalysisName(value, fallback = DEFAULT_ANALYSIS_NAME) {
+function slugifyAnalysisName(value, fallback = DEFAULT_ANALYSIS_NAME) {
   let slug = String(value || '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -22,7 +20,7 @@ export function slugifyAnalysisName(value, fallback = DEFAULT_ANALYSIS_NAME) {
   return slug || fallback
 }
 
-export function normalizeAnalysisDate(value, now = new Date()) {
+function normalizeAnalysisDate(value, now = new Date()) {
   let text = String(value || '').trim()
   let match = text.match(/\d{4}(?:-\d{2}(?:-\d{2})?)?/)
 
@@ -31,7 +29,7 @@ export function normalizeAnalysisDate(value, now = new Date()) {
   return now.toISOString().slice(0, 10)
 }
 
-export function getAnalysisBoardSize(metadata = {}) {
+function getAnalysisBoardSize(metadata = {}) {
   let width = Number(metadata.boardWidth ?? metadata.width ?? 19)
   let height = Number(metadata.boardHeight ?? metadata.height ?? width)
 
@@ -41,7 +39,7 @@ export function getAnalysisBoardSize(metadata = {}) {
   return {width, height}
 }
 
-export function buildAnalysisFilename(metadata = {}, {now = new Date()} = {}) {
+function buildAnalysisFilename(metadata = {}, {now = new Date()} = {}) {
   let {width, height} = getAnalysisBoardSize(metadata)
   let name =
     metadata.name ||
@@ -53,7 +51,7 @@ export function buildAnalysisFilename(metadata = {}, {now = new Date()} = {}) {
   return `${width}x${height}-${slug}-${date}.sgf`
 }
 
-export function getUniqueAnalysisOutputPath(
+function getUniqueAnalysisOutputPath(
   directory,
   metadata = {},
   {exists = null, now = new Date()} = {},
@@ -81,34 +79,35 @@ export function getUniqueAnalysisOutputPath(
   }
 }
 
-export function getPartialAnalysisOutputPath(outputPath) {
+function getPartialAnalysisOutputPath(outputPath) {
   return `${outputPath}.partial`
 }
 
-export function extractSgfAnalysisMetadata(content) {
-  let [tree] = sgf.parse(content)
-  if (tree == null) return null
-  if (Object.keys(tree.root.data).length === 0) return null
+function extractSgfAnalysisMetadata(content) {
+  let [root] = sgf.parse(content)
+  if (root == null) return null
+  if (Object.keys(root.data).length === 0) return null
 
-  let info = gametree.getGameInfo(tree)
-  let [width, height] = info.size || [19, 19]
+  let size = parseSgfSize(getRootProperty(root, 'SZ'))
 
   return {
-    gameName: info.gameName || '',
-    blackPlayer: info.blackName || '',
-    whitePlayer: info.whiteName || '',
-    blackRank: info.blackRank || '',
-    whiteRank: info.whiteRank || '',
-    result: info.result || '',
-    date: info.date || '',
-    boardWidth: width || 19,
-    boardHeight: height || width || 19,
-    komi: info.komi,
-    summary: gametree.getRootProperty(tree, 'C', '') || '',
+    gameName: getRootProperty(root, 'GN', '') || '',
+    blackPlayer:
+      getRootProperty(root, 'PB', '') || getRootProperty(root, 'BT', '') || '',
+    whitePlayer:
+      getRootProperty(root, 'PW', '') || getRootProperty(root, 'WT', '') || '',
+    blackRank: getRootProperty(root, 'BR', '') || '',
+    whiteRank: getRootProperty(root, 'WR', '') || '',
+    result: getRootProperty(root, 'RE', '') || '',
+    date: getRootProperty(root, 'DT', '') || '',
+    boardWidth: size[0],
+    boardHeight: size[1],
+    komi: parseKomi(getRootProperty(root, 'KM')),
+    summary: getRootProperty(root, 'C', '') || '',
   }
 }
 
-export function readSgfAnalysisMetadata(filePath) {
+function readSgfAnalysisMetadata(filePath) {
   try {
     return extractSgfAnalysisMetadata(readFileSync(filePath, 'utf8'))
   } catch (err) {
@@ -116,7 +115,7 @@ export function readSgfAnalysisMetadata(filePath) {
   }
 }
 
-export function createAnalyzedGame(filePath, {stat = null} = {}) {
+function createAnalyzedGame(filePath, {stat = null} = {}) {
   let metadata = readSgfAnalysisMetadata(filePath)
   if (metadata == null) return null
 
@@ -139,7 +138,7 @@ export function createAnalyzedGame(filePath, {stat = null} = {}) {
   }
 }
 
-export function listAnalyzedGames(directory) {
+function listAnalyzedGames(directory) {
   let entries
 
   try {
@@ -159,3 +158,40 @@ export function listAnalyzedGames(directory) {
         b.modifiedAt - a.modifiedAt || a.filename.localeCompare(b.filename),
     )
 }
+
+function getRootProperty(root, property, fallback = null) {
+  let result = ''
+  if (property in root.data) result = root.data[property][0]
+
+  return result === '' ? fallback : result
+}
+
+function parseSgfSize(value) {
+  if (value == null) return [19, 19]
+
+  let parts = value.toString().split(':')
+  let width = Number(parts[0])
+  let height = Number(parts[parts.length - 1])
+
+  width = Number.isInteger(width) && width > 0 ? width : 19
+  height = Number.isInteger(height) && height > 0 ? height : width
+
+  return [width, height]
+}
+
+function parseKomi(value) {
+  if (value == null) return null
+  let komi = Number(value)
+  return Number.isFinite(komi) ? komi : null
+}
+
+exports.slugifyAnalysisName = slugifyAnalysisName
+exports.normalizeAnalysisDate = normalizeAnalysisDate
+exports.getAnalysisBoardSize = getAnalysisBoardSize
+exports.buildAnalysisFilename = buildAnalysisFilename
+exports.getUniqueAnalysisOutputPath = getUniqueAnalysisOutputPath
+exports.getPartialAnalysisOutputPath = getPartialAnalysisOutputPath
+exports.extractSgfAnalysisMetadata = extractSgfAnalysisMetadata
+exports.readSgfAnalysisMetadata = readSgfAnalysisMetadata
+exports.createAnalyzedGame = createAnalyzedGame
+exports.listAnalyzedGames = listAnalyzedGames

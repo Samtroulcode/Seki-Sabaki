@@ -51,6 +51,17 @@ ipcRenderer.on('ogs:stateChange', (_, state) => {
   }
 })
 
+const analysisStateChangeCallbacks = new Set()
+ipcRenderer.on('analysis:stateChange', (_, state) => {
+  for (const callback of analysisStateChangeCallbacks) {
+    try {
+      callback(state)
+    } catch (err) {
+      console.error('[preload] analysis state-change callback failed:', err)
+    }
+  }
+})
+
 window.sabaki = {
   // Settings - sync get with cache, async set
   setting: {
@@ -183,6 +194,31 @@ window.sabaki = {
     sendChat: (gameId, body) =>
       ipcRenderer.invoke('ogs:sendChat', {gameId, body}),
     logout: () => ipcRenderer.invoke('ogs:logout'),
+  },
+
+  analysis: {
+    getState: () => ipcRenderer.invoke('analysis:getState'),
+    start: (request) => ipcRenderer.invoke('analysis:start', request),
+    cancel: (jobId) => ipcRenderer.invoke('analysis:cancel', jobId),
+    getConfig: () => ipcRenderer.invoke('analysis:getConfig'),
+    setConfig: (config) => ipcRenderer.invoke('analysis:setConfig', config),
+    listAnalyzedGames: () => ipcRenderer.invoke('analysis:listAnalyzedGames'),
+    refreshAnalyzedGames: () =>
+      ipcRenderer.invoke('analysis:refreshAnalyzedGames'),
+    selectInputFile: () => ipcRenderer.invoke('analysis:selectInputFile'),
+    selectOutputDirectory: () =>
+      ipcRenderer.invoke('analysis:selectOutputDirectory'),
+    showInFolder: (path) => ipcRenderer.invoke('analysis:showInFolder', path),
+    onStateChange: (callback) => {
+      if (typeof callback !== 'function') {
+        throw new TypeError(
+          'Analysis state-change callback must be a function.',
+        )
+      }
+
+      analysisStateChangeCallbacks.add(callback)
+      return () => analysisStateChangeCallbacks.delete(callback)
+    },
   },
 
   // File path helper for Electron 32+ (File.path was removed)

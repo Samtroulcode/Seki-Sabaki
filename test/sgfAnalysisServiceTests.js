@@ -117,35 +117,38 @@ describe('SGF analysis service', () => {
     }
   })
 
-  it('uses per-request output directory overrides for board temp sources', () => {
+  it('does not allow per-request options to override privileged paths', () => {
     let baseDirectory = mkdtempSync(join(tmpdir(), 'seki-service-'))
     let overrideDirectory = join(baseDirectory, 'override')
+    let calls = []
     let {service} = createService({
       directory: baseDirectory,
-      runner: () => deferred().promise,
-      fs: {
-        exists: (path) => path === '/katago' || existsSync(path),
-        stat: (path) => ({
-          isDirectory: () =>
-            path === baseDirectory || path === overrideDirectory,
-        }),
+      runner: (job) => {
+        calls.push(job)
+        return deferred().promise
       },
     })
 
     try {
       let job = service.startAnalysis({
         source: {type: 'board', sgfContent: '(;GM[1]FF[4]SZ[9]GN[Board])'},
-        options: {outputDirectory: overrideDirectory},
+        options: {
+          outputDirectory: overrideDirectory,
+          analyzeSgfPath: '/tmp/evil',
+          katagoPath: '/tmp/evil-katago',
+          maxVisits: 42,
+        },
       })
 
-      assert.strictEqual(
-        job.sourcePath,
-        join(overrideDirectory, 'tmp', 'id-1.sgf'),
-      )
+      assert.strictEqual(job.sourcePath, join(baseDirectory, 'tmp', 'id-1.sgf'))
       assert.strictEqual(
         job.outputPath,
-        join(overrideDirectory, '9x9-board-2026-07-20.sgf'),
+        join(baseDirectory, '9x9-board-2026-07-20.sgf'),
       )
+      assert.strictEqual(calls[0].config.outputDirectory, baseDirectory)
+      assert.strictEqual(calls[0].config.analyzeSgfPath, 'analyze-sgf')
+      assert.strictEqual(calls[0].config.katagoPath, '/katago')
+      assert.strictEqual(calls[0].config.maxVisits, 42)
     } finally {
       service.dispose()
       rmSync(baseDirectory, {recursive: true, force: true})
@@ -242,6 +245,51 @@ describe('SGF analysis service', () => {
         (error) =>
           error instanceof SgfAnalysisServiceError &&
           error.code === 'invalid-source',
+      )
+    } finally {
+      service.dispose()
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
+  it('rejects unsupported, non-regular, and oversized source files', () => {
+    let {directory, service} = createService({
+      fs: {
+        exists: (path) => path === '/katago' || path.startsWith('/tmp/source'),
+        stat: (path) => {
+          if (path === '/tmp/source-dir.sgf')
+            return {isFile: () => false, size: 0}
+          if (path === '/tmp/source-large.sgf') {
+            return {isFile: () => true, size: 51 * 1024 * 1024}
+          }
+
+          return {isFile: () => true, size: 10, isDirectory: () => true}
+        },
+        readFile: () => '(;GM[1])',
+      },
+    })
+
+    try {
+      assert.throws(
+        () =>
+          service.startAnalysis({
+            source: {type: 'file', path: '/tmp/source.txt'},
+          }),
+        (error) => error.code === 'unsupported-source-file',
+      )
+      assert.throws(
+        () =>
+          service.startAnalysis({
+            source: {type: 'file', path: '/tmp/source-dir.sgf'},
+          }),
+        (error) => error.code === 'unsupported-source-file',
+      )
+      assert.throws(
+        () =>
+          service.startAnalysis({
+            source: {type: 'file', path: '/tmp/source-large.sgf'},
+          }),
+        (error) => error.code === 'source-too-large',
       )
     } finally {
       service.dispose()

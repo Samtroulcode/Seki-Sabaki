@@ -1,4 +1,4 @@
-export function parseAnalyzeSgfProgress(line) {
+function parseAnalyzeSgfProgress(line) {
   if (typeof line !== 'string') return null
 
   let match = line.match(
@@ -39,3 +39,5 @@ function parseVisits(value, suffix) {
 
   return Math.round(visits * multiplier)
 }
+
+exports.parseAnalyzeSgfProgress = parseAnalyzeSgfProgress

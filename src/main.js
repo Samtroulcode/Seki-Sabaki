@@ -14,6 +14,7 @@ const setting = require('./setting')
 const updater = require('./updater')
 const {getOpenFileFromArgv} = require('./argv')
 const {setupOgsIpcHandlers} = require('./ogs')
+const {setupSgfAnalysisIpcHandlers} = require('./sgfanalysis')
 const {openExternalUrl} = require('./shell')
 
 let windows = []
@@ -360,6 +361,16 @@ function setupIpcHandlers() {
     sendStateChange: (state) => {
       BrowserWindow.getAllWindows().forEach((win) => {
         win.webContents.send('ogs:stateChange', state)
+      })
+    },
+  })
+
+  setupSgfAnalysisIpcHandlers(ipcMain, undefined, {
+    dialog,
+    shell,
+    sendStateChange: (state) => {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('analysis:stateChange', state)
       })
     },
   })

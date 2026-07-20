@@ -1,6 +1,6 @@
-import {runSgfAnalysis} from './sgfanalysisrunner.js'
+const {runSgfAnalysis} = require('./sgfanalysisrunner.js')
 
-export class SgfAnalysisQueue {
+class SgfAnalysisQueue {
   constructor({
     runner = runSgfAnalysis,
     now = () => Date.now(),
@@ -133,6 +133,8 @@ export class SgfAnalysisQueue {
     })
   }
 }
+
+exports.SgfAnalysisQueue = SgfAnalysisQueue
 
 function createQueuedJob(request, {id, createdAt}) {
   validateAnalysisQueueRequest(request)

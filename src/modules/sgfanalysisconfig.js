@@ -2,7 +2,7 @@ const SUPPORTED_LANGUAGES = ['en', 'fr']
 const COMMENT_STYLES = ['legacy', 'compact', 'detailed']
 const ANNOTATION_STYLES = ['auto', 'legacy', 'classification', 'none']
 
-export function createDefaultSgfAnalysisConfig() {
+function createDefaultSgfAnalysisConfig() {
   return {
     analyzeSgfPath: 'analyze-sgf',
     katagoPath: '',
@@ -19,7 +19,7 @@ export function createDefaultSgfAnalysisConfig() {
   }
 }
 
-export function normalizeSgfAnalysisConfig(config = {}) {
+function normalizeSgfAnalysisConfig(config = {}) {
   let defaults = createDefaultSgfAnalysisConfig()
 
   return {
@@ -38,7 +38,7 @@ export function normalizeSgfAnalysisConfig(config = {}) {
   }
 }
 
-export function validateSgfAnalysisConfig(
+function validateSgfAnalysisConfig(
   config = {},
   {fileExists = null, directoryExists = null} = {},
 ) {
@@ -170,7 +170,7 @@ export function validateSgfAnalysisConfig(
   return errors
 }
 
-export function buildAnalyzeSgfArguments({inputPath, config, fileSuffix}) {
+function buildAnalyzeSgfArguments({inputPath, config, fileSuffix}) {
   let normalized = normalizeSgfAnalysisConfig(config)
   let sgfOptions = {
     commentStyle: normalized.commentStyle,
@@ -200,7 +200,7 @@ export function buildAnalyzeSgfArguments({inputPath, config, fileSuffix}) {
   ]
 }
 
-export function serializeAnalyzeSgfOptions(options) {
+function serializeAnalyzeSgfOptions(options) {
   return Object.entries(options)
     .filter(([, value]) => value != null)
     .map(([key, value]) => `${key}:${serializeAnalyzeSgfValue(value)}`)
@@ -283,3 +283,9 @@ function requireNonEmptyString(errors, value, error) {
 
   errors.push(error)
 }
+
+exports.createDefaultSgfAnalysisConfig = createDefaultSgfAnalysisConfig
+exports.normalizeSgfAnalysisConfig = normalizeSgfAnalysisConfig
+exports.validateSgfAnalysisConfig = validateSgfAnalysisConfig
+exports.buildAnalyzeSgfArguments = buildAnalyzeSgfArguments
+exports.serializeAnalyzeSgfOptions = serializeAnalyzeSgfOptions

@@ -1,5 +1,5 @@
-import {spawn} from 'child_process'
-import {
+const {spawn} = require('child_process')
+const {
   constants,
   closeSync,
   fstatSync,
@@ -9,16 +9,16 @@ import {
   unlinkSync,
   readFileSync,
   writeFileSync,
-} from 'fs'
-import {dirname, extname, join, basename, resolve} from 'path'
+} = require('fs')
+const {dirname, extname, join, basename, resolve} = require('path')
 
-import {buildAnalyzeSgfArguments} from './sgfanalysisconfig.js'
-import {extractSgfAnalysisMetadata} from './sgfanalysisfiles.js'
-import {parseAnalyzeSgfProgress} from './sgfanalysisprogress.js'
+const {buildAnalyzeSgfArguments} = require('./sgfanalysisconfig.js')
+const {extractSgfAnalysisMetadata} = require('./sgfanalysisfiles.js')
+const {parseAnalyzeSgfProgress} = require('./sgfanalysisprogress.js')
 
 const MAX_ERROR_MESSAGE_LENGTH = 500
 
-export async function runSgfAnalysis({
+async function runSgfAnalysis({
   inputPath,
   outputPath,
   config,
@@ -144,13 +144,13 @@ export async function runSgfAnalysis({
   })
 }
 
-export function createDefaultGeneratedFileSuffix() {
+function createDefaultGeneratedFileSuffix() {
   return `.seki-analysis-${process.pid}-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}`
 }
 
-export function getAnalyzeSgfGeneratedPath(inputPath, fileSuffix) {
+function getAnalyzeSgfGeneratedPath(inputPath, fileSuffix) {
   let extension = extname(inputPath)
   let stem = basename(inputPath, extension)
 
@@ -307,10 +307,15 @@ function toSgfAnalysisRunnerError(error) {
   })
 }
 
-export class SgfAnalysisRunnerError extends Error {
+class SgfAnalysisRunnerError extends Error {
   constructor({code, message}) {
     super(message)
     this.name = 'SgfAnalysisRunnerError'
     this.code = code
   }
 }
+
+exports.runSgfAnalysis = runSgfAnalysis
+exports.createDefaultGeneratedFileSuffix = createDefaultGeneratedFileSuffix
+exports.getAnalyzeSgfGeneratedPath = getAnalyzeSgfGeneratedPath
+exports.SgfAnalysisRunnerError = SgfAnalysisRunnerError

@@ -1,27 +1,30 @@
-import {
+const {
   existsSync,
   mkdirSync,
   readFileSync,
   statSync,
   unlinkSync,
   writeFileSync,
-} from 'fs'
-import {basename, join} from 'path'
+} = require('fs')
+const {basename, extname, join} = require('path')
 
-import {
+const {
   createDefaultSgfAnalysisConfig,
   normalizeSgfAnalysisConfig,
   validateSgfAnalysisConfig,
-} from './sgfanalysisconfig.js'
-import {
+} = require('./sgfanalysisconfig.js')
+const {
   extractSgfAnalysisMetadata,
   getUniqueAnalysisOutputPath,
   listAnalyzedGames,
-} from './sgfanalysisfiles.js'
-import {SgfAnalysisQueue} from './sgfanalysisqueue.js'
-import {runSgfAnalysis} from './sgfanalysisrunner.js'
+} = require('./sgfanalysisfiles.js')
+const {SgfAnalysisQueue} = require('./sgfanalysisqueue.js')
+const {runSgfAnalysis} = require('./sgfanalysisrunner.js')
 
-export class SgfAnalysisService {
+const MAX_SOURCE_FILE_BYTES = 50 * 1024 * 1024
+const PER_JOB_OPTION_KEYS = ['maxVisits', 'rules', 'komi']
+
+class SgfAnalysisService {
   constructor({
     config = createDefaultSgfAnalysisConfig(),
     queue = null,
@@ -98,7 +101,7 @@ export class SgfAnalysisService {
   startAnalysis(request) {
     let config = normalizeSgfAnalysisConfig({
       ...this.config,
-      ...(request?.options || {}),
+      ...pickPerJobOptions(request?.options || {}),
     })
     let configErrors = this.validateConfig(config)
     if (configErrors.length > 0)
@@ -145,6 +148,10 @@ export class SgfAnalysisService {
     return this.queue.cancel(jobId)
   }
 
+  subscribe(listener) {
+    return this.queue.subscribe(listener)
+  }
+
   refreshAnalyzedGames() {
     return this.getAnalyzedGames()
   }
@@ -171,6 +178,7 @@ export class SgfAnalysisService {
       })
     }
 
+    this.validateSourceFile(path)
     let content = this.readSourceContent(path)
     let metadata = extractSgfAnalysisMetadata(content)
     if (metadata == null) {
@@ -185,6 +193,13 @@ export class SgfAnalysisService {
 
   prepareBoardSource(request, config, jobId) {
     let content = request.source.sgfContent
+    if (content.length > MAX_SOURCE_FILE_BYTES) {
+      throw new SgfAnalysisServiceError({
+        code: 'source-too-large',
+        message: 'Analysis source is too large.',
+      })
+    }
+
     let metadata = extractSgfAnalysisMetadata(content)
     if (metadata == null) {
       throw new SgfAnalysisServiceError({
@@ -216,6 +231,41 @@ export class SgfAnalysisService {
       throw new SgfAnalysisServiceError({
         code: 'source-read-failed',
         message: 'Analysis source file could not be read.',
+      })
+    }
+  }
+
+  validateSourceFile(path) {
+    let extension = extname(path).toLowerCase()
+    if (extension !== '.sgf' && extension !== '.rsgf') {
+      throw new SgfAnalysisServiceError({
+        code: 'unsupported-source-file',
+        message: 'Analysis source must be an SGF file.',
+      })
+    }
+
+    let stat
+
+    try {
+      stat = this.fs.stat(path)
+    } catch (err) {
+      throw new SgfAnalysisServiceError({
+        code: 'source-not-found',
+        message: 'Analysis source file was not found.',
+      })
+    }
+
+    if (!stat.isFile()) {
+      throw new SgfAnalysisServiceError({
+        code: 'unsupported-source-file',
+        message: 'Analysis source must be a regular SGF file.',
+      })
+    }
+
+    if (stat.size > MAX_SOURCE_FILE_BYTES) {
+      throw new SgfAnalysisServiceError({
+        code: 'source-too-large',
+        message: 'Analysis source file is too large.',
       })
     }
   }
@@ -294,10 +344,23 @@ function getAnalysisDisplayName(metadata, sourcePath) {
   )
 }
 
-export class SgfAnalysisServiceError extends Error {
+function pickPerJobOptions(options) {
+  let result = {}
+
+  for (let key of PER_JOB_OPTION_KEYS) {
+    if (key in options) result[key] = options[key]
+  }
+
+  return result
+}
+
+class SgfAnalysisServiceError extends Error {
   constructor({code, message}) {
     super(message)
     this.name = 'SgfAnalysisServiceError'
     this.code = code
   }
 }
+
+exports.SgfAnalysisService = SgfAnalysisService
+exports.SgfAnalysisServiceError = SgfAnalysisServiceError
