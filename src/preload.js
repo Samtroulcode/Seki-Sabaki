@@ -40,6 +40,17 @@ ipcRenderer.on('setting:change', (_, data) => {
   }
 })
 
+const ogsStateChangeCallbacks = new Set()
+ipcRenderer.on('ogs:stateChange', (_, state) => {
+  for (const callback of ogsStateChangeCallbacks) {
+    try {
+      callback(state)
+    } catch (err) {
+      console.error('[preload] OGS state-change callback failed:', err)
+    }
+  }
+})
+
 window.sabaki = {
   // Settings - sync get with cache, async set
   setting: {
@@ -138,6 +149,14 @@ window.sabaki = {
   ogs: {
     getSession: () => ipcRenderer.invoke('ogs:getSession'),
     getState: () => ipcRenderer.invoke('ogs:getState'),
+    onStateChange: (callback) => {
+      if (typeof callback !== 'function') {
+        throw new TypeError('OGS state-change callback must be a function.')
+      }
+
+      ogsStateChangeCallbacks.add(callback)
+      return () => ogsStateChangeCallbacks.delete(callback)
+    },
     login: (username, password) =>
       ipcRenderer.invoke('ogs:login', {username, password}),
     setMatchmakingOptions: (options) =>

@@ -25,6 +25,7 @@ import * as gametree from '../modules/gametree.js'
 import * as gtplogger from '../modules/gtplogger.js'
 import * as helper from '../modules/helper.js'
 import * as utils from '../modules/utils.js'
+import onlineStore from '../modules/onlinestore.js'
 
 if (process.env.SABAKI_E2E) window.__sabaki = sabaki
 
@@ -62,6 +63,7 @@ class App extends Component {
 
   componentDidMount() {
     gtplogger.updatePath()
+    onlineStore.initialize()
 
     window.addEventListener('contextmenu', (evt) => {
       evt.preventDefault()

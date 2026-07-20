@@ -1,3 +1,5 @@
+import {defaultMatchmakingOptions} from '../../modules/ogsmatchmakingoptions.js'
+
 export const boardSizes = [9, 13, 19]
 export const speeds = ['blitz', 'rapid', 'live', 'correspondence']
 export const timeSystems = ['byoyomi', 'fischer']
@@ -5,15 +7,7 @@ export const conditions = ['required', 'preferred', 'no-preference']
 export const rules = ['japanese', 'chinese', 'aga', 'korean', 'ing', 'nz']
 export const handicapValues = ['enabled', 'disabled']
 
-export const defaultMatchmakingOptions = {
-  boardSizes: [19],
-  speeds: ['rapid'],
-  timeSystem: 'byoyomi',
-  lowerRankDiff: 3,
-  upperRankDiff: 3,
-  rules: {condition: 'required', value: 'japanese'},
-  handicap: {condition: 'preferred', value: 'enabled'},
-}
+export {defaultMatchmakingOptions}
 
 export function createOgsPanelLabels(t) {
   return {

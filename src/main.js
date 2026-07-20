@@ -354,7 +354,13 @@ function setupIpcHandlers() {
     }
   })
 
-  setupOgsIpcHandlers(ipcMain)
+  setupOgsIpcHandlers(ipcMain, undefined, {
+    sendStateChange: (state) => {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('ogs:stateChange', state)
+      })
+    },
+  })
 }
 
 async function main() {

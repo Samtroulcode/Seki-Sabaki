@@ -1,5 +1,5 @@
 import i18n from '../i18n.js'
-import {defaultMatchmakingOptions} from '../components/sidebars/ogsPanelData.js'
+import {defaultMatchmakingOptions} from './ogsmatchmakingoptions.js'
 
 const t = i18n.context('OgsPanel')
 
@@ -23,6 +23,8 @@ export class OnlineStore {
     this.ogs = ogs
     this.state = createInitialOnlineState()
     this.listeners = new Set()
+    this.unsubscribeOgsStateChange = null
+    this.subscribedOgs = null
   }
 
   getState() {
@@ -37,6 +39,38 @@ export class OnlineStore {
   subscribe(listener) {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
+  }
+
+  initialize() {
+    let ogs = this.ogs()
+
+    if (
+      this.unsubscribeOgsStateChange == null &&
+      typeof ogs?.onStateChange === 'function'
+    ) {
+      this.unsubscribeOgsStateChange = ogs.onStateChange((state) => {
+        this.applyOgsState(state)
+      })
+      this.subscribedOgs = ogs
+    }
+
+    return this.refresh()
+  }
+
+  isUsingCurrentOgsStateChangeEvents() {
+    let ogs = this.ogs()
+
+    return (
+      this.subscribedOgs === ogs &&
+      this.unsubscribeOgsStateChange != null &&
+      typeof ogs?.onStateChange === 'function'
+    )
+  }
+
+  dispose() {
+    this.unsubscribeOgsStateChange?.()
+    this.unsubscribeOgsStateChange = null
+    this.subscribedOgs = null
   }
 
   emitChange() {
@@ -56,7 +90,7 @@ export class OnlineStore {
       return null
     }
 
-    if (state?.user != null) this.applyPublicState(state)
+    this.applyOgsState(state)
 
     return state
   }
@@ -206,6 +240,27 @@ export class OnlineStore {
       connected: true,
       ...extra,
     })
+  }
+
+  applyDisconnectedState(state = null, extra = {}) {
+    this.setState({
+      user: null,
+      socket: state?.socket || null,
+      network: state?.network || null,
+      matchmaking: state?.matchmaking || this.state.matchmaking,
+      onlineGame: null,
+      activeGames: state?.activeGames || [],
+      connected: false,
+      ...extra,
+    })
+  }
+
+  applyOgsState(state) {
+    if (state?.user != null) {
+      this.applyPublicState(state)
+    } else {
+      this.applyDisconnectedState(state)
+    }
   }
 
   applyCommandState(state) {

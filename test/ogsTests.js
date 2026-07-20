@@ -1419,6 +1419,90 @@ describe('OGS client', () => {
     assert.strictEqual(result.error.code, 'invalid-input')
   })
 
+  it('forwards public OGS state changes through IPC setup callback', async () => {
+    let handlers = {}
+    let sentStates = []
+    let ipcMain = {
+      handle: (name, handler) => {
+        handlers[name] = handler
+      },
+    }
+    let publicState = {
+      user: {id: 1, username: 'Seki'},
+      socket: {status: 'authenticated'},
+      matchmaking: {status: 'idle'},
+      onlineGame: null,
+      activeGames: [],
+    }
+    let client = {
+      getSession: () => publicState.user,
+      getState: () => publicState,
+      logout: () => true,
+      setMatchmakingOptions: () => publicState,
+      startAutomatch: () => publicState,
+      cancelAutomatch: () => publicState,
+      acknowledgeAutomatchOpen: () => publicState,
+      connectGame: () => publicState,
+      disconnectGame: () => publicState,
+      playMove: () => publicState,
+      pass: () => publicState,
+      resign: () => publicState,
+      setRemovedStones: () => publicState,
+      acceptRemovedStones: () => publicState,
+      sendChat: () => publicState,
+      login: async () => publicState.user,
+    }
+
+    setupOgsIpcHandlers(ipcMain, client, {
+      sendStateChange: (state) => sentStates.push(state),
+    })
+
+    client.onStateChange(publicState)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assert.deepStrictEqual(sentStates, [publicState])
+  })
+
+  it('coalesces OGS state-change IPC notifications in one tick', async () => {
+    let handlers = {}
+    let sentStates = []
+    let ipcMain = {
+      handle: (name, handler) => {
+        handlers[name] = handler
+      },
+    }
+    let firstState = {user: {id: 1, username: 'First'}}
+    let lastState = {user: {id: 2, username: 'Last'}}
+    let client = {
+      getSession: () => null,
+      getState: () => lastState,
+      logout: () => true,
+      setMatchmakingOptions: () => lastState,
+      startAutomatch: () => lastState,
+      cancelAutomatch: () => lastState,
+      acknowledgeAutomatchOpen: () => lastState,
+      connectGame: () => lastState,
+      disconnectGame: () => lastState,
+      playMove: () => lastState,
+      pass: () => lastState,
+      resign: () => lastState,
+      setRemovedStones: () => lastState,
+      acceptRemovedStones: () => lastState,
+      sendChat: () => lastState,
+      login: async () => lastState.user,
+    }
+
+    setupOgsIpcHandlers(ipcMain, client, {
+      sendStateChange: (state) => sentStates.push(state),
+    })
+
+    client.onStateChange(firstState)
+    client.onStateChange(lastState)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assert.deepStrictEqual(sentStates, [lastState])
+  })
+
   it('maps login failures to invalid credentials', async () => {
     let client = new OgsClient({
       fetchImpl: async (url) => {

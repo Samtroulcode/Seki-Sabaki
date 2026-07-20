@@ -103,10 +103,12 @@ class OgsSocket {
     serverUrl,
     webSocketImpl = globalThis.WebSocket,
     onEvent = null,
+    onStateChange = null,
   }) {
     this.serverUrl = serverUrl
     this.WebSocketImpl = webSocketImpl
     this.onEvent = onEvent
+    this.onStateChange = onStateChange
     this.socket = null
     this.state = getInitialSocketState()
     this.lastRequestId = 0
@@ -115,6 +117,10 @@ class OgsSocket {
 
   getState() {
     return {...this.state}
+  }
+
+  emitStateChange() {
+    if (typeof this.onStateChange === 'function') this.onStateChange()
   }
 
   disconnect() {
@@ -130,6 +136,7 @@ class OgsSocket {
 
     this.socket = null
     this.state = getInitialSocketState()
+    this.emitStateChange()
   }
 
   send(event, data) {
@@ -227,6 +234,7 @@ class OgsSocket {
 
     this.disconnect()
     this.state = {status: 'connecting', authenticated: false, error: null}
+    this.emitStateChange()
 
     return new Promise((resolve, reject) => {
       let settled = false
@@ -246,6 +254,7 @@ class OgsSocket {
           authenticated: false,
           error: 'OGS socket connection timed out.',
         }
+        this.emitStateChange()
         this.rejectPendingRequests(new OgsError('network', this.state.error))
         reject(new OgsError('network', this.state.error))
       }, 10000)
@@ -269,6 +278,7 @@ class OgsSocket {
           authenticated: false,
           error: 'Unable to create OGS socket.',
         }
+        this.emitStateChange()
         reject(new OgsError('network', this.state.error))
         return
       }
@@ -281,6 +291,7 @@ class OgsSocket {
         try {
           console.log('[ogs:socket] open')
           this.state = {status: 'connected', authenticated: false, error: null}
+          this.emitStateChange()
           await this.sendAndGetResponse('authenticate', {
             jwt: jwtToken,
             device_id: randomUUID(),
@@ -294,6 +305,7 @@ class OgsSocket {
             authenticated: true,
             error: null,
           }
+          this.emitStateChange()
           finish(() => resolve(this.getState()))
         } catch (err) {
           if (settled) return
@@ -310,6 +322,7 @@ class OgsSocket {
                 ? err.message
                 : 'OGS socket authentication failed.',
           }
+          this.emitStateChange()
           finish(() => reject(err))
         }
       }
@@ -323,6 +336,7 @@ class OgsSocket {
           authenticated: false,
           error: 'OGS socket connection failed.',
         }
+        this.emitStateChange()
         this.rejectPendingRequests(new OgsError('network', this.state.error))
         finish(() => reject(new OgsError('network', this.state.error)))
       }
@@ -345,6 +359,7 @@ class OgsSocket {
             authenticated: false,
             error: 'OGS socket closed before connecting.',
           }
+          this.emitStateChange()
           this.rejectPendingRequests(new OgsError('network', this.state.error))
           finish(() => reject(new OgsError('network', this.state.error)))
           return
@@ -352,6 +367,7 @@ class OgsSocket {
 
         if (this.state.status !== 'error') {
           this.state = getInitialSocketState()
+          this.emitStateChange()
         }
         this.rejectPendingRequests(
           new OgsError('socket-disconnected', 'OGS socket is disconnected.'),
@@ -367,6 +383,7 @@ class OgsClient {
     fetchImpl = globalThis.fetch,
     webSocketImpl = globalThis.WebSocket,
     now = () => Date.now(),
+    onStateChange = null,
   } = {}) {
     this.serverUrl = serverUrl.replace(/\/$/, '')
     this.fetch = fetchImpl
@@ -375,7 +392,9 @@ class OgsClient {
       serverUrl: this.serverUrl,
       webSocketImpl,
       onEvent: (event, payload) => this.handleSocketEvent(event, payload),
+      onStateChange: () => this.emitStateChange(),
     })
+    this.onStateChange = onStateChange
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
@@ -402,9 +421,15 @@ class OgsClient {
     }
   }
 
+  emitStateChange() {
+    if (typeof this.onStateChange === 'function') {
+      this.onStateChange(this.getState())
+    }
+  }
+
   logout() {
-    this.socket.disconnect()
     this.session = null
+    this.socket.disconnect()
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
     this.pendingClocks = new Map()
@@ -413,6 +438,7 @@ class OgsClient {
     this.pendingNetworkPings = new Set()
     this.lastNetworkPingClient = null
     this.lastNetworkPongClient = null
+    this.emitStateChange()
     return true
   }
 
@@ -476,6 +502,7 @@ class OgsClient {
     this.sendNetworkPing()
 
     this.session = {jwtToken, user}
+    this.emitStateChange()
 
     return user
   }
@@ -497,6 +524,7 @@ class OgsClient {
       error: null,
     }
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -520,6 +548,7 @@ class OgsClient {
 
     console.log('[ogs:automatch] find_match', JSON.stringify(payload))
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -540,6 +569,7 @@ class OgsClient {
       error: null,
     }
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -556,6 +586,7 @@ class OgsClient {
       }
     }
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -573,6 +604,7 @@ class OgsClient {
     this.sendNetworkPing()
     this.socket.send('game/connect', {game_id: gameId, chat: true})
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -587,6 +619,7 @@ class OgsClient {
       this.pendingClocks = new Map()
     }
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -608,6 +641,7 @@ class OgsClient {
     this.socket.send('game/move', {game_id: gameId, move})
     this.onlineGame = {...this.onlineGame, pendingMove: true}
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -618,6 +652,7 @@ class OgsClient {
     this.socket.send('game/move', {game_id: gameId, move: '..'})
     this.onlineGame = {...this.onlineGame, pendingMove: true}
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -627,6 +662,7 @@ class OgsClient {
     this.assertCanPlayGameCommand(gameId, {requireTurn: false})
     this.socket.send('game/resign', {game_id: gameId})
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -650,6 +686,7 @@ class OgsClient {
       ),
     }
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -667,6 +704,7 @@ class OgsClient {
       strict_seki_mode: input.strictSekiMode === true,
     })
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -682,6 +720,7 @@ class OgsClient {
       body,
     })
 
+    this.emitStateChange()
     return this.getState()
   }
 
@@ -818,11 +857,13 @@ class OgsClient {
   handleSocketEvent(event, payload) {
     if (event === 'net/pong') {
       this.handleNetworkPong(payload)
+      this.emitStateChange()
       return
     }
 
     if (event === 'active_game') {
       this.upsertActiveGame(payload)
+      this.emitStateChange()
       return
     }
 
@@ -847,6 +888,7 @@ class OgsClient {
         matchedGameId: null,
         error: null,
       }
+      this.emitStateChange()
       return
     }
 
@@ -863,6 +905,7 @@ class OgsClient {
           matchedGameId: null,
           error: null,
         }
+        this.emitStateChange()
       }
       return
     }
@@ -885,6 +928,7 @@ class OgsClient {
           error: null,
         }
         this.connectGame({gameId})
+        this.emitStateChange()
       }
 
       return
@@ -897,6 +941,7 @@ class OgsClient {
     if (gameId == null || gameId !== this.onlineGame.gameId) return
 
     this.applyGameEvent(match[2], payload)
+    this.emitStateChange()
   }
 
   applyGameEvent(type, payload) {
@@ -1454,7 +1499,35 @@ function serializeError(err) {
   }
 }
 
-function setupOgsIpcHandlers(ipcMain, client = new OgsClient()) {
+function setupOgsIpcHandlers(
+  ipcMain,
+  client = new OgsClient(),
+  {sendStateChange = null} = {},
+) {
+  if (typeof sendStateChange === 'function') {
+    let previousOnStateChange = client.onStateChange
+    let scheduledStateChange = false
+    let latestState = null
+
+    client.onStateChange = (state) => {
+      if (typeof previousOnStateChange === 'function') {
+        previousOnStateChange(state)
+      }
+
+      latestState = state
+
+      if (scheduledStateChange) return
+      scheduledStateChange = true
+
+      setTimeout(() => {
+        scheduledStateChange = false
+        let state = latestState
+        latestState = null
+        sendStateChange(state)
+      }, 0)
+    }
+  }
+
   ipcMain.handle('ogs:getSession', () => client.getSession())
 
   ipcMain.handle('ogs:getState', () => client.getState())

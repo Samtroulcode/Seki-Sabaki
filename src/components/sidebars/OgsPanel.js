@@ -147,6 +147,14 @@ export default class OgsPanel extends Component {
     this.handleCancelAutomatchButtonClick = async () => {
       await onlineStore.cancelAutomatch()
     }
+
+    this.handleOnlineStoreState = (state) => {
+      this.enqueueOgsState(state)
+    }
+
+    this.lastFallbackRefreshAt = 0
+    this.handlingOgsState = false
+    this.pendingOgsState = null
   }
 
   async updateMatchmakingOptions(options) {
@@ -154,10 +162,10 @@ export default class OgsPanel extends Component {
   }
 
   async componentDidMount() {
-    this.unsubscribeOnlineStore = onlineStore.subscribe((state) => {
-      this.setState(state)
-    })
-    this.pollTimer = setInterval(() => this.refreshOgsState(), 2000)
+    this.unsubscribeOnlineStore = onlineStore.subscribe(
+      this.handleOnlineStoreState,
+    )
+    this.pollTimer = setInterval(() => this.refreshOgsStateIfDue(), 2000)
     await this.refreshOgsState()
   }
 
@@ -167,16 +175,46 @@ export default class OgsPanel extends Component {
   }
 
   async refreshOgsState() {
-    let state = null
-
     try {
-      state = await onlineStore.refresh()
+      await onlineStore.refresh()
     } catch (err) {
       return
     }
 
+    this.lastFallbackRefreshAt = Date.now()
+  }
+
+  async enqueueOgsState(state) {
+    this.pendingOgsState = state
+    if (this.handlingOgsState) return
+
+    this.handlingOgsState = true
+    try {
+      while (this.pendingOgsState != null) {
+        let nextState = this.pendingOgsState
+        this.pendingOgsState = null
+        this.setState(nextState)
+        await this.handleOgsState(nextState)
+      }
+    } finally {
+      this.handlingOgsState = false
+    }
+  }
+
+  async refreshOgsStateIfDue() {
+    let now = Date.now()
+    if (hasOgsStateChangeEvents() && now - this.lastFallbackRefreshAt < 60000) {
+      return
+    }
+
+    this.lastFallbackRefreshAt = now
+    await this.refreshOgsState()
+  }
+
+  async handleOgsState(state) {
     if (state?.user != null) {
       await this.syncController.handleOnlineGameError(state.onlineGame)
+      if (state.onlineGame?.pendingMove === true) return
 
       if (
         state.matchmaking?.status === 'matched' &&
@@ -333,4 +371,8 @@ export default class OgsPanel extends Component {
       ),
     )
   }
+}
+
+function hasOgsStateChangeEvents() {
+  return onlineStore.isUsingCurrentOgsStateChangeEvents()
 }

@@ -4,7 +4,7 @@ import {
   OnlineStore,
   createInitialOnlineState,
 } from '../src/modules/onlinestore.js'
-import {defaultMatchmakingOptions} from '../src/components/sidebars/ogsPanelData.js'
+import {defaultMatchmakingOptions} from '../src/modules/ogsmatchmakingoptions.js'
 
 function createStore(ogs) {
   return new OnlineStore({ogs: () => ogs})
@@ -30,6 +30,7 @@ describe('online store', () => {
       error: null,
       connected: false,
       socket: null,
+      network: null,
       matchmaking: {options: defaultMatchmakingOptions},
       onlineGame: null,
       activeGames: [],
@@ -106,6 +107,7 @@ describe('online store', () => {
       username: 'Seki',
       user: publicState.user,
       socket: publicState.socket,
+      network: null,
       matchmaking: publicState.matchmaking,
       onlineGame: publicState.onlineGame,
       activeGames: publicState.activeGames,
@@ -113,15 +115,60 @@ describe('online store', () => {
     })
   })
 
-  it('keeps current state when refresh fails or has no user', async () => {
+  it('applies disconnected state when refresh has no user', async () => {
     let store = createStore({getState: async () => ({user: null})})
-    store.setState({username: 'Keep', connected: true})
+    store.setState({username: 'Keep', user: {username: 'Old'}, connected: true})
 
     assert.deepStrictEqual(await store.refresh(), {user: null})
     assert.strictEqual(store.getState().username, 'Keep')
+    assert.strictEqual(store.getState().user, null)
+    assert.strictEqual(store.getState().connected, false)
+  })
+
+  it('initializes a single pushed-state subscription', async () => {
+    let callbacks = []
+    let ogs = {
+      getState: async () => ({user: null}),
+      onStateChange: (callback) => {
+        callbacks.push(callback)
+        return () => callbacks.splice(callbacks.indexOf(callback), 1)
+      },
+    }
+    let store = createStore(ogs)
+
+    await store.initialize()
+    await store.initialize()
+
+    assert.strictEqual(callbacks.length, 1)
+    assert.strictEqual(store.isUsingCurrentOgsStateChangeEvents(), true)
+
+    callbacks[0](createPublicState({user: {id: 2, username: 'Event'}}))
+
+    assert.strictEqual(store.getState().user.username, 'Event')
     assert.strictEqual(store.getState().connected, true)
 
-    store = createStore({
+    store.dispose()
+    assert.strictEqual(callbacks.length, 0)
+    assert.strictEqual(store.isUsingCurrentOgsStateChangeEvents(), false)
+  })
+
+  it('detects when the renderer OGS API has been replaced after init', async () => {
+    let ogs = {
+      getState: async () => ({user: null}),
+      onStateChange: () => () => {},
+    }
+    let currentOgs = ogs
+    let store = new OnlineStore({ogs: () => currentOgs})
+
+    await store.initialize()
+    assert.strictEqual(store.isUsingCurrentOgsStateChangeEvents(), true)
+
+    currentOgs = {getState: async () => ({user: null})}
+    assert.strictEqual(store.isUsingCurrentOgsStateChangeEvents(), false)
+  })
+
+  it('keeps current state when refresh fails', async () => {
+    let store = createStore({
       getState: async () => {
         throw new Error('offline')
       },

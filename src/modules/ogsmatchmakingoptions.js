@@ -1,3 +1,13 @@
+export const defaultMatchmakingOptions = {
+  boardSizes: [19],
+  speeds: ['rapid'],
+  timeSystem: 'byoyomi',
+  lowerRankDiff: 3,
+  upperRankDiff: 3,
+  rules: {condition: 'required', value: 'japanese'},
+  handicap: {condition: 'preferred', value: 'enabled'},
+}
+
 export function updateScalarMatchmakingOption(options, name, value) {
   return {
     ...options,

@@ -5,6 +5,7 @@ import sabaki from '../../modules/sabaki.js'
 import * as gametree from '../../modules/gametree.js'
 import {getOgsClockView} from '../../modules/ogsclock.js'
 import OgsPanelSyncController from '../../modules/ogspanelsync.js'
+import onlineStore from '../../modules/onlinestore.js'
 
 const t = i18n.context('OgsGameContextPanel')
 
@@ -26,6 +27,14 @@ export default class OgsGameContextPanel extends Component {
     this.handleSabakiChange = () => {
       this.setState(({revision}) => ({revision: revision + 1}))
     }
+
+    this.handleOnlineStoreState = (state) => {
+      this.enqueueOgsState(state)
+    }
+
+    this.lastFallbackRefreshAt = 0
+    this.handlingOgsState = false
+    this.pendingOgsState = null
 
     this.handlePassButtonClick = async () => {
       let {onPass = () => {}} = this.props
@@ -112,7 +121,10 @@ export default class OgsGameContextPanel extends Component {
 
   async componentDidMount() {
     sabaki.on('change', this.handleSabakiChange)
-    this.pollTimer = setInterval(() => this.refreshOgsState(), 2000)
+    this.unsubscribeOnlineStore = onlineStore.subscribe(
+      this.handleOnlineStoreState,
+    )
+    this.pollTimer = setInterval(() => this.refreshOgsStateIfDue(), 2000)
     this.clockTimer = setInterval(this.handleSabakiChange, 1000)
     await this.refreshOgsState()
   }
@@ -126,20 +138,52 @@ export default class OgsGameContextPanel extends Component {
 
   componentWillUnmount() {
     sabaki.removeListener('change', this.handleSabakiChange)
+    this.unsubscribeOnlineStore?.()
     clearInterval(this.pollTimer)
     clearInterval(this.clockTimer)
   }
 
   async refreshOgsState() {
-    let state
-
     try {
-      state = await window.sabaki.ogs.getState()
+      let state = await onlineStore.refresh()
+      if (state == null) {
+        this.setState({error: t('OGS game details are unavailable.')})
+      }
     } catch (err) {
       this.setState({error: t('OGS game details are unavailable.')})
       return
     }
 
+    this.lastFallbackRefreshAt = Date.now()
+  }
+
+  async enqueueOgsState(state) {
+    this.pendingOgsState = state
+    if (this.handlingOgsState) return
+
+    this.handlingOgsState = true
+    try {
+      while (this.pendingOgsState != null) {
+        let nextState = this.pendingOgsState
+        this.pendingOgsState = null
+        await this.applyOgsState(nextState)
+      }
+    } finally {
+      this.handlingOgsState = false
+    }
+  }
+
+  async refreshOgsStateIfDue() {
+    let now = Date.now()
+    if (hasOgsStateChangeEvents() && now - this.lastFallbackRefreshAt < 60000) {
+      return
+    }
+
+    this.lastFallbackRefreshAt = now
+    await this.refreshOgsState()
+  }
+
+  async applyOgsState(state) {
     this.setState({
       user: state?.user || null,
       network: state?.network || null,
@@ -149,6 +193,8 @@ export default class OgsGameContextPanel extends Component {
 
     let onlineGame = state?.onlineGame
     await this.syncController.handleOnlineGameError(onlineGame)
+
+    if (onlineGame?.pendingMove === true) return
 
     if (onlineGame?.gameId === this.props.onlineGameId) {
       await this.syncController.syncOnlineGameToBoard(onlineGame, {
@@ -430,6 +476,10 @@ function formatDeadStones(deadStones = []) {
 
 function getInitial(player) {
   return (player?.username || '?').slice(0, 1).toUpperCase()
+}
+
+function hasOgsStateChangeEvents() {
+  return onlineStore.isUsingCurrentOgsStateChangeEvents()
 }
 
 function withOptimisticPendingMove(game) {
