@@ -25,7 +25,9 @@ export default class OgsPanelSyncController {
     this.syncedOnlineGameKey = null
   }
 
-  async syncOnlineGameToBoard(onlineGame) {
+  async syncOnlineGameToBoard(onlineGame, options = {}) {
+    let {enterStoneRemovalMode = false} = options
+
     if (
       onlineGame?.status !== 'connected' ||
       onlineGame.board == null ||
@@ -51,6 +53,7 @@ export default class OgsPanelSyncController {
         (onlineGame.phase === 'finished' &&
           this.sabaki.state.onlineGameId == null))
     ) {
+      if (enterStoneRemovalMode) this.enterOgsStoneRemovalMode(onlineGame)
       return true
     }
 
@@ -79,9 +82,22 @@ export default class OgsPanelSyncController {
     if (loaded && onlineGame.phase === 'finished') {
       await this.sabaki.showOgsGameEndInfo(onlineGame)
       this.sabaki.detachOgsGame(onlineGame.gameId)
+    } else if (loaded && enterStoneRemovalMode) {
+      this.enterOgsStoneRemovalMode(onlineGame)
     }
 
     return loaded
+  }
+
+  enterOgsStoneRemovalMode(onlineGame) {
+    if (
+      onlineGame?.phase !== 'stone removal' &&
+      onlineGame?.clock?.stoneRemovalMode !== true
+    ) {
+      return
+    }
+
+    this.sabaki.enterOgsStoneRemovalMode?.(onlineGame)
   }
 
   async handleOnlineGameError(onlineGame) {

@@ -4,6 +4,7 @@ import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
 import * as gametree from '../../modules/gametree.js'
 import {getOgsClockView} from '../../modules/ogsclock.js'
+import OgsPanelSyncController from '../../modules/ogspanelsync.js'
 
 const t = i18n.context('OgsGameContextPanel')
 
@@ -19,9 +20,7 @@ export default class OgsGameContextPanel extends Component {
       chatBody: '',
       revision: 0,
     }
-    this.syncingOnlineGame = false
-    this.handledOnlineGameErrorKey = null
-    this.handledOnlineGameErrorPendingMove = null
+    this.syncController = new OgsPanelSyncController({sabaki})
 
     this.handleSabakiChange = () => {
       this.setState(({revision}) => ({revision: revision + 1}))
@@ -119,6 +118,7 @@ export default class OgsGameContextPanel extends Component {
 
   async componentDidUpdate(prevProps) {
     if (prevProps.onlineGameId !== this.props.onlineGameId) {
+      this.syncController.resetConnectAttempt()
       await this.refreshOgsState()
     }
   }
@@ -145,70 +145,13 @@ export default class OgsGameContextPanel extends Component {
       error: state?.onlineGame?.error || null,
     })
 
-    await this.handleOnlineGameError(state?.onlineGame)
-    await this.syncOnlineGameToBoard(state?.onlineGame)
-  }
+    let onlineGame = state?.onlineGame
+    await this.syncController.handleOnlineGameError(onlineGame)
 
-  async handleOnlineGameError(onlineGame) {
-    if (onlineGame?.status !== 'error') return
-
-    let pendingMove = sabaki.ogsPendingMove
-    if (pendingMove == null || pendingMove.gameId !== onlineGame.gameId) return
-
-    let pendingKey = `${pendingMove.moveNumber || ''}:${pendingMove.move || ''}`
-    let key = `${onlineGame.gameId}:${onlineGame.error || ''}:${pendingKey}`
-    if (
-      key === this.handledOnlineGameErrorKey &&
-      pendingMove === this.handledOnlineGameErrorPendingMove
-    ) {
-      return
-    }
-
-    if (await sabaki.handleOgsGameError(onlineGame)) {
-      this.handledOnlineGameErrorKey = key
-      this.handledOnlineGameErrorPendingMove = pendingMove
-    }
-  }
-
-  async syncOnlineGameToBoard(onlineGame) {
-    let {onlineGameId} = this.props
-
-    if (
-      onlineGameId == null ||
-      onlineGame?.gameId !== onlineGameId ||
-      onlineGame?.status !== 'connected' ||
-      onlineGame.board == null ||
-      !Array.isArray(onlineGame.moves)
-    ) {
-      return
-    }
-    if (this.syncingOnlineGame) return
-
-    let synced = false
-
-    this.syncingOnlineGame = true
-    try {
-      synced = await sabaki.applyOgsGameUpdate(onlineGame)
-
-      if (!synced && sabaki.state.onlineGameId === onlineGameId) {
-        synced = await sabaki.loadOgsGame(onlineGame, {
-          suppressAskForSave: true,
-          clearHistory: false,
-        })
-      }
-    } finally {
-      this.syncingOnlineGame = false
-    }
-
-    if (synced && onlineGame.phase === 'finished') {
-      await sabaki.showOgsGameEndInfo(onlineGame)
-      sabaki.detachOgsGame(onlineGameId)
-    } else if (
-      synced &&
-      (onlineGame.phase === 'stone removal' ||
-        onlineGame.clock?.stoneRemovalMode === true)
-    ) {
-      sabaki.enterOgsStoneRemovalMode(onlineGame)
+    if (onlineGame?.gameId === this.props.onlineGameId) {
+      await this.syncController.syncOnlineGameToBoard(onlineGame, {
+        enterStoneRemovalMode: true,
+      })
     }
   }
 

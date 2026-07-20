@@ -26,6 +26,9 @@ function createSabaki(overrides = {}) {
       calls.push(['detachOgsGame', gameId])
       return true
     },
+    enterOgsStoneRemovalMode: (onlineGame) => {
+      calls.push(['enterOgsStoneRemovalMode', onlineGame.gameId])
+    },
     handleOgsGameError: async (onlineGame) => {
       calls.push(['handleOgsGameError', onlineGame.gameId, onlineGame.error])
       sabaki.ogsPendingMove = null
@@ -200,6 +203,65 @@ describe('OGS panel sync controller', () => {
       ['loadOgsGame', 42, {suppressAskForSave: true, clearHistory: false}],
       ['showOgsGameEndInfo', 42],
       ['detachOgsGame', 42],
+    ])
+  })
+
+  it('can enter stone removal mode after syncing when requested', async () => {
+    let sabaki = createSabaki({state: {onlineGameId: 42}})
+    let controller = new OgsPanelSyncController({sabaki})
+
+    assert.strictEqual(
+      await controller.syncOnlineGameToBoard(
+        createOnlineGame({phase: 'stone removal'}),
+        {enterStoneRemovalMode: true},
+      ),
+      true,
+    )
+    assert.deepStrictEqual(sabaki.calls, [
+      ['applyOgsGameUpdate', 42],
+      ['loadOgsGame', 42, {suppressAskForSave: true, clearHistory: false}],
+      ['enterOgsStoneRemovalMode', 42],
+    ])
+  })
+
+  it('does not enter stone removal mode unless requested', async () => {
+    let sabaki = createSabaki({state: {onlineGameId: 42}})
+    let controller = new OgsPanelSyncController({sabaki})
+
+    assert.strictEqual(
+      await controller.syncOnlineGameToBoard(
+        createOnlineGame({phase: 'stone removal'}),
+      ),
+      true,
+    )
+    assert.deepStrictEqual(sabaki.calls, [
+      ['applyOgsGameUpdate', 42],
+      ['loadOgsGame', 42, {suppressAskForSave: true, clearHistory: false}],
+    ])
+  })
+
+  it('enters stone removal mode for deduped attached syncs when requested', async () => {
+    let sabaki = createSabaki()
+    let controller = new OgsPanelSyncController({sabaki})
+    let onlineGame = createOnlineGame({phase: 'stone removal'})
+
+    assert.strictEqual(
+      await controller.syncOnlineGameToBoard(onlineGame, {
+        enterStoneRemovalMode: true,
+      }),
+      true,
+    )
+    sabaki.state.onlineGameId = 42
+    assert.strictEqual(
+      await controller.syncOnlineGameToBoard(onlineGame, {
+        enterStoneRemovalMode: true,
+      }),
+      true,
+    )
+    assert.deepStrictEqual(sabaki.calls, [
+      ['loadOgsGame', 42, {suppressAskForSave: false, clearHistory: true}],
+      ['enterOgsStoneRemovalMode', 42],
+      ['enterOgsStoneRemovalMode', 42],
     ])
   })
 
