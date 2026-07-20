@@ -7,7 +7,7 @@ import {
 import {defaultMatchmakingOptions} from '../src/modules/ogsmatchmakingoptions.js'
 
 function createStore(ogs) {
-  return new OnlineStore({ogs: () => ogs})
+  return new OnlineStore({ogs: () => ogs, now: () => 1234})
 }
 
 function createPublicState(overrides = {}) {
@@ -30,7 +30,11 @@ describe('online store', () => {
       error: null,
       connected: false,
       socket: null,
-      network: null,
+      network: {
+        status: 'offline',
+        lastError: null,
+        lastSuccessfulSyncAt: null,
+      },
       matchmaking: {options: defaultMatchmakingOptions},
       onlineGame: null,
       activeGames: [],
@@ -107,7 +111,11 @@ describe('online store', () => {
       username: 'Seki',
       user: publicState.user,
       socket: publicState.socket,
-      network: null,
+      network: {
+        status: 'online',
+        lastError: null,
+        lastSuccessfulSyncAt: 1234,
+      },
       matchmaking: publicState.matchmaking,
       onlineGame: publicState.onlineGame,
       activeGames: publicState.activeGames,
@@ -123,6 +131,8 @@ describe('online store', () => {
     assert.strictEqual(store.getState().username, 'Keep')
     assert.strictEqual(store.getState().user, null)
     assert.strictEqual(store.getState().connected, false)
+    assert.strictEqual(store.getState().network.status, 'offline')
+    assert.strictEqual(store.getState().network.lastSuccessfulSyncAt, 1234)
   })
 
   it('initializes a single pushed-state subscription', async () => {
@@ -178,6 +188,29 @@ describe('online store', () => {
     assert.strictEqual(await store.refresh(), null)
     assert.strictEqual(store.getState().username, 'Keep')
     assert.strictEqual(store.getState().connected, true)
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'degraded',
+      lastError: {code: 'ipc-failure', message: 'offline'},
+      lastSuccessfulSyncAt: null,
+    })
+  })
+
+  it('preserves server network metrics when adding sync metadata', async () => {
+    let publicState = createPublicState({
+      network: {latency: 50, drift: -10, updatedAt: 1000},
+    })
+    let store = createStore({getState: async () => publicState})
+
+    await store.refresh()
+
+    assert.deepStrictEqual(store.getState().network, {
+      latency: 50,
+      drift: -10,
+      updatedAt: 1000,
+      status: 'online',
+      lastError: null,
+      lastSuccessfulSyncAt: 1234,
+    })
   })
 
   it('updates state after successful login', async () => {
@@ -210,6 +243,25 @@ describe('online store', () => {
     assert.strictEqual(result.ok, false)
     assert.strictEqual(store.getState().busy, false)
     assert.strictEqual(store.getState().error, 'Bad credentials')
+  })
+
+  it('keeps IPC login errors in network state', async () => {
+    let store = createStore({
+      login: async () => {
+        throw new Error('offline')
+      },
+    })
+
+    let result = await store.login('Seki', 'bad')
+
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(store.getState().busy, false)
+    assert.strictEqual(store.getState().error, 'Unable to connect to OGS.')
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'degraded',
+      lastError: {code: 'network', message: 'offline'},
+      lastSuccessfulSyncAt: null,
+    })
   })
 
   it('resets public session state on logout', async () => {
@@ -260,6 +312,11 @@ describe('online store', () => {
     assert.strictEqual(store.getState().error, 'No game')
     assert.deepStrictEqual(store.getState().onlineGame, {gameId: 44})
     assert.deepStrictEqual(store.getState().activeGames, [{gameId: 44}])
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'degraded',
+      lastError: {code: 'connect-game-failed', message: 'No game'},
+      lastSuccessfulSyncAt: null,
+    })
   })
 
   it('can leave busy state under caller control while connecting games', async () => {
@@ -286,6 +343,21 @@ describe('online store', () => {
     assert.strictEqual(store.getState().onlineGame, null)
   })
 
+  it('marks network degraded when disconnect fails', async () => {
+    let store = createStore({
+      disconnectGame: async () => ({ok: false, error: {message: 'Busy'}}),
+    })
+
+    let result = await store.disconnectGame(42)
+
+    assert.strictEqual(result.ok, false)
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'degraded',
+      lastError: {code: 'disconnect-game-failed', message: 'Busy'},
+      lastSuccessfulSyncAt: null,
+    })
+  })
+
   it('keeps optimistic matchmaking options when syncing options fails', async () => {
     let options = {...defaultMatchmakingOptions, boardSizes: [9]}
     let store = createStore({
@@ -296,6 +368,11 @@ describe('online store', () => {
 
     assert.strictEqual(await store.setMatchmakingOptions(options), null)
     assert.deepStrictEqual(store.getState().matchmaking.options, options)
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'degraded',
+      lastError: {code: 'ipc-failure', message: 'offline'},
+      lastSuccessfulSyncAt: null,
+    })
   })
 
   it('updates matchmaking and socket for automatch results', async () => {
@@ -315,5 +392,45 @@ describe('online store', () => {
     assert.strictEqual(store.getState().busy, false)
     assert.deepStrictEqual(store.getState().matchmaking, {status: 'searching'})
     assert.deepStrictEqual(store.getState().socket, {status: 'authenticated'})
+  })
+
+  it('updates network state for automatch acknowledgements', async () => {
+    let store = createStore({
+      acknowledgeAutomatchOpen: async () => ({
+        ok: true,
+        state: createPublicState({
+          matchmaking: {status: 'idle'},
+          onlineGame: {gameId: 42},
+        }),
+      }),
+    })
+
+    let result = await store.acknowledgeAutomatchOpen(42)
+
+    assert.strictEqual(result.ok, true)
+    assert.deepStrictEqual(store.getState().matchmaking, {status: 'idle'})
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'online',
+      lastError: null,
+      lastSuccessfulSyncAt: 1234,
+    })
+  })
+
+  it('marks network degraded when automatch acknowledgement fails', async () => {
+    let store = createStore({
+      acknowledgeAutomatchOpen: async () => ({
+        ok: false,
+        error: {code: 'invalid-state', message: 'No match'},
+      }),
+    })
+
+    let result = await store.acknowledgeAutomatchOpen(42)
+
+    assert.strictEqual(result.ok, false)
+    assert.deepStrictEqual(store.getState().network, {
+      status: 'degraded',
+      lastError: {code: 'invalid-state', message: 'No match'},
+      lastSuccessfulSyncAt: null,
+    })
   })
 })

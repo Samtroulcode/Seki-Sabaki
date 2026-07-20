@@ -3,6 +3,14 @@ import {defaultMatchmakingOptions} from './ogsmatchmakingoptions.js'
 
 const t = i18n.context('OgsPanel')
 
+export function createInitialOnlineNetworkState() {
+  return {
+    status: 'offline',
+    lastError: null,
+    lastSuccessfulSyncAt: null,
+  }
+}
+
 export function createInitialOnlineState() {
   return {
     username: '',
@@ -11,7 +19,7 @@ export function createInitialOnlineState() {
     error: null,
     connected: false,
     socket: null,
-    network: null,
+    network: createInitialOnlineNetworkState(),
     matchmaking: {options: defaultMatchmakingOptions},
     onlineGame: null,
     activeGames: [],
@@ -19,8 +27,9 @@ export function createInitialOnlineState() {
 }
 
 export class OnlineStore {
-  constructor({ogs = () => window.sabaki.ogs} = {}) {
+  constructor({ogs = () => window.sabaki.ogs, now = () => Date.now()} = {}) {
     this.ogs = ogs
+    this.now = now
     this.state = createInitialOnlineState()
     this.listeners = new Set()
     this.unsubscribeOgsStateChange = null
@@ -87,6 +96,10 @@ export class OnlineStore {
     try {
       state = await this.ogs().getState()
     } catch (err) {
+      this.applySyncError(err, {
+        code: 'ipc-failure',
+        message: t('Unable to refresh OGS state.'),
+      })
       return null
     }
 
@@ -99,11 +112,17 @@ export class OnlineStore {
     this.setState({busy: true, error: null})
 
     let result
+    let syncErrorApplied = false
 
     try {
       result = await this.ogs().login(username, password)
     } catch (err) {
       result = {ok: false, error: {message: t('Unable to connect to OGS.')}}
+      this.applySyncError(err, {
+        code: 'network',
+        message: result.error.message,
+      })
+      syncErrorApplied = true
     }
 
     if (result.ok) {
@@ -113,6 +132,12 @@ export class OnlineStore {
         connected: true,
       })
     } else {
+      if (!syncErrorApplied) {
+        this.applySyncError(result.error, {
+          code: result.error?.code || 'login-failed',
+          message: result.error?.message || t('OGS login failed.'),
+        })
+      }
       this.setState({error: result.error?.message || t('OGS login failed.')})
     }
 
@@ -127,7 +152,11 @@ export class OnlineStore {
       connected: false,
       error: null,
       socket: null,
-      network: null,
+      network: this.mergeNetworkState(null, {
+        status: 'offline',
+        lastError: null,
+        lastSuccessfulSyncAt: null,
+      }),
       onlineGame: null,
       activeGames: [],
     })
@@ -144,6 +173,10 @@ export class OnlineStore {
       if (result.ok) {
         this.applyCommandState(result.state)
       } else {
+        this.applySyncError(result.error, {
+          code: result.error?.code || 'connect-game-failed',
+          message: result.error?.message || t('Unable to connect to game.'),
+        })
         this.setState({
           error: result.error?.message || t('Unable to connect to game.'),
           onlineGame: result.state?.onlineGame || this.state.onlineGame,
@@ -152,6 +185,10 @@ export class OnlineStore {
       }
     } catch (err) {
       result = {ok: false, error: {message: t('Unable to connect to game.')}}
+      this.applySyncError(err, {
+        code: 'ipc-failure',
+        message: result.error.message,
+      })
       this.setState({error: result.error.message})
     }
 
@@ -160,10 +197,33 @@ export class OnlineStore {
   }
 
   async disconnectGame(gameId) {
-    let result = await this.ogs().disconnectGame(gameId)
+    let result
+
+    try {
+      result = await this.ogs().disconnectGame(gameId)
+    } catch (err) {
+      result = {ok: false, error: {message: t('Unable to disconnect game.')}}
+      this.applySyncError(err, {
+        code: 'ipc-failure',
+        message: result.error.message,
+      })
+      return result
+    }
 
     if (result.ok) {
-      this.setState({onlineGame: result.state.onlineGame})
+      this.setState({
+        onlineGame: result.state.onlineGame,
+        network: this.mergeNetworkState(result.state.network, {
+          status: 'online',
+          lastError: null,
+          lastSuccessfulSyncAt: this.now(),
+        }),
+      })
+    } else {
+      this.applySyncError(result.error, {
+        code: result.error?.code || 'disconnect-game-failed',
+        message: result.error?.message || t('Unable to disconnect game.'),
+      })
     }
 
     return result
@@ -174,9 +234,21 @@ export class OnlineStore {
 
     try {
       let state = await this.ogs().setMatchmakingOptions(options)
-      this.setState({matchmaking: state.matchmaking, socket: state.socket})
+      this.setState({
+        matchmaking: state.matchmaking,
+        socket: state.socket,
+        network: this.mergeNetworkState(state.network, {
+          status: 'online',
+          lastError: null,
+          lastSuccessfulSyncAt: this.now(),
+        }),
+      })
       return state
     } catch (err) {
+      this.applySyncError(err, {
+        code: 'ipc-failure',
+        message: t('Unable to update automatch options.'),
+      })
       return null
     }
   }
@@ -196,7 +268,29 @@ export class OnlineStore {
   }
 
   async acknowledgeAutomatchOpen(gameId) {
-    return await this.ogs().acknowledgeAutomatchOpen(gameId)
+    let result
+
+    try {
+      result = await this.ogs().acknowledgeAutomatchOpen(gameId)
+    } catch (err) {
+      result = {ok: false, error: {message: t('Unable to update automatch.')}}
+      this.applySyncError(err, {
+        code: 'ipc-failure',
+        message: result.error.message,
+      })
+      return result
+    }
+
+    if (result.ok) {
+      this.applyCommandState(result.state)
+    } else {
+      this.applySyncError(result.error, {
+        code: result.error?.code || 'automatch-failed',
+        message: result.error?.message || t('Unable to update automatch.'),
+      })
+    }
+
+    return result
   }
 
   async updateAutomatch(action, fallbackMessage) {
@@ -211,8 +305,17 @@ export class OnlineStore {
         this.setState({
           matchmaking: result.state.matchmaking,
           socket: result.state.socket,
+          network: this.mergeNetworkState(result.state.network, {
+            status: 'online',
+            lastError: null,
+            lastSuccessfulSyncAt: this.now(),
+          }),
         })
       } else {
+        this.applySyncError(result.error, {
+          code: result.error?.code || 'automatch-failed',
+          message: result.error?.message || fallbackMessage,
+        })
         this.setState({
           error: result.error?.message || fallbackMessage,
           matchmaking: result.state?.matchmaking || this.state.matchmaking,
@@ -221,6 +324,10 @@ export class OnlineStore {
       }
     } catch (err) {
       result = {ok: false, error: {message: fallbackMessage}}
+      this.applySyncError(err, {
+        code: 'ipc-failure',
+        message: fallbackMessage,
+      })
       this.setState({error: fallbackMessage})
     }
 
@@ -233,7 +340,11 @@ export class OnlineStore {
       username: state?.user?.username || this.state.username,
       user: state?.user || null,
       socket: state?.socket || null,
-      network: state?.network || null,
+      network: this.mergeNetworkState(state?.network, {
+        status: 'online',
+        lastError: null,
+        lastSuccessfulSyncAt: this.now(),
+      }),
       matchmaking: state?.matchmaking || this.state.matchmaking,
       onlineGame: state?.onlineGame || null,
       activeGames: state?.activeGames || [],
@@ -246,7 +357,11 @@ export class OnlineStore {
     this.setState({
       user: null,
       socket: state?.socket || null,
-      network: state?.network || null,
+      network: this.mergeNetworkState(state?.network, {
+        status: 'offline',
+        lastError: null,
+        lastSuccessfulSyncAt: state == null ? null : this.now(),
+      }),
       matchmaking: state?.matchmaking || this.state.matchmaking,
       onlineGame: null,
       activeGames: state?.activeGames || [],
@@ -266,11 +381,48 @@ export class OnlineStore {
   applyCommandState(state) {
     this.setState({
       socket: state.socket,
-      network: state.network || this.state.network,
+      network: this.mergeNetworkState(state.network, {
+        status: 'online',
+        lastError: null,
+        lastSuccessfulSyncAt: this.now(),
+      }),
       matchmaking: state.matchmaking,
       onlineGame: state.onlineGame,
       activeGames: state.activeGames || this.state.activeGames,
     })
+  }
+
+  applySyncError(err, fallback) {
+    this.setState({
+      network: this.mergeNetworkState(this.state.network, {
+        status: 'degraded',
+        lastError: serializeOnlineStoreError(err, fallback),
+      }),
+    })
+  }
+
+  mergeNetworkState(network, metadata = {}) {
+    return {
+      ...createInitialOnlineNetworkState(),
+      ...this.state.network,
+      ...(network || {}),
+      ...metadata,
+    }
+  }
+}
+
+function serializeOnlineStoreError(err, fallback) {
+  return {
+    code:
+      typeof err?.code === 'string'
+        ? err.code
+        : typeof fallback?.code === 'string'
+          ? fallback.code
+          : 'unknown',
+    message:
+      typeof err?.message === 'string' && err.message !== ''
+        ? err.message
+        : fallback?.message || t('Unable to connect to OGS.'),
   }
 }
 
