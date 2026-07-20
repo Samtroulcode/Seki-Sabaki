@@ -80,6 +80,7 @@ describe('SGF analysis service', () => {
         job.outputPath,
         join(directory, '9x9-override-2026-07-20.sgf'),
       )
+      assert.strictEqual(job.logPath, join(directory, 'logs', 'id-1.log'))
       assert.strictEqual(
         readFileSync(sourcePath, 'utf8').includes('Test Game'),
         true,
@@ -197,6 +198,30 @@ describe('SGF analysis service', () => {
         service.getAnalysisState().completedJobs[0].status,
         'failed',
       )
+    } finally {
+      service.dispose()
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
+  it('does not create board temporary sources when log setup fails', () => {
+    let {directory, service} = createService({
+      fs: {
+        mkdir: (path) => {
+          if (path === join(directory, 'logs')) throw new Error('no logs')
+        },
+      },
+    })
+
+    try {
+      assert.throws(
+        () =>
+          service.startAnalysis({
+            source: {type: 'board', sgfContent: '(;GM[1]FF[4]SZ[9]GN[Board])'},
+          }),
+        /no logs/,
+      )
+      assert.strictEqual(existsSync(join(directory, 'tmp', 'id-1.sgf')), false)
     } finally {
       service.dispose()
       rmSync(directory, {recursive: true, force: true})

@@ -213,6 +213,8 @@ window.sabaki = {
     selectKatagoModel: () => ipcRenderer.invoke('analysis:selectKatagoModel'),
     selectKatagoConfig: () => ipcRenderer.invoke('analysis:selectKatagoConfig'),
     showInFolder: (path) => ipcRenderer.invoke('analysis:showInFolder', path),
+    showLogInFolder: (path) =>
+      ipcRenderer.invoke('analysis:showLogInFolder', path),
     openAnalyzedGame: (path) =>
       ipcRenderer.invoke('analysis:openAnalyzedGame', path),
     onStateChange: (callback) => {

@@ -59,6 +59,7 @@ describe('SGF analysis runner', () => {
     let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
     let inputPath = join(directory, 'source.sgf')
     let outputPath = join(directory, 'final.sgf')
+    let logPath = join(directory, 'analysis.log')
     let generatedPath = getAnalyzeSgfGeneratedPath(inputPath, '.tmp')
     let progress = []
     let spawnCalls = []
@@ -69,6 +70,7 @@ describe('SGF analysis runner', () => {
       let result = await runSgfAnalysis({
         inputPath,
         outputPath,
+        logPath,
         config: config(),
         generatedFileSuffix: '.tmp',
         onProgress: (value) => progress.push(value),
@@ -91,9 +93,47 @@ describe('SGF analysis runner', () => {
       ])
       assert.strictEqual(spawnCalls[0].executable, 'fake-analyze-sgf')
       assert.strictEqual(spawnCalls[0].options.shell, false)
+      assert.match(readFileSync(logPath, 'utf8'), /Starting analysis/)
+      assert.match(readFileSync(logPath, 'utf8'), /stderr: 63%/)
+      assert.match(readFileSync(logPath, 'utf8'), /completed successfully/)
       assert(spawnCalls[0].args.includes(inputPath))
       assert(
         spawnCalls[0].args.some((arg) => arg.includes('fileSuffix:".tmp"')),
+      )
+    } finally {
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
+  it('continues analysis when the diagnostic log cannot be written', async () => {
+    let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
+    let inputPath = join(directory, 'source.sgf')
+    let outputPath = join(directory, 'final.sgf')
+    let generatedPath = getAnalyzeSgfGeneratedPath(inputPath, '.tmp')
+    let logLines = []
+
+    try {
+      writeFileSync(inputPath, '(;GM[1])')
+
+      let result = await runSgfAnalysis({
+        inputPath,
+        outputPath,
+        logPath: directory,
+        config: config(),
+        generatedFileSuffix: '.tmp',
+        onLog: (line) => logLines.push(line),
+        spawnImpl: createFakeSpawn(({child}) => {
+          child.stderr.write('63% (5/8, 4.2k visits) | ETA: 1s\n')
+          writeFileSync(generatedPath, '(;GM[1]FF[4]SZ[9]GN[Analyzed])')
+          child.emit('close', 0, null)
+        }),
+      })
+
+      assert.strictEqual(result.outputPath, outputPath)
+      assert.strictEqual(existsSync(outputPath), true)
+      assert.strictEqual(
+        logLines.some((line) => line.includes('stderr: 63%')),
+        true,
       )
     } finally {
       rmSync(directory, {recursive: true, force: true})

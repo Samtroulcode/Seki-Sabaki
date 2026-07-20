@@ -109,6 +109,53 @@ describe('SGF analysis queue', () => {
     await Promise.resolve()
   })
 
+  it('keeps recent log lines on the running job', async () => {
+    let run = deferred()
+    let emitLog
+    let queue = createQueue({
+      runner: ({onLog}) => {
+        emitLog = onLog
+        return run.promise
+      },
+    })
+
+    queue.enqueue(request({logPath: '/tmp/job.log'}))
+    emitLog('first line')
+    emitLog('second line')
+
+    assert.deepStrictEqual(queue.getState().currentJob.logTail, [
+      'first line',
+      'second line',
+    ])
+    assert.strictEqual(queue.getState().currentJob.logPath, '/tmp/job.log')
+
+    run.resolve()
+    await Promise.resolve()
+  })
+
+  it('keeps only the recent log tail', async () => {
+    let run = deferred()
+    let emitLog
+    let queue = createQueue({
+      runner: ({onLog}) => {
+        emitLog = onLog
+        return run.promise
+      },
+    })
+
+    queue.enqueue(request())
+
+    for (let i = 1; i <= 25; i++) emitLog(`line ${i}`)
+
+    assert.deepStrictEqual(
+      queue.getState().currentJob.logTail,
+      Array.from({length: 20}, (_, i) => `line ${i + 6}`),
+    )
+
+    run.resolve()
+    await Promise.resolve()
+  })
+
   it('ignores stale progress after advancing to the next job', async () => {
     let first = deferred()
     let second = deferred()

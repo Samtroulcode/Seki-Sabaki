@@ -339,6 +339,17 @@ export class AnalysisStore {
     }
   }
 
+  async showLogInFolder(path) {
+    try {
+      return await this.analysis().showLogInFolder(path)
+    } catch (err) {
+      this.setState({
+        error: getErrorMessage(err, t('Unable to show analysis log.')),
+      })
+      return false
+    }
+  }
+
   async openAnalyzedGame(path) {
     try {
       return await this.analysis().openAnalyzedGame(path)

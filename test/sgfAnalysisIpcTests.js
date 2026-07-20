@@ -203,6 +203,33 @@ describe('SGF analysis IPC handlers', () => {
     assert.deepStrictEqual(sent, [['load-file', '/analysis/game.sgf']])
   })
 
+  it('only shows known analysis logs in folder', async () => {
+    let shown = []
+    let handlers = setup({
+      service: createService({
+        getAnalysisState: () => ({
+          currentJob: {id: 'job-1', logPath: '/analysis/logs/job-1.log'},
+          queuedJobs: [],
+          completedJobs: [],
+        }),
+      }),
+      shell: {showItemInFolder: (path) => shown.push(path)},
+    })
+
+    assert.strictEqual(
+      await handlers['analysis:showLogInFolder'](
+        {},
+        '/analysis/logs/job-1.log',
+      ),
+      true,
+    )
+    assert.strictEqual(
+      await handlers['analysis:showLogInFolder']({}, '/etc/passwd'),
+      false,
+    )
+    assert.deepStrictEqual(shown, ['/analysis/logs/job-1.log'])
+  })
+
   it('coalesces state-change notifications', async () => {
     let states = []
     let service = createService()

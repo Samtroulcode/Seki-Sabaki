@@ -108,6 +108,7 @@ class SgfAnalysisService {
       throw new SgfAnalysisServiceError(configErrors[0])
 
     let jobId = this.createId()
+    let logPath = this.getAnalysisLogPath(config, jobId)
     let source = this.prepareSource(request, config, jobId)
     let metadata = {...source.metadata, ...(request.metadata || {})}
     let outputPath = getUniqueAnalysisOutputPath(
@@ -119,7 +120,6 @@ class SgfAnalysisService {
         now: new Date(this.now()),
       },
     )
-
     if (source.temporary) this.tempSources.set(jobId, source.path)
 
     let job
@@ -129,6 +129,7 @@ class SgfAnalysisService {
         id: jobId,
         sourcePath: source.path,
         outputPath,
+        logPath,
         displayName: getAnalysisDisplayName(metadata, source.path),
         config,
       })
@@ -159,6 +160,12 @@ class SgfAnalysisService {
   getAnalyzedGames() {
     if (this.config.outputDirectory === '') return []
     return this.fs.listAnalyzedGames(this.config.outputDirectory)
+  }
+
+  getAnalysisLogPath(config, jobId) {
+    let logDirectory = join(config.outputDirectory, 'logs')
+    this.fs.mkdir(logDirectory)
+    return join(logDirectory, `${jobId}.log`)
   }
 
   prepareSource(request, config, jobId) {

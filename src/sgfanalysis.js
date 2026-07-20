@@ -166,6 +166,13 @@ function setupSgfAnalysisIpcHandlers(
     return true
   })
 
+  ipcMain.handle('analysis:showLogInFolder', (evt, path) => {
+    if (shell == null || !isKnownAnalysisLogPath(service, path)) return false
+
+    shell.showItemInFolder(path)
+    return true
+  })
+
   ipcMain.handle('analysis:openAnalyzedGame', (evt, path) => {
     if (!isKnownAnalyzedGamePath(service, path)) return false
 
@@ -247,6 +254,22 @@ function isKnownAnalyzedGamePath(service, path) {
   return service
     .getAnalyzedGames()
     .some((game) => resolve(game.path) === target)
+}
+
+function isKnownAnalysisLogPath(service, path) {
+  if (typeof path !== 'string' || path === '') return false
+
+  let target = resolve(path)
+  let state = service.getAnalysisState()
+  let jobs = [
+    state.currentJob,
+    ...(state.queuedJobs || []),
+    ...(state.completedJobs || []),
+  ].filter(Boolean)
+
+  return jobs.some(
+    (job) => job.logPath != null && resolve(job.logPath) === target,
+  )
 }
 
 function serializeError(err) {

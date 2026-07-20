@@ -64,6 +64,7 @@ function createAnalysisApi(overrides = {}) {
       return {ok: true, state: analysisState}
     },
     showInFolder: async () => true,
+    showLogInFolder: async () => true,
     openAnalyzedGame: async () => true,
     onStateChange: (callback) => {
       stateChangeCallback = callback

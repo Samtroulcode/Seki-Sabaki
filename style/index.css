@@ -2234,6 +2234,17 @@ button:active {
 .analysis-current-job progress {
   width: 100%;
 }
+.analysis-log-tail {
+  max-height: 12rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.6rem;
+  border: 1px solid #292a2d;
+  border-radius: 6px;
+  background: #181818;
+  color: #cfcfcf;
+  white-space: pre-wrap;
+}
 
 @media (max-width: 1180px) {
   .ogs-dashboard-grid {

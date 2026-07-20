@@ -22,10 +22,13 @@ async function runSgfAnalysis({
   inputPath,
   outputPath,
   config,
+  logPath = null,
   generatedFileSuffix = createDefaultGeneratedFileSuffix(),
   onProgress = () => {},
+  onLog = () => {},
   signal = null,
   spawnImpl = spawn,
+  now = () => new Date(),
 } = {}) {
   validateRunInput({inputPath, outputPath})
 
@@ -64,6 +67,14 @@ async function runSgfAnalysis({
     config,
     fileSuffix: generatedFileSuffix,
   })
+  writeLog(logPath, onLog, now, `Starting analysis for ${inputPath}`)
+  writeLog(logPath, onLog, now, `Output path: ${outputPath}`)
+  writeLog(
+    logPath,
+    onLog,
+    now,
+    `Command: ${config.analyzeSgfPath} ${args.join(' ')}`,
+  )
   let child = spawnImpl(config.analyzeSgfPath, args, {shell: false})
   let stdout = ''
   let stderr = ''
@@ -76,6 +87,7 @@ async function runSgfAnalysis({
     let fail = (error) => {
       if (settled) return
       settled = true
+      writeLog(logPath, onLog, now, `Failed: ${error.message || error.code}`)
       cleanupFile(generatedPath)
       reject(toSgfAnalysisRunnerError(error))
     }
@@ -88,6 +100,7 @@ async function runSgfAnalysis({
         let content = readValidGeneratedSgf(generatedPath)
         writeFinalSgf(outputPath, content)
         cleanupFile(generatedPath)
+        writeLog(logPath, onLog, now, 'Analysis completed successfully.')
         resolve({outputPath, stdout, stderr})
       } catch (error) {
         cleanupFile(generatedPath)
@@ -97,6 +110,7 @@ async function runSgfAnalysis({
 
     let abort = () => {
       cancelled = true
+      writeLog(logPath, onLog, now, 'Cancellation requested.')
       try {
         child.kill?.('SIGTERM')
       } catch (err) {}
@@ -107,12 +121,14 @@ async function runSgfAnalysis({
     child.stdout?.on?.('data', (chunk) => {
       let text = chunk.toString()
       stdout += text
+      emitLogChunk(logPath, onLog, now, 'stdout', text)
       stdoutLineBuffer = emitProgressChunk(stdoutLineBuffer, text, onProgress)
     })
 
     child.stderr?.on?.('data', (chunk) => {
       let text = chunk.toString()
       stderr += text
+      emitLogChunk(logPath, onLog, now, 'stderr', text)
       stderrLineBuffer = emitProgressChunk(stderrLineBuffer, text, onProgress)
     })
 
@@ -125,6 +141,14 @@ async function runSgfAnalysis({
       signal?.removeEventListener?.('abort', abort)
       flushProgressLine(stdoutLineBuffer, onProgress)
       flushProgressLine(stderrLineBuffer, onProgress)
+      writeLog(
+        logPath,
+        onLog,
+        now,
+        `analyze-sgf closed with code ${code ?? 'null'}${
+          closeSignal == null ? '' : ` and signal ${closeSignal}`
+        }.`,
+      )
 
       if (cancelled || signal?.aborted) {
         fail({code: 'cancelled', message: 'Analysis was cancelled.'})
@@ -142,6 +166,46 @@ async function runSgfAnalysis({
       finish()
     })
   })
+}
+
+function emitLogChunk(logPath, onLog, now, streamName, text) {
+  let lines = text.split(/\r?\n|\r/g).filter((line) => line.trim() !== '')
+  for (let line of lines)
+    writeLog(logPath, onLog, now, `${streamName}: ${line}`)
+}
+
+function writeLog(logPath, onLog, now, message) {
+  let timestamp = normalizeDate(now()).toISOString()
+  let line = `[${timestamp}] ${message}`
+
+  appendLogLine(logPath, line)
+  onLog(line)
+}
+
+function appendLogLine(logPath, line) {
+  if (logPath == null || logPath === '') return
+
+  let fd = null
+
+  try {
+    fd = openSync(
+      logPath,
+      constants.O_APPEND |
+        constants.O_CREAT |
+        constants.O_WRONLY |
+        (constants.O_NOFOLLOW || 0),
+      0o600,
+    )
+    writeFileSync(fd, `${line}\n`)
+  } catch (err) {
+    // Logging is diagnostic; analysis should continue if the log is unavailable.
+  } finally {
+    if (fd != null) closeSync(fd)
+  }
+}
+
+function normalizeDate(value) {
+  return value instanceof Date ? value : new Date(value)
 }
 
 function createDefaultGeneratedFileSuffix() {

@@ -92,8 +92,10 @@ class SgfAnalysisQueue {
         inputPath: this.currentJob.sourcePath,
         outputPath: this.currentJob.outputPath,
         config: this.currentJob.config,
+        logPath: this.currentJob.logPath,
         signal: abortController.signal,
         onProgress: (progress) => this.applyProgress(jobId, progress),
+        onLog: (line) => this.applyLog(jobId, line),
       })
 
       this.completeCurrentJob({
@@ -123,6 +125,14 @@ class SgfAnalysisQueue {
     this.emitChange()
   }
 
+  applyLog(jobId, line) {
+    if (this.currentJob?.id !== jobId || typeof line !== 'string') return
+
+    let logTail = [...(this.currentJob.logTail || []), line].slice(-20)
+    this.currentJob = {...this.currentJob, logTail, lastLogAt: this.now()}
+    this.emitChange()
+  }
+
   completeCurrentJob(change) {
     if (this.currentJob == null) return
 
@@ -144,6 +154,7 @@ function createQueuedJob(request, {id, createdAt}) {
     status: 'queued',
     sourcePath: request.sourcePath,
     outputPath: request.outputPath,
+    logPath: request.logPath || null,
     displayName: request.displayName || request.sourcePath,
     config: request.config || {},
     progress: 0,
@@ -154,6 +165,8 @@ function createQueuedJob(request, {id, createdAt}) {
     startedAt: null,
     completedAt: null,
     error: null,
+    logTail: [],
+    lastLogAt: null,
   }
 }
 

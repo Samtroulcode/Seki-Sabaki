@@ -418,20 +418,14 @@ function QueueCard({analysisState, busy}) {
         {class: 'analysis-job-list'},
         completedJobs
           .slice(0, 5)
-          .map((job) =>
-            h(
-              'li',
-              {key: job.id},
-              getJobTitle(job),
-              h('span', {}, getJobStateLabel(job)),
-            ),
-          ),
+          .map((job) => h(RecentJobListItem, {key: job.id, job, busy})),
       ),
   )
 }
 
 function JobSummary({job, busy}) {
-  let progress = Math.round((job.progress || 0) * 100)
+  let progress = getJobProgressPercent(job)
+  let logTail = job.logTail || []
 
   return h(
     'div',
@@ -449,17 +443,38 @@ function JobSummary({job, busy}) {
       h('dd', {}, formatMoveProgress(job)),
       h('dt', {}, t('Visits')),
       h('dd', {}, job.visits == null ? t('Unknown') : job.visits),
+      h('dt', {}, t('Log')),
+      h('dd', {}, job.logPath || t('Pending')),
     ),
     h(
-      'button',
-      {
-        type: 'button',
-        disabled: busy,
-        onClick: () => analysisStore.cancelAnalysis(job.id),
-      },
-      t('Cancel'),
+      'div',
+      {class: 'analysis-actions'},
+      h(
+        'button',
+        {
+          type: 'button',
+          disabled: busy,
+          onClick: () => analysisStore.cancelAnalysis(job.id),
+        },
+        t('Cancel'),
+      ),
+      job.logPath &&
+        h(
+          'button',
+          {
+            type: 'button',
+            disabled: busy,
+            onClick: () => analysisStore.showLogInFolder(job.logPath),
+          },
+          t('Show log'),
+        ),
     ),
+    logTail.length > 0 && h(LogTail, {lines: logTail}),
   )
+}
+
+function LogTail({lines}) {
+  return h('pre', {class: 'analysis-log-tail'}, lines.slice(-8).join('\n'))
 }
 
 function JobListItem({job, busy}) {
@@ -468,14 +483,47 @@ function JobListItem({job, busy}) {
     {},
     h('span', {}, getJobTitle(job)),
     h(
-      'button',
-      {
-        type: 'button',
-        disabled: busy,
-        onClick: () => analysisStore.cancelAnalysis(job.id),
-      },
-      t('Cancel'),
+      'div',
+      {class: 'analysis-actions'},
+      h(
+        'button',
+        {
+          type: 'button',
+          disabled: busy,
+          onClick: () => analysisStore.cancelAnalysis(job.id),
+        },
+        t('Cancel'),
+      ),
+      job.logPath &&
+        h(
+          'button',
+          {
+            type: 'button',
+            disabled: busy,
+            onClick: () => analysisStore.showLogInFolder(job.logPath),
+          },
+          t('Show log'),
+        ),
     ),
+  )
+}
+
+function RecentJobListItem({job, busy}) {
+  return h(
+    'li',
+    {},
+    h('span', {}, getJobTitle(job)),
+    h('span', {}, getJobStateLabel(job)),
+    job.logPath &&
+      h(
+        'button',
+        {
+          type: 'button',
+          disabled: busy,
+          onClick: () => analysisStore.showLogInFolder(job.logPath),
+        },
+        t('Show log'),
+      ),
   )
 }
 
@@ -568,6 +616,13 @@ function getJobTitle(job) {
 
 function getJobStateLabel(job) {
   return job.error?.message || job.status || t('Unknown')
+}
+
+function getJobProgressPercent(job) {
+  if (Number.isFinite(job.percent)) return Math.round(job.percent)
+  if (Number.isFinite(job.progress)) return Math.round(job.progress * 100)
+
+  return 0
 }
 
 function formatMoveProgress(job) {
