@@ -2,6 +2,7 @@ import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
+import onlineStore from '../../modules/onlinestore.js'
 import {
   updateMultiMatchmakingOption,
   updateNestedMatchmakingOption,
@@ -25,22 +26,14 @@ export default class OgsPanel extends Component {
     super(props)
 
     this.state = {
-      username: '',
-      user: null,
-      busy: false,
-      error: null,
-      connected: false,
-      socket: null,
-      matchmaking: {options: defaultMatchmakingOptions},
-      onlineGame: null,
-      activeGames: [],
+      ...onlineStore.getState(),
       activeSection: 'overview',
     }
 
     this.syncController = new OgsPanelSyncController({sabaki})
 
     this.handleUsernameInput = (evt) => {
-      this.setState({username: evt.currentTarget.value})
+      onlineStore.setUsername(evt.currentTarget.value)
     }
 
     this.handleSectionButtonClick = (activeSection) => {
@@ -55,53 +48,21 @@ export default class OgsPanel extends Component {
 
       if (username === '') return
 
-      this.setState({busy: true, error: null})
-
       if (this.passwordInputElement != null) {
         this.passwordInputElement.value = ''
       }
 
-      let result
-
-      try {
-        result = await window.sabaki.ogs.login(username, password)
-      } catch (err) {
-        result = {ok: false, error: {message: t('Unable to connect to OGS.')}}
-      }
-
-      if (result.ok) {
-        this.setState({
-          username,
-          user: result.user,
-          socket: result.state?.socket || null,
-          matchmaking: result.state?.matchmaking || this.state.matchmaking,
-          onlineGame: result.state?.onlineGame || null,
-          activeGames: result.state?.activeGames || [],
-          connected: true,
-        })
-      } else {
-        this.setState({error: result.error?.message || t('OGS login failed.')})
-      }
-
-      this.setState({busy: false})
+      await onlineStore.login(username, password)
     }
 
     this.handleDisconnectButtonClick = async () => {
       sabaki.detachOgsGame()
-      await window.sabaki.ogs.logout()
-      this.setState({
-        user: null,
-        connected: false,
-        error: null,
-        socket: null,
-        onlineGame: null,
-        activeGames: [],
-      })
+      await onlineStore.logout()
       this.syncController.resetSession()
     }
 
     this.handleActiveGameButtonClick = async (gameId) => {
-      this.setState({busy: true, error: null})
+      onlineStore.setState({busy: true, error: null})
 
       try {
         if (
@@ -112,45 +73,31 @@ export default class OgsPanel extends Component {
             this.state.onlineGame,
           )
           if (loaded) sabaki.setState({activeWorkspace: 'board'})
-          this.setState({busy: false})
           return
         }
 
-        let result = await window.sabaki.ogs.connectGame(gameId)
+        let result = await onlineStore.connectGame(gameId, {manageBusy: false})
         this.syncController.resetConnectAttempt()
 
         if (result.ok) {
-          this.setState({
-            socket: result.state.socket,
-            matchmaking: result.state.matchmaking,
-            onlineGame: result.state.onlineGame,
-            activeGames: result.state.activeGames || this.state.activeGames,
-          })
           await this.syncController.syncOnlineGameToBoard(
             result.state.onlineGame,
           )
-        } else {
-          this.setState({
-            error: result.error?.message || t('Unable to connect to game.'),
-            onlineGame: result.state?.onlineGame || this.state.onlineGame,
-            activeGames: result.state?.activeGames || this.state.activeGames,
-          })
         }
       } catch (err) {
-        this.setState({error: t('Unable to connect to game.')})
+        onlineStore.setState({error: t('Unable to connect to game.')})
+      } finally {
+        onlineStore.setState({busy: false})
       }
-
-      this.setState({busy: false})
     }
 
     this.handleDisconnectGameButtonClick = async () => {
       let gameId = this.state.onlineGame?.gameId
       if (gameId == null) return
 
-      let result = await window.sabaki.ogs.disconnectGame(gameId)
+      let result = await onlineStore.disconnectGame(gameId)
 
       if (result.ok) {
-        this.setState({onlineGame: result.state.onlineGame})
         sabaki.detachOgsGame(gameId)
         this.syncController.resetSyncKey()
       }
@@ -194,77 +141,28 @@ export default class OgsPanel extends Component {
     }
 
     this.handleStartAutomatchButtonClick = async () => {
-      this.setState({busy: true, error: null})
-
-      try {
-        let result = await window.sabaki.ogs.startAutomatch()
-
-        if (result.ok) {
-          this.setState({
-            matchmaking: result.state.matchmaking,
-            socket: result.state.socket,
-          })
-        } else {
-          this.setState({
-            error: result.error?.message || t('Unable to start automatch.'),
-            matchmaking: result.state?.matchmaking || this.state.matchmaking,
-            socket: result.state?.socket || this.state.socket,
-          })
-        }
-      } catch (err) {
-        this.setState({error: t('Unable to start automatch.')})
-      }
-
-      this.setState({busy: false})
+      await onlineStore.startAutomatch()
     }
 
     this.handleCancelAutomatchButtonClick = async () => {
-      this.setState({busy: true, error: null})
-
-      try {
-        let result = await window.sabaki.ogs.cancelAutomatch()
-
-        if (result.ok) {
-          this.setState({
-            matchmaking: result.state.matchmaking,
-            socket: result.state.socket,
-          })
-        } else {
-          this.setState({
-            error: result.error?.message || t('Unable to cancel automatch.'),
-            matchmaking: result.state?.matchmaking || this.state.matchmaking,
-            socket: result.state?.socket || this.state.socket,
-          })
-        }
-      } catch (err) {
-        this.setState({error: t('Unable to cancel automatch.')})
-      }
-
-      this.setState({busy: false})
+      await onlineStore.cancelAutomatch()
     }
   }
 
   async updateMatchmakingOptions(options) {
-    this.setState({
-      matchmaking: {...this.state.matchmaking, options},
-    })
-
-    try {
-      let state = await window.sabaki.ogs.setMatchmakingOptions(options)
-
-      this.setState({
-        matchmaking: state.matchmaking,
-        socket: state.socket,
-      })
-    } catch (err) {}
+    await onlineStore.setMatchmakingOptions(options)
   }
 
   async componentDidMount() {
+    this.unsubscribeOnlineStore = onlineStore.subscribe((state) => {
+      this.setState(state)
+    })
     this.pollTimer = setInterval(() => this.refreshOgsState(), 2000)
     await this.refreshOgsState()
   }
 
   componentWillUnmount() {
+    this.unsubscribeOnlineStore?.()
     clearInterval(this.pollTimer)
   }
 
@@ -272,21 +170,12 @@ export default class OgsPanel extends Component {
     let state = null
 
     try {
-      state = await window.sabaki.ogs.getState()
+      state = await onlineStore.refresh()
     } catch (err) {
       return
     }
 
     if (state?.user != null) {
-      this.setState({
-        username: state.user.username || '',
-        user: state.user,
-        socket: state.socket,
-        matchmaking: state.matchmaking,
-        onlineGame: state.onlineGame,
-        activeGames: state.activeGames || [],
-        connected: true,
-      })
       await this.syncController.handleOnlineGameError(state.onlineGame)
 
       if (
@@ -301,9 +190,7 @@ export default class OgsPanel extends Component {
         )
         if (!opened)
           this.syncController.declinedOnlineGameId = state.onlineGame.gameId
-        await window.sabaki.ogs.acknowledgeAutomatchOpen(
-          state.onlineGame.gameId,
-        )
+        await onlineStore.acknowledgeAutomatchOpen(state.onlineGame.gameId)
       }
     }
   }
