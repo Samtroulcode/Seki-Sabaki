@@ -11,6 +11,7 @@ function createAnalysisApi(overrides = {}) {
   }
   let config = {
     analyzeSgfPath: 'analyze-sgf',
+    analyzeSgfStatus: 'path',
     katagoPath: '',
     katagoArguments: '',
     outputDirectory: '',
@@ -58,6 +59,7 @@ function createAnalysisApi(overrides = {}) {
       return {ok: true, state: analysisState}
     },
     showInFolder: async () => true,
+    openAnalyzedGame: async () => true,
     onStateChange: (callback) => {
       stateChangeCallback = callback
       return () => {
@@ -79,6 +81,7 @@ describe('AnalysisStore', () => {
 
     assert.strictEqual(typeof api.stateChangeCallback, 'function')
     assert.strictEqual(store.getState().config.maxVisits, 1600)
+    assert.strictEqual(store.getState().configDirty, false)
 
     api.stateChangeCallback({
       currentJob: {id: 'job-1', status: 'running'},
@@ -121,7 +124,38 @@ describe('AnalysisStore', () => {
     assert.strictEqual(store.getState().analysisState.currentJob.id, 'job-1')
   })
 
-  it('updates the output directory and refreshes results', async () => {
+  it('edits draft settings and starts only after applying them', async () => {
+    let receivedRequest = null
+    let api = createAnalysisApi({
+      start: async (request) => {
+        receivedRequest = request
+
+        return {
+          ok: true,
+          job: {id: 'job-1'},
+          state: {currentJob: null, queuedJobs: [], completedJobs: []},
+        }
+      },
+    })
+    let store = new AnalysisStore({analysis: () => api})
+
+    await store.initialize()
+    store.setSelectedInputPath('/tmp/game.sgf')
+    store.updateConfigDraft({katagoPath: '/usr/bin/katago'})
+
+    assert.strictEqual(store.getState().configDirty, true)
+    assert.strictEqual(await store.startAnalysis(), null)
+    assert.strictEqual(receivedRequest, null)
+
+    await store.applyConfig()
+    await store.startAnalysis()
+
+    assert.deepStrictEqual(receivedRequest, {
+      source: {type: 'file', path: '/tmp/game.sgf'},
+    })
+  })
+
+  it('updates output directory draft and refreshes results after apply', async () => {
     let refreshed = false
     let api = createAnalysisApi({
       listAnalyzedGames: async () => [{path: '/old/game.sgf'}],
@@ -135,11 +169,61 @@ describe('AnalysisStore', () => {
     await store.initialize()
     await store.selectOutputDirectory()
 
+    assert.strictEqual(
+      store.getState().draftConfig.outputDirectory,
+      '/tmp/analysis',
+    )
+    assert.strictEqual(store.getState().configDirty, true)
+    assert.strictEqual(refreshed, false)
+
+    await store.applyConfig()
+
     assert.strictEqual(store.getState().config.outputDirectory, '/tmp/analysis')
     assert.strictEqual(refreshed, true)
     assert.deepStrictEqual(store.getState().analyzedGames, [
       {path: '/tmp/analysis/game.sgf'},
     ])
+  })
+
+  it('reverts draft settings', async () => {
+    let store = new AnalysisStore({analysis: () => createAnalysisApi()})
+
+    await store.initialize()
+    store.updateConfigDraft({katagoPath: '/tmp/katago'})
+
+    assert.strictEqual(store.getState().configDirty, true)
+
+    store.resetConfigDraft()
+
+    assert.strictEqual(store.getState().draftConfig.katagoPath, '')
+    assert.strictEqual(store.getState().configDirty, false)
+  })
+
+  it('keeps dirty draft settings across refreshes', async () => {
+    let config = {
+      analyzeSgfPath: 'analyze-sgf',
+      analyzeSgfStatus: 'path',
+      katagoPath: '',
+      katagoArguments: '',
+      outputDirectory: '',
+      maxVisits: 1600,
+      rules: 'tromp-taylor',
+      komi: 7.5,
+    }
+    let api = createAnalysisApi({
+      getConfig: async () => config,
+    })
+    let store = new AnalysisStore({analysis: () => api})
+
+    await store.initialize()
+    store.updateConfigDraft({katagoPath: '/tmp/katago'})
+
+    config = {...config, outputDirectory: '/tmp/analysis'}
+    await store.refresh()
+
+    assert.strictEqual(store.getState().draftConfig.katagoPath, '/tmp/katago')
+    assert.strictEqual(store.getState().config.outputDirectory, '/tmp/analysis')
+    assert.strictEqual(store.getState().configDirty, true)
   })
 
   it('stores command errors for display', async () => {

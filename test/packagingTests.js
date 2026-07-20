@@ -14,6 +14,7 @@ import {dirname, join} from 'path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const mainSource = readFileSync(join(root, 'src', 'main.js'), 'utf8')
+const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
 describe('main-process module boundary', () => {
   it('main.js does not require renderer modules (src/modules, src/components)', () => {
@@ -30,5 +31,46 @@ describe('main-process module boundary', () => {
         ', ',
       )}. build.files excludes src/modules and src/components, so the packaged app would crash with "Cannot find module". Move that logic to a src-root main-process module (see src/argv.js).`,
     )
+  })
+})
+
+describe('analyze-sgf packaging', () => {
+  it('ships analyze-sgf resources without bundling KataGo', () => {
+    assert.deepStrictEqual(packageJson.build.extraResources, [
+      {from: 'build/analyze-sgf', to: 'analyze-sgf'},
+    ])
+    assert.strictEqual(packageJson.devDependencies['analyze-sgf'], '0.4.8')
+    assert.strictEqual(packageJson.dependencies.katago, undefined)
+  })
+
+  it('prepares analyze-sgf resources for supported platform targets', () => {
+    let prepareScript = readFileSync(
+      join(root, 'scripts', 'prepare-analyze-sgf-binaries.js'),
+      'utf8',
+    )
+
+    for (let resource of [
+      'linux-x64',
+      'linux-arm64',
+      'darwin-x64',
+      'darwin-arm64',
+      'win32-x64',
+      'win32-arm64',
+    ]) {
+      assert.match(prepareScript, new RegExp(`resource: '${resource}'`))
+    }
+  })
+
+  it('prepares analyze-sgf before packaged builds', () => {
+    for (let scriptName of [
+      'build',
+      'dist:macos',
+      'dist:linux',
+      'dist:flatpak',
+      'dist:win64',
+      'dist:win64-portable',
+    ]) {
+      assert.match(packageJson.scripts[scriptName], /prepare:analyze-sgf/)
+    }
   })
 })

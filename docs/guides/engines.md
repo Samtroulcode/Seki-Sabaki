@@ -46,3 +46,19 @@ List of this parameters can be found in engine documentation.
   level of expert players.
 
   Arguments: None
+
+## SGF analysis jobs
+
+Seki-Sabaki can run batch SGF analysis from the Analysis Manager. Packaged
+releases include the `analyze-sgf` helper, so you don't need to install it
+separately.
+
+KataGo is not bundled. Install KataGo separately, then configure:
+
+- KataGo executable: path to the `katago` binary
+- KataGo arguments: for example
+  `analysis -model /path/to/model.bin.gz -config /path/to/analysis.cfg`
+- Output folder: destination for analyzed SGF files
+
+Click **Apply settings**, choose an SGF file, then click **Start analysis**. The
+KataGo path, arguments, and output folder are saved for future sessions.

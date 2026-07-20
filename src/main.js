@@ -366,8 +366,10 @@ function setupIpcHandlers() {
   })
 
   setupSgfAnalysisIpcHandlers(ipcMain, undefined, {
+    app,
     dialog,
     shell,
+    setting,
     sendStateChange: (state) => {
       BrowserWindow.getAllWindows().forEach((win) => {
         win.webContents.send('analysis:stateChange', state)

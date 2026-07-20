@@ -1,8 +1,18 @@
 import assert from 'assert'
 
-import {setupSgfAnalysisIpcHandlers} from '../src/sgfanalysis.js'
+import {
+  createSgfAnalysisService,
+  filterUserSgfAnalysisConfig,
+  setupSgfAnalysisIpcHandlers,
+} from '../src/sgfanalysis.js'
 
-function setup({service, dialog = null, shell = null, sendStateChange = null}) {
+function setup({
+  service,
+  dialog = null,
+  shell = null,
+  setting = null,
+  sendStateChange = null,
+}) {
   let handlers = {}
   let ipcMain = {
     handle: (name, handler) => {
@@ -13,6 +23,7 @@ function setup({service, dialog = null, shell = null, sendStateChange = null}) {
   setupSgfAnalysisIpcHandlers(ipcMain, service, {
     dialog,
     shell,
+    setting,
     sendStateChange,
   })
 
@@ -175,5 +186,64 @@ describe('SGF analysis IPC handlers', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     assert.deepStrictEqual(states, [{currentJob: {id: 'last'}}])
+  })
+
+  it('filters renderer config to user-owned settings', () => {
+    assert.deepStrictEqual(
+      filterUserSgfAnalysisConfig({
+        analyzeSgfPath: '/tmp/evil',
+        katagoPath: '/usr/bin/katago',
+        katagoArguments: 'analysis',
+        outputDirectory: '/analysis',
+        maxVisits: 1,
+      }),
+      {
+        katagoPath: '/usr/bin/katago',
+        katagoArguments: 'analysis',
+        outputDirectory: '/analysis',
+      },
+    )
+  })
+
+  it('initializes and persists user analysis settings', () => {
+    let values = {
+      'analysis.katago_path': '/bin/sh',
+      'analysis.katago_arguments': 'analysis -model model.bin.gz',
+      'analysis.output_directory': '/tmp',
+    }
+    let setCalls = []
+    let setting = {
+      get: (key) => values[key],
+      set: (key, value) => {
+        setCalls.push([key, value])
+        values[key] = value
+        return setting
+      },
+    }
+
+    let service = createSgfAnalysisService({
+      app: {isPackaged: false},
+      setting,
+    })
+
+    assert.strictEqual(service.getConfig().katagoPath, '/bin/sh')
+
+    let handlers = setup({service, dialog: null, shell: null, setting})
+    handlers['analysis:setConfig'](
+      {},
+      {
+        analyzeSgfPath: '/tmp/ignored',
+        katagoPath: '/bin/sh',
+        katagoArguments: 'analysis -model next.bin.gz',
+        outputDirectory: '/tmp',
+      },
+    )
+
+    assert.strictEqual(service.getConfig().analyzeSgfPath, 'analyze-sgf')
+    assert.deepStrictEqual(setCalls, [
+      ['analysis.katago_path', '/bin/sh'],
+      ['analysis.katago_arguments', 'analysis -model next.bin.gz'],
+      ['analysis.output_directory', '/tmp'],
+    ])
   })
 })

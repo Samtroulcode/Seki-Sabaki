@@ -30,6 +30,17 @@ To start Sabaki while in development, use the start command:
 $ npm start
 ```
 
+Packaged builds run the following command before Electron Builder:
+
+```
+$ npm run prepare:analyze-sgf
+```
+
+This creates platform-specific `analyze-sgf` helper binaries under
+`build/analyze-sgf/` and ships them as packaged resources. Run `npm install`
+first so the `analyze-sgf` dependency and `pkg` are available. KataGo is not
+bundled and remains user-configured.
+
 You can build Sabaki binaries with Electron by using:
 
 ```

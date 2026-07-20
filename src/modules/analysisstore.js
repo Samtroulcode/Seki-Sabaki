@@ -10,6 +10,8 @@ export function createInitialAnalysisStoreState() {
       completedJobs: [],
     },
     config: null,
+    draftConfig: null,
+    configDirty: false,
     analyzedGames: [],
     selectedInputPath: '',
     busy: false,
@@ -86,7 +88,16 @@ export class AnalysisStore {
         this.analysis().listAnalyzedGames(),
       ])
 
-      this.setState({analysisState, config, analyzedGames, busy: false})
+      let configDirty = this.state.configDirty
+
+      this.setState({
+        analysisState,
+        config,
+        draftConfig: configDirty ? this.state.draftConfig : config,
+        configDirty,
+        analyzedGames,
+        busy: false,
+      })
 
       return {analysisState, config, analyzedGames}
     } catch (err) {
@@ -133,7 +144,10 @@ export class AnalysisStore {
         return null
       }
 
-      return await this.updateConfig({outputDirectory})
+      this.updateConfigDraft({outputDirectory})
+      this.setState({busy: false})
+
+      return outputDirectory
     } catch (err) {
       this.setState({
         busy: false,
@@ -143,9 +157,29 @@ export class AnalysisStore {
     }
   }
 
-  async updateConfig(change) {
-    let config = {...(this.state.config || {}), ...change}
-    this.setState({busy: true, error: null, config})
+  updateConfigDraft(change) {
+    let draftConfig = {...(this.state.draftConfig || {}), ...change}
+    this.setState({
+      draftConfig,
+      configDirty: !configsEqual(draftConfig, this.state.config),
+      error: null,
+    })
+  }
+
+  resetConfigDraft() {
+    this.setState({
+      draftConfig: this.state.config,
+      configDirty: false,
+      error: null,
+    })
+  }
+
+  async applyConfig() {
+    let config = this.state.draftConfig || {}
+    let outputDirectoryChanged =
+      config.outputDirectory !== this.state.config?.outputDirectory
+
+    this.setState({busy: true, error: null})
 
     try {
       let result = await this.analysis().setConfig(config)
@@ -153,11 +187,17 @@ export class AnalysisStore {
       if (result?.ok) {
         let analyzedGames = this.state.analyzedGames
 
-        if (Object.prototype.hasOwnProperty.call(change, 'outputDirectory')) {
+        if (outputDirectoryChanged) {
           analyzedGames = await this.analysis().refreshAnalyzedGames()
         }
 
-        this.setState({busy: false, config: result.config, analyzedGames})
+        this.setState({
+          busy: false,
+          config: result.config,
+          draftConfig: result.config,
+          configDirty: false,
+          analyzedGames,
+        })
       } else {
         this.setState({
           busy: false,
@@ -178,7 +218,7 @@ export class AnalysisStore {
 
   async startAnalysis() {
     let path = this.state.selectedInputPath.trim()
-    if (path === '') return null
+    if (path === '' || this.state.configDirty) return null
 
     this.setState({busy: true, error: null})
 
@@ -280,6 +320,10 @@ function getErrorMessage(err, fallback) {
   return typeof err?.message === 'string' && err.message !== ''
     ? err.message
     : fallback
+}
+
+function configsEqual(left, right) {
+  return JSON.stringify(left || {}) === JSON.stringify(right || {})
 }
 
 function cloneObject(value) {

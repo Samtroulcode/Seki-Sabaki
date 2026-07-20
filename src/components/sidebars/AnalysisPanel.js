@@ -33,13 +33,18 @@ export default class AnalysisPanel extends Component {
       await analysisStore.selectOutputDirectory()
     }
 
-    this.handleConfigInput = async (evt) => {
+    this.handleConfigInput = (evt) => {
       let {name, value} = evt.currentTarget
 
-      if (name === 'maxVisits') value = Number.parseInt(value, 10)
-      if (name === 'komi') value = Number.parseFloat(value)
+      analysisStore.updateConfigDraft({[name]: value})
+    }
 
-      await analysisStore.updateConfig({[name]: value})
+    this.handleApplyConfig = async () => {
+      await analysisStore.applyConfig()
+    }
+
+    this.handleResetConfig = () => {
+      analysisStore.resetConfigDraft()
     }
 
     this.handleOpenGame = async (path) => {
@@ -84,12 +89,21 @@ export default class AnalysisPanel extends Component {
   }
 
   render(_, state) {
-    let {analysisState, config, analyzedGames, selectedInputPath, busy, error} =
-      state
+    let {
+      analysisState,
+      config,
+      draftConfig,
+      configDirty,
+      analyzedGames,
+      selectedInputPath,
+      busy,
+      error,
+    } = state
     let currentJob = analysisState?.currentJob || null
     let queuedJobs = analysisState?.queuedJobs || []
     let configMissing = getMissingConfigFields(config).length > 0
-    let canStart = !busy && !configMissing && selectedInputPath.trim() !== ''
+    let canStart =
+      !busy && !configMissing && !configDirty && selectedInputPath.trim() !== ''
 
     return h(
       'section',
@@ -146,12 +160,16 @@ export default class AnalysisPanel extends Component {
           canStart,
           configMissing,
           config,
+          draftConfig,
+          configDirty,
           selectedInputPath,
           onInputPathChange: this.handleInputPathChange,
           onSelectInputFile: this.handleSelectInputFile,
           onStartAnalysis: this.handleStartAnalysis,
           onOutputDirectoryClick: this.handleOutputDirectoryButtonClick,
           onConfigInput: this.handleConfigInput,
+          onApplyConfig: this.handleApplyConfig,
+          onResetConfig: this.handleResetConfig,
         }),
         h(QueueCard, {analysisState, busy}),
         h(ResultsCard, {
@@ -169,12 +187,16 @@ function SourceCard({
   canStart,
   configMissing,
   config,
+  draftConfig,
+  configDirty,
   selectedInputPath,
   onInputPathChange,
   onSelectInputFile,
   onStartAnalysis,
   onOutputDirectoryClick,
   onConfigInput,
+  onApplyConfig,
+  onResetConfig,
 }) {
   return h(
     'section',
@@ -211,15 +233,46 @@ function SourceCard({
         {class: 'analysis-warning'},
         t('Configure KataGo and an output folder before starting.'),
       ),
-    h(ConfigSummary, {config, busy, onOutputDirectoryClick, onConfigInput}),
+    configDirty &&
+      h(
+        'p',
+        {class: 'analysis-warning'},
+        t('Apply settings before starting analysis.'),
+      ),
+    h(ConfigSummary, {
+      config,
+      draftConfig,
+      configDirty,
+      busy,
+      onOutputDirectoryClick,
+      onConfigInput,
+      onApplyConfig,
+      onResetConfig,
+    }),
   )
 }
 
-function ConfigSummary({config, busy, onOutputDirectoryClick, onConfigInput}) {
+function ConfigSummary({
+  config,
+  draftConfig,
+  configDirty,
+  busy,
+  onOutputDirectoryClick,
+  onConfigInput,
+  onApplyConfig,
+  onResetConfig,
+}) {
+  let displayedConfig = draftConfig || config || {}
+
   return h(
     'div',
     {class: 'analysis-config'},
     h('h4', {}, t('Settings')),
+    h(
+      'p',
+      {class: 'analysis-bundled-tool'},
+      getAnalyzerStatusLabel(config?.analyzeSgfStatus),
+    ),
     h(
       'label',
       {},
@@ -227,9 +280,9 @@ function ConfigSummary({config, busy, onOutputDirectoryClick, onConfigInput}) {
       h('input', {
         type: 'text',
         name: 'katagoPath',
-        value: config?.katagoPath || '',
+        value: displayedConfig.katagoPath || '',
         placeholder: t('Path to katago'),
-        onChange: onConfigInput,
+        onInput: onConfigInput,
       }),
     ),
     h(
@@ -239,9 +292,9 @@ function ConfigSummary({config, busy, onOutputDirectoryClick, onConfigInput}) {
       h('input', {
         type: 'text',
         name: 'katagoArguments',
-        value: config?.katagoArguments || '',
+        value: displayedConfig.katagoArguments || '',
         placeholder: t('analysis -config ... -model ...'),
-        onChange: onConfigInput,
+        onInput: onConfigInput,
       }),
     ),
     h(
@@ -251,42 +304,36 @@ function ConfigSummary({config, busy, onOutputDirectoryClick, onConfigInput}) {
       h('input', {
         type: 'text',
         name: 'outputDirectory',
-        value: config?.outputDirectory || '',
+        value: displayedConfig.outputDirectory || '',
         placeholder: t('Folder for analyzed SGF files'),
-        onChange: onConfigInput,
+        onInput: onConfigInput,
       }),
     ),
     h(
-      'button',
-      {type: 'button', disabled: busy, onClick: onOutputDirectoryClick},
-      t('Choose output folder...'),
-    ),
-    h(
       'div',
-      {class: 'analysis-config-inline'},
+      {class: 'analysis-actions'},
       h(
-        'label',
-        {},
-        h('span', {}, t('Visits')),
-        h('input', {
-          type: 'number',
-          min: '1',
-          name: 'maxVisits',
-          value: config?.maxVisits || 1600,
-          onChange: onConfigInput,
-        }),
+        'button',
+        {type: 'button', disabled: busy, onClick: onOutputDirectoryClick},
+        t('Choose output folder...'),
       ),
       h(
-        'label',
-        {},
-        h('span', {}, t('Komi')),
-        h('input', {
-          type: 'number',
-          step: '0.5',
-          name: 'komi',
-          value: config?.komi ?? 7.5,
-          onChange: onConfigInput,
-        }),
+        'button',
+        {
+          type: 'button',
+          disabled: busy || !configDirty,
+          onClick: onApplyConfig,
+        },
+        t('Apply settings'),
+      ),
+      h(
+        'button',
+        {
+          type: 'button',
+          disabled: busy || !configDirty,
+          onClick: onResetConfig,
+        },
+        t('Revert'),
       ),
     ),
   )
@@ -448,6 +495,13 @@ function getStatusLabel({currentJob, queuedJobs, configMissing}) {
   }
 
   return t('Idle')
+}
+
+function getAnalyzerStatusLabel(status) {
+  if (status === 'bundled') return t('SGF analyzer: bundled with Seki-Sabaki.')
+  if (status === 'path') return t('SGF analyzer: available from PATH.')
+
+  return t('SGF analyzer: missing from bundled resources.')
 }
 
 function getJobTitle(job) {

@@ -2,12 +2,26 @@ const {resolve} = require('path')
 const {BrowserWindow} = require('electron')
 
 const {SgfAnalysisService} = require('./modules/sgfanalysisservice.js')
+const {
+  getAnalyzeSgfStatus,
+  resolveAnalyzeSgfPath,
+} = require('./sgfanalysisbinary.js')
+
+const USER_CONFIG_KEYS = ['katagoPath', 'katagoArguments', 'outputDirectory']
 
 function setupSgfAnalysisIpcHandlers(
   ipcMain,
-  service = new SgfAnalysisService(),
-  {dialog = null, shell = null, sendStateChange = null} = {},
+  service = null,
+  {
+    app = null,
+    dialog = null,
+    shell = null,
+    setting = null,
+    sendStateChange = null,
+  } = {},
 ) {
+  if (service == null) service = createSgfAnalysisService({app, setting})
+
   if (typeof sendStateChange === 'function') {
     let scheduledStateChange = false
     let latestState = null
@@ -36,7 +50,12 @@ function setupSgfAnalysisIpcHandlers(
 
   ipcMain.handle('analysis:setConfig', (evt, config) => {
     try {
-      return {ok: true, config: service.setConfig(config || {})}
+      let nextConfig = service.setConfig(
+        filterUserSgfAnalysisConfig(config || {}),
+      )
+      persistUserSgfAnalysisConfig(setting, nextConfig)
+
+      return {ok: true, config: nextConfig}
     } catch (err) {
       return {ok: false, error: serializeError(err)}
     }
@@ -110,6 +129,44 @@ function setupSgfAnalysisIpcHandlers(
   return service
 }
 
+function createSgfAnalysisService({app = null, setting = null} = {}) {
+  let analyzeSgfPath = resolveAnalyzeSgfPath({
+    isPackaged: app?.isPackaged === true,
+  })
+  let config = {
+    analyzeSgfPath,
+    analyzeSgfStatus: getAnalyzeSgfStatus({analyzeSgfPath}),
+    ...loadUserSgfAnalysisConfig(setting),
+  }
+
+  return new SgfAnalysisService({config})
+}
+
+function loadUserSgfAnalysisConfig(setting) {
+  if (setting == null || typeof setting.get !== 'function') return {}
+
+  return {
+    katagoPath: setting.get('analysis.katago_path') || '',
+    katagoArguments: setting.get('analysis.katago_arguments') || '',
+    outputDirectory: setting.get('analysis.output_directory') || '',
+  }
+}
+
+function persistUserSgfAnalysisConfig(setting, config) {
+  if (setting == null || typeof setting.set !== 'function') return
+
+  setting
+    .set('analysis.katago_path', config.katagoPath || '')
+    .set('analysis.katago_arguments', config.katagoArguments || '')
+    .set('analysis.output_directory', config.outputDirectory || '')
+}
+
+function filterUserSgfAnalysisConfig(config) {
+  return Object.fromEntries(
+    Object.entries(config).filter(([key]) => USER_CONFIG_KEYS.includes(key)),
+  )
+}
+
 function getWindow(evt) {
   return BrowserWindow?.fromWebContents?.(evt.sender) ?? null
 }
@@ -134,6 +191,10 @@ function serializeError(err) {
 }
 
 module.exports = {
+  createSgfAnalysisService,
+  filterUserSgfAnalysisConfig,
+  loadUserSgfAnalysisConfig,
+  persistUserSgfAnalysisConfig,
   setupSgfAnalysisIpcHandlers,
   serializeError,
 }

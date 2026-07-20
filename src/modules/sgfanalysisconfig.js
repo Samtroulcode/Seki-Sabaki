@@ -5,6 +5,7 @@ const ANNOTATION_STYLES = ['auto', 'legacy', 'classification', 'none']
 function createDefaultSgfAnalysisConfig() {
   return {
     analyzeSgfPath: 'analyze-sgf',
+    analyzeSgfStatus: 'path',
     katagoPath: '',
     katagoArguments: '',
     outputDirectory: '',

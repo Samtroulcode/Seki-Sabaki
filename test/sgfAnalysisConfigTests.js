@@ -23,6 +23,7 @@ describe('SGF analysis config', () => {
   it('defines Seki defaults for analyze-sgf integration', () => {
     assert.deepStrictEqual(createDefaultSgfAnalysisConfig(), {
       analyzeSgfPath: 'analyze-sgf',
+      analyzeSgfStatus: 'path',
       katagoPath: '',
       katagoArguments: '',
       outputDirectory: '',

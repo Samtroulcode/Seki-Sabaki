@@ -42,8 +42,31 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Configure KataGo and an output folder before starting.',
     )
+    await expect(page.locator('#analysis-dashboard')).toContainText(
+      'SGF analyzer:',
+    )
+    await expect(
+      page.locator('#analysis-dashboard input[name="analyzeSgfPath"]'),
+    ).toHaveCount(0)
+    await expect(
+      page.locator('#analysis-dashboard input[name="maxVisits"]'),
+    ).toHaveCount(0)
+    await expect(
+      page.locator('#analysis-dashboard input[name="komi"]'),
+    ).toHaveCount(0)
     await expect(
       page.getByRole('button', {name: 'Start analysis'}),
     ).toBeDisabled()
+    await expect(
+      page.getByRole('button', {name: 'Apply settings'}),
+    ).toBeDisabled()
+
+    await page.locator('input[name="katagoPath"]').fill('/tmp/katago')
+    await expect(
+      page.getByRole('button', {name: 'Apply settings'}),
+    ).toBeEnabled()
+    await expect(page.locator('#analysis-dashboard')).toContainText(
+      'Apply settings before starting analysis.',
+    )
   })
 })
