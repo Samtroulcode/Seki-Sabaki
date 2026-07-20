@@ -56,4 +56,44 @@ describe('OGS clock display', () => {
     assert.strictEqual(view.black.label, '0:25')
     assert.strictEqual(view.white.label, '5:00')
   })
+
+  it('freezes the active clock while a move is submitting', () => {
+    let clock = {
+      currentPlayer: 7,
+      expiration: 1060000,
+      now: 1000000,
+      receivedAt: 5000,
+      blackTime: {thinkingTime: 120},
+      whiteTime: {thinkingTime: 90},
+    }
+
+    let view = getOgsClockView(clock, {black: {id: 7}, white: {id: 8}}, 35000, {
+      freezeActive: true,
+      freezeAt: 15000,
+    })
+
+    assert.strictEqual(view.black.active, true)
+    assert.strictEqual(view.black.label, '0:50')
+    assert.strictEqual(view.black.detail, 'Submitting move')
+    assert.strictEqual(view.white.label, '1:30')
+  })
+
+  it('does not rewind clock snapshots received after submission began', () => {
+    let clock = {
+      currentPlayer: 7,
+      expiration: 1060000,
+      now: 1020000,
+      receivedAt: 25000,
+      blackTime: {thinkingTime: 120},
+      whiteTime: {thinkingTime: 90},
+    }
+
+    let view = getOgsClockView(clock, {black: {id: 7}, white: {id: 8}}, 35000, {
+      freezeActive: true,
+      freezeAt: 15000,
+    })
+
+    assert.strictEqual(view.black.label, '0:40')
+    assert.strictEqual(view.black.detail, 'Submitting move')
+  })
 })

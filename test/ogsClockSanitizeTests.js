@@ -1,8 +1,10 @@
 import assert from 'assert'
 
 import {
+  advanceClockSequence,
   isCurrentClock,
   isFutureClock,
+  reduceClockSequence,
   sanitizeClock,
   sanitizeClockPause,
   sanitizeClockTime,
@@ -106,5 +108,60 @@ describe('OGS clock sanitize helpers', () => {
     assert.strictEqual(isCurrentClock({lastMove: 2}, 2), true)
     assert.strictEqual(isCurrentClock({lastMove: 1}, 2), false)
     assert.strictEqual(isCurrentClock({lastMove: null}, 2), true)
+  })
+
+  it('applies, buffers, and ignores sequenced clock updates', () => {
+    let currentClock = {lastMove: 2, currentPlayer: 7}
+    let pendingClocks = new Map([[4, {lastMove: 4, currentPlayer: 7}]])
+
+    let result = reduceClockSequence({
+      currentClock,
+      pendingClocks,
+      moveCount: 2,
+      incomingClock: {lastMove: 3, currentPlayer: 8},
+    })
+
+    assert.strictEqual(result.action, 'buffered')
+    assert.strictEqual(result.clock, currentClock)
+    assert.strictEqual(result.pendingClocks.get(3).currentPlayer, 8)
+    assert.strictEqual(pendingClocks.has(3), false)
+
+    result = reduceClockSequence({
+      currentClock,
+      pendingClocks: result.pendingClocks,
+      moveCount: 2,
+      incomingClock: {lastMove: 1, currentPlayer: 8},
+    })
+
+    assert.strictEqual(result.action, 'ignored')
+    assert.strictEqual(result.clock, currentClock)
+
+    result = reduceClockSequence({
+      currentClock,
+      pendingClocks: result.pendingClocks,
+      moveCount: 2,
+      incomingClock: {lastMove: 2, currentPlayer: 8},
+    })
+
+    assert.strictEqual(result.action, 'applied')
+    assert.deepStrictEqual(result.clock, {lastMove: 2, currentPlayer: 8})
+  })
+
+  it('advances buffered clocks and purges stale clock updates', () => {
+    let result = advanceClockSequence({
+      currentClock: {lastMove: 2, currentPlayer: 7},
+      pendingClocks: new Map([
+        [1, {lastMove: 1, currentPlayer: 7}],
+        [3, {lastMove: 3, currentPlayer: 8}],
+        [4, {lastMove: 4, currentPlayer: 7}],
+      ]),
+      moveCount: 3,
+    })
+
+    assert.strictEqual(result.action, 'applied')
+    assert.deepStrictEqual(result.clock, {lastMove: 3, currentPlayer: 8})
+    assert.strictEqual(result.pendingClocks.has(1), false)
+    assert.strictEqual(result.pendingClocks.has(3), false)
+    assert.strictEqual(result.pendingClocks.has(4), true)
   })
 })

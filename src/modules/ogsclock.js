@@ -1,14 +1,35 @@
-export function getOgsClockView(clock, players = {}, now = Date.now()) {
+export function getOgsClockView(
+  clock,
+  players = {},
+  now = Date.now(),
+  options = {},
+) {
   return {
-    black: getPlayerClockView(clock, players.black?.id, clock?.blackTime, now),
-    white: getPlayerClockView(clock, players.white?.id, clock?.whiteTime, now),
+    black: getPlayerClockView(
+      clock,
+      players.black?.id,
+      clock?.blackTime,
+      now,
+      options,
+    ),
+    white: getPlayerClockView(
+      clock,
+      players.white?.id,
+      clock?.whiteTime,
+      now,
+      options,
+    ),
   }
 }
 
-function getPlayerClockView(clock, playerId, time, now) {
+function getPlayerClockView(clock, playerId, time, now, options) {
   let active = clock?.currentPlayer != null && clock.currentPlayer === playerId
   let paused = clock?.pause?.paused === true
-  let remaining = getRemainingMilliseconds(clock, time, active, now)
+  let freezeActive = options.freezeActive === true && active
+  let remaining = getRemainingMilliseconds(clock, time, active, now, {
+    freezeActive,
+    freezeAt: options.freezeAt,
+  })
 
   return {
     active,
@@ -17,19 +38,23 @@ function getPlayerClockView(clock, playerId, time, now) {
     label: remaining == null ? '—' : formatClockDuration(remaining),
     detail: getClockDetail(time, {
       paused,
+      submitting: freezeActive,
       stoneRemoval: clock?.stoneRemovalMode,
     }),
   }
 }
 
-function getRemainingMilliseconds(clock, time, active, now) {
+function getRemainingMilliseconds(clock, time, active, now, options = {}) {
   if (
     active &&
     clock?.expiration != null &&
     clock?.pause?.paused !== true &&
     clock?.stoneRemovalMode !== true
   ) {
-    let serverNow = getServerNow(clock, now)
+    let clockNow = options.freezeActive
+      ? Math.max(options.freezeAt || now, clock.receivedAt || 0)
+      : now
+    let serverNow = getServerNow(clock, clockNow)
     return Math.max(0, clock.expiration - serverNow)
   }
 
@@ -56,8 +81,9 @@ function getServerNow(clock, now) {
   return clock.now + (now - clock.receivedAt)
 }
 
-function getClockDetail(time, {paused, stoneRemoval}) {
+function getClockDetail(time, {paused, submitting, stoneRemoval}) {
   if (stoneRemoval === true) return 'Stone removal'
+  if (submitting === true) return 'Submitting move'
   if (paused === true) return 'Paused'
   if (time?.periods != null && time.periodTime != null) {
     return `${time.periods} × ${formatClockDuration(time.periodTime * 1000)}`

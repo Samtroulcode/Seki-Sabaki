@@ -163,7 +163,11 @@ export default class OgsGameContextPanel extends Component {
       game?.status === 'connected' &&
       (game.phase === 'stone removal' || game.clock?.stoneRemovalMode === true)
     let captures = getOgsCaptures(game)
-    let clockView = getOgsClockView(game?.clock, game?.players)
+    let pendingMove = sabaki.ogsPendingMove?.gameId === game?.gameId
+    let clockView = getOgsClockView(game?.clock, game?.players, Date.now(), {
+      freezeActive: pendingMove,
+      freezeAt: sabaki.ogsPendingMove?.submittedAt,
+    })
 
     return h(
       'div',
@@ -430,38 +434,9 @@ function withOptimisticPendingMove(game) {
 
   if (game == null || pendingMove?.gameId !== game.gameId) return game
 
-  let players = game.players || {}
-  let currentPlayer = game.clock?.currentPlayer
-  let nextCurrentPlayer =
-    currentPlayer === players.black?.id
-      ? players.white?.id
-      : currentPlayer === players.white?.id
-        ? players.black?.id
-        : getOpponentFromMoveNumber(pendingMove.moveNumber, game)
-
   return {
     ...game,
     pendingMove: true,
     moveCount: Math.max(game.moveCount || 0, pendingMove.moveNumber),
-    clock:
-      game.clock == null
-        ? {currentPlayer: nextCurrentPlayer}
-        : {...game.clock, currentPlayer: nextCurrentPlayer},
   }
-}
-
-function getOpponentFromMoveNumber(moveNumber, game) {
-  let blackId = game.players?.black?.id
-  let whiteId = game.players?.white?.id
-  if (blackId == null || whiteId == null) return null
-
-  let firstPlayer = game.handicap > 1 ? whiteId : blackId
-  let movePlayer =
-    moveNumber % 2 === 1
-      ? firstPlayer
-      : firstPlayer === blackId
-        ? whiteId
-        : blackId
-
-  return movePlayer === blackId ? whiteId : blackId
 }

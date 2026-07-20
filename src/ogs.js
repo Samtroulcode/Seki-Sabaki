@@ -46,7 +46,12 @@ const {
   sanitizePlayer,
 } = require('./ogs/users.js')
 const {ratingToRank} = require('./ogs/ranks.js')
-const {sanitizeClock, isFutureClock, isCurrentClock} = require('./ogs/clock.js')
+const {
+  sanitizeClock,
+  isCurrentClock,
+  reduceClockSequence,
+  advanceClockSequence,
+} = require('./ogs/clock.js')
 const {
   sanitizeHistoricalMoves,
   sanitizeLiveMove,
@@ -998,45 +1003,33 @@ class OgsClient {
   }
 
   applyClock(clock) {
-    if (isFutureClock(clock, this.onlineGame.moveCount)) {
-      this.pendingClocks.set(clock.lastMove, clock)
-      this.onlineGame = {
-        ...this.onlineGame,
-        status: 'connected',
-        error: null,
-      }
-      return
-    }
+    let result = reduceClockSequence({
+      currentClock: this.onlineGame.clock,
+      pendingClocks: this.pendingClocks,
+      moveCount: this.onlineGame.moveCount,
+      incomingClock: clock,
+    })
 
-    if (!isCurrentClock(clock, this.onlineGame.moveCount)) {
-      this.onlineGame = {
-        ...this.onlineGame,
-        status: 'connected',
-        error: null,
-      }
-      return
-    }
-
-    this.pendingClocks.delete(clock?.lastMove)
+    this.pendingClocks = result.pendingClocks
     this.onlineGame = {
       ...this.onlineGame,
       status: 'connected',
-      clock,
+      clock: result.clock,
       error: null,
     }
   }
 
   applyPendingClock() {
-    for (let lastMove of this.pendingClocks.keys()) {
-      if (lastMove < this.onlineGame.moveCount)
-        this.pendingClocks.delete(lastMove)
+    let result = advanceClockSequence({
+      currentClock: this.onlineGame.clock,
+      pendingClocks: this.pendingClocks,
+      moveCount: this.onlineGame.moveCount,
+    })
+
+    this.pendingClocks = result.pendingClocks
+    if (result.action === 'applied') {
+      this.onlineGame = {...this.onlineGame, clock: result.clock}
     }
-
-    let clock = this.pendingClocks.get(this.onlineGame.moveCount)
-    if (clock == null) return
-
-    this.pendingClocks.delete(this.onlineGame.moveCount)
-    this.onlineGame = {...this.onlineGame, clock}
   }
 
   upsertActiveGame(payload) {

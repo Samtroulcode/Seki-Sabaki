@@ -1634,6 +1634,7 @@ class Sabaki extends EventEmitter {
         gameId,
         move: optimisticMove,
         moveNumber: this.getOgsLocalMoves().length + 1,
+        submittedAt: Date.now(),
       }
       this.ogsPendingMove = pendingMove
       let ogsLineEnd = this.getOgsBoardLineEnd()
@@ -1701,6 +1702,7 @@ class Sabaki extends EventEmitter {
         gameId,
         move: '..',
         moveNumber: this.getOgsLocalMoves().length + 1,
+        submittedAt: Date.now(),
       }
       this.ogsPendingMove = pendingMove
       let ogsLineEnd = this.getOgsBoardLineEnd()
