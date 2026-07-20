@@ -26,6 +26,10 @@ import * as gtplogger from '../modules/gtplogger.js'
 import * as helper from '../modules/helper.js'
 import * as utils from '../modules/utils.js'
 import onlineStore from '../modules/onlinestore.js'
+import {
+  OgsOnlineController,
+  configureOgsOnlineController,
+} from '../modules/ogsonlinecontroller.js'
 
 if (process.env.SABAKI_E2E) window.__sabaki = sabaki
 
@@ -40,6 +44,9 @@ const t = i18n.context('App')
 
 const leftSidebarMinWidth = setting.get('view.sidebar_minwidth')
 const sidebarMinWidth = setting.get('view.leftsidebar_minwidth')
+const ogsOnlineController = configureOgsOnlineController(
+  new OgsOnlineController({store: onlineStore, sabaki}),
+)
 
 fixPath()
 const portableDir = process.env.PORTABLE_EXECUTABLE_DIR
@@ -63,6 +70,7 @@ class App extends Component {
 
   componentDidMount() {
     gtplogger.updatePath()
+    ogsOnlineController.initialize()
     onlineStore.initialize()
 
     window.addEventListener('contextmenu', (evt) => {

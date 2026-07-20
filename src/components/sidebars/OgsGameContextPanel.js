@@ -4,7 +4,6 @@ import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
 import * as gametree from '../../modules/gametree.js'
 import {getOgsClockView} from '../../modules/ogsclock.js'
-import OgsPanelSyncController from '../../modules/ogspanelsync.js'
 import onlineStore from '../../modules/onlinestore.js'
 
 const t = i18n.context('OgsGameContextPanel')
@@ -22,19 +21,13 @@ export default class OgsGameContextPanel extends Component {
       chatBody: '',
       revision: 0,
     }
-    this.syncController = new OgsPanelSyncController({sabaki})
-
     this.handleSabakiChange = () => {
       this.setState(({revision}) => ({revision: revision + 1}))
     }
 
-    this.handleOnlineStoreState = (state) => {
-      this.enqueueOgsState(state)
-    }
+    this.handleOnlineStoreState = (state) => this.applyOgsState(state)
 
     this.lastFallbackRefreshAt = 0
-    this.handlingOgsState = false
-    this.pendingOgsState = null
 
     this.handlePassButtonClick = async () => {
       let {onPass = () => {}} = this.props
@@ -131,7 +124,6 @@ export default class OgsGameContextPanel extends Component {
 
   async componentDidUpdate(prevProps) {
     if (prevProps.onlineGameId !== this.props.onlineGameId) {
-      this.syncController.resetConnectAttempt()
       await this.refreshOgsState()
     }
   }
@@ -157,22 +149,6 @@ export default class OgsGameContextPanel extends Component {
     this.lastFallbackRefreshAt = Date.now()
   }
 
-  async enqueueOgsState(state) {
-    this.pendingOgsState = state
-    if (this.handlingOgsState) return
-
-    this.handlingOgsState = true
-    try {
-      while (this.pendingOgsState != null) {
-        let nextState = this.pendingOgsState
-        this.pendingOgsState = null
-        await this.applyOgsState(nextState)
-      }
-    } finally {
-      this.handlingOgsState = false
-    }
-  }
-
   async refreshOgsStateIfDue() {
     let now = Date.now()
     if (hasOgsStateChangeEvents() && now - this.lastFallbackRefreshAt < 60000) {
@@ -183,24 +159,13 @@ export default class OgsGameContextPanel extends Component {
     await this.refreshOgsState()
   }
 
-  async applyOgsState(state) {
+  applyOgsState(state) {
     this.setState({
       user: state?.user || null,
       network: state?.network || null,
       onlineGame: state?.onlineGame || null,
       error: state?.onlineGame?.error || null,
     })
-
-    let onlineGame = state?.onlineGame
-    await this.syncController.handleOnlineGameError(onlineGame)
-
-    if (onlineGame?.pendingMove === true) return
-
-    if (onlineGame?.gameId === this.props.onlineGameId) {
-      await this.syncController.syncOnlineGameToBoard(onlineGame, {
-        enterStoneRemovalMode: true,
-      })
-    }
   }
 
   render({onlineGameId}, {user, network, onlineGame, error, busy, chatBody}) {

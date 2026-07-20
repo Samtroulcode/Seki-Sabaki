@@ -3,12 +3,12 @@ import {h, Component} from 'preact'
 import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
 import onlineStore from '../../modules/onlinestore.js'
+import {getOgsOnlineController} from '../../modules/ogsonlinecontroller.js'
 import {
   updateMultiMatchmakingOption,
   updateNestedMatchmakingOption,
   updateScalarMatchmakingOption,
 } from '../../modules/ogsmatchmakingoptions.js'
-import OgsPanelSyncController from '../../modules/ogspanelsync.js'
 import {AccountStatus, LoginForm} from './OgsPanelAccount.js'
 import {
   OgsDashboardNav,
@@ -29,8 +29,6 @@ export default class OgsPanel extends Component {
       ...onlineStore.getState(),
       activeSection: 'overview',
     }
-
-    this.syncController = new OgsPanelSyncController({sabaki})
 
     this.handleUsernameInput = (evt) => {
       onlineStore.setUsername(evt.currentTarget.value)
@@ -58,36 +56,14 @@ export default class OgsPanel extends Component {
     this.handleDisconnectButtonClick = async () => {
       sabaki.detachOgsGame()
       await onlineStore.logout()
-      this.syncController.resetSession()
+      getOgsOnlineController().resetSession()
     }
 
     this.handleActiveGameButtonClick = async (gameId) => {
-      onlineStore.setState({busy: true, error: null})
-
       try {
-        if (
-          this.state.onlineGame?.gameId === gameId &&
-          this.state.onlineGame?.status === 'connected'
-        ) {
-          let loaded = await this.syncController.syncOnlineGameToBoard(
-            this.state.onlineGame,
-          )
-          if (loaded) sabaki.setState({activeWorkspace: 'board'})
-          return
-        }
-
-        let result = await onlineStore.connectGame(gameId, {manageBusy: false})
-        this.syncController.resetConnectAttempt()
-
-        if (result.ok) {
-          await this.syncController.syncOnlineGameToBoard(
-            result.state.onlineGame,
-          )
-        }
+        await getOgsOnlineController().openGame(gameId, this.state)
       } catch (err) {
         onlineStore.setState({error: t('Unable to connect to game.')})
-      } finally {
-        onlineStore.setState({busy: false})
       }
     }
 
@@ -99,7 +75,7 @@ export default class OgsPanel extends Component {
 
       if (result.ok) {
         sabaki.detachOgsGame(gameId)
-        this.syncController.resetSyncKey()
+        getOgsOnlineController().resetSyncKey()
       }
     }
 
@@ -148,13 +124,9 @@ export default class OgsPanel extends Component {
       await onlineStore.cancelAutomatch()
     }
 
-    this.handleOnlineStoreState = (state) => {
-      this.enqueueOgsState(state)
-    }
+    this.handleOnlineStoreState = (state) => this.setState(state)
 
     this.lastFallbackRefreshAt = 0
-    this.handlingOgsState = false
-    this.pendingOgsState = null
   }
 
   async updateMatchmakingOptions(options) {
@@ -184,23 +156,6 @@ export default class OgsPanel extends Component {
     this.lastFallbackRefreshAt = Date.now()
   }
 
-  async enqueueOgsState(state) {
-    this.pendingOgsState = state
-    if (this.handlingOgsState) return
-
-    this.handlingOgsState = true
-    try {
-      while (this.pendingOgsState != null) {
-        let nextState = this.pendingOgsState
-        this.pendingOgsState = null
-        this.setState(nextState)
-        await this.handleOgsState(nextState)
-      }
-    } finally {
-      this.handlingOgsState = false
-    }
-  }
-
   async refreshOgsStateIfDue() {
     let now = Date.now()
     if (hasOgsStateChangeEvents() && now - this.lastFallbackRefreshAt < 60000) {
@@ -209,28 +164,6 @@ export default class OgsPanel extends Component {
 
     this.lastFallbackRefreshAt = now
     await this.refreshOgsState()
-  }
-
-  async handleOgsState(state) {
-    if (state?.user != null) {
-      await this.syncController.handleOnlineGameError(state.onlineGame)
-      if (state.onlineGame?.pendingMove === true) return
-
-      if (
-        state.matchmaking?.status === 'matched' &&
-        state.matchmaking?.matchedGameId === state.onlineGame?.gameId &&
-        state.onlineGame?.status === 'connected'
-      ) {
-        if (this.syncController.syncingOnlineGame) return
-
-        let opened = await this.syncController.syncOnlineGameToBoard(
-          state.onlineGame,
-        )
-        if (!opened)
-          this.syncController.declinedOnlineGameId = state.onlineGame.gameId
-        await onlineStore.acknowledgeAutomatchOpen(state.onlineGame.gameId)
-      }
-    }
   }
 
   render(
