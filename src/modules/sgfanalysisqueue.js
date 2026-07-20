@@ -138,7 +138,7 @@ function createQueuedJob(request, {id, createdAt}) {
   validateAnalysisQueueRequest(request)
 
   return {
-    id,
+    id: request.id || id,
     status: 'queued',
     sourcePath: request.sourcePath,
     outputPath: request.outputPath,
