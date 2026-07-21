@@ -23,6 +23,14 @@ export function buildOgsGameTree(
     EV: ['Online-Go.com'],
   }
 
+  if (Number.isFinite(onlineGame?.komi)) {
+    rootData.KM = [String(onlineGame.komi)]
+  }
+
+  if (typeof onlineGame?.rules === 'string' && onlineGame.rules.trim() !== '') {
+    rootData.RU = [onlineGame.rules.trim().toLowerCase()]
+  }
+
   if (onlineGame?.gameName) rootData.GN = [onlineGame.gameName]
   if (onlineGame?.gameId != null) {
     rootData.SO = [`https://online-go.com/game/${onlineGame.gameId}`]
