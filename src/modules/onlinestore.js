@@ -50,7 +50,7 @@ export class OnlineStore {
     return () => this.listeners.delete(listener)
   }
 
-  initialize() {
+  async initialize() {
     let ogs = this.ogs()
 
     if (
@@ -63,7 +63,32 @@ export class OnlineStore {
       this.subscribedOgs = ogs
     }
 
-    return this.refresh()
+    if (typeof ogs?.restoreSession === 'function') {
+      try {
+        let result = await ogs.restoreSession()
+        if (result?.ok === false) {
+          if (result.state != null) this.applyOgsState(result.state)
+          this.applySyncError(result.error, {
+            code: result.error?.code || 'restore-failed',
+            message:
+              result.error?.message || t('Unable to restore OGS session.'),
+          })
+          return result.state || null
+        }
+
+        if (result?.state != null) {
+          this.applyOgsState(result.state)
+          return result.state
+        }
+      } catch (err) {
+        this.applySyncError(err, {
+          code: 'restore-failed',
+          message: t('Unable to restore OGS session.'),
+        })
+      }
+    }
+
+    return await this.refresh()
   }
 
   isUsingCurrentOgsStateChangeEvents() {

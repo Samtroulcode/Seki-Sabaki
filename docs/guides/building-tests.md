@@ -74,6 +74,10 @@ web branch. To run the unit tests, use:
 $ npm test
 ```
 
+OGS account persistence coverage lives in `test/ogsCredentialStoreTests.js` and
+uses fake `safeStorage` plus temporary files. Tests must not require real OGS
+accounts, real credentials, or the user's actual `userData` directory.
+
 ### E2E Tests
 
 Sabaki includes Playwright-based end-to-end tests that launch the full Electron

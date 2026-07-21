@@ -18,6 +18,14 @@ accounts.
 Current OGS work supports a minimal online-play slice:
 
 - OGS login/session state is owned by the main process.
+- OGS session persistence stores only the OGS JWT as a credential, encrypted
+  with Electron `safeStorage` in `ogs-session.json` under `userData`; passwords
+  are never stored and OGS credentials are not written to settings.
+- `OnlineStore.initialize()` asks the main-process OGS client to restore the
+  stored session on app start. If `safeStorage` is unavailable or Electron
+  reports the unprotected `basic_text` backend, persistence is disabled and the
+  app starts signed out.
+- OGS logout clears the stored session token.
 - The renderer uses narrow `window.sabaki.ogs` IPC methods for OGS actions.
 - The OGS workspace shows account state, active games, automatch controls, and
   placeholder dashboard sections.

@@ -13,6 +13,7 @@ view older versions of the documentation, you can browse by tag on GitHub.
 ## User Guides
 
 - [Engines](guides/engines.md)
+- [OGS Account](guides/ogs-account.md)
 - [Markdown in Sabaki](guides/markdown.md)
 - [Textures & Theme Directory](guides/theme-directory.md)
 

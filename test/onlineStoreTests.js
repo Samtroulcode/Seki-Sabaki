@@ -177,6 +177,25 @@ describe('online store', () => {
     assert.strictEqual(store.isUsingCurrentOgsStateChangeEvents(), false)
   })
 
+  it('records restore IPC failures before refreshing state', async () => {
+    let store = createStore({
+      restoreSession: async () => ({
+        ok: false,
+        error: {code: 'restore-failed', message: 'Restore failed.'},
+        state: {user: null},
+      }),
+      getState: async () => ({user: null}),
+    })
+
+    await store.initialize()
+
+    assert.deepStrictEqual(store.getState().network.lastError, {
+      code: 'restore-failed',
+      message: 'Restore failed.',
+    })
+    assert.strictEqual(store.getState().connected, false)
+  })
+
   it('keeps current state when refresh fails', async () => {
     let store = createStore({
       getState: async () => {

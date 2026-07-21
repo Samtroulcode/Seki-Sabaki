@@ -160,6 +160,7 @@ window.sabaki = {
   ogs: {
     getSession: () => ipcRenderer.invoke('ogs:getSession'),
     getState: () => ipcRenderer.invoke('ogs:getState'),
+    restoreSession: () => ipcRenderer.invoke('ogs:restoreSession'),
     onStateChange: (callback) => {
       if (typeof callback !== 'function') {
         throw new TypeError('OGS state-change callback must be a function.')

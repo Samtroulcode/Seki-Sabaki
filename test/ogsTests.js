@@ -83,6 +83,44 @@ class RejectingAuthWebSocket extends FakeWebSocket {
   }
 }
 
+class DelayedRejectingAuthWebSocket extends FakeWebSocket {
+  send(message) {
+    this.sent.push(message)
+
+    let data = JSON.parse(message)
+    if (data[0] === 'authenticate' && Number.isInteger(data[2])) {
+      setTimeout(
+        () =>
+          this.onmessage?.({
+            data: JSON.stringify([
+              data[2],
+              null,
+              {code: 'auth', message: 'Authentication failed.'},
+            ]),
+          }),
+        20,
+      )
+    }
+  }
+}
+
+class DelayedAuthWebSocket extends FakeWebSocket {
+  send(message) {
+    this.sent.push(message)
+
+    let data = JSON.parse(message)
+    if (data[0] === 'authenticate' && Number.isInteger(data[2])) {
+      setTimeout(
+        () =>
+          this.onmessage?.({
+            data: JSON.stringify([data[2], {id: 7, username: 'sente'}]),
+          }),
+        20,
+      )
+    }
+  }
+}
+
 function loginFetch(url, options = {}) {
   if (url.endsWith('/api/v1/ui/config')) {
     return response({
@@ -208,6 +246,245 @@ describe('OGS client', () => {
       updatedAt: null,
     })
     assert.strictEqual(client.getState().socket.status, 'disconnected')
+  })
+
+  it('persists OGS session tokens without exposing them publicly', async () => {
+    let savedSession = null
+    let clearCount = 0
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      now: () => 1234,
+      credentialStore: {
+        saveSession: (session) => {
+          savedSession = session
+          return true
+        },
+        clearSession: () => {
+          clearCount++
+          return true
+        },
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+
+    assert.strictEqual(clearCount, 0)
+    assert.strictEqual(savedSession.serverUrl, 'https://online-go.com')
+    assert.strictEqual(savedSession.jwtToken, 'jwt-token')
+    assert.strictEqual(savedSession.user.username, 'sente')
+    assert.strictEqual(savedSession.createdAt, 1234)
+    assert.strictEqual(client.getSession().jwtToken, undefined)
+    assert.strictEqual(client.getState().user.jwtToken, undefined)
+
+    client.logout()
+    assert.strictEqual(clearCount, 1)
+  })
+
+  it('restores persisted OGS sessions in the main process', async () => {
+    FakeWebSocket.instances = []
+    let user = {
+      id: '7',
+      username: 'sente',
+      rank: '1d',
+      rating: null,
+      iconUrl: null,
+      online: true,
+    }
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      credentialStore: {
+        loadSession: () => ({
+          serverUrl: 'https://online-go.com',
+          jwtToken: 'stored-jwt',
+          user,
+        }),
+        clearSession: () => true,
+      },
+    })
+
+    let state = await client.restoreStoredSession()
+
+    assert.deepStrictEqual(client.getSession(), user)
+    assert.deepStrictEqual(state.user, user)
+    assert.strictEqual(state.socket.status, 'authenticated')
+    assert.strictEqual(
+      JSON.parse(FakeWebSocket.instances[0].sent[0])[1].jwt,
+      'stored-jwt',
+    )
+  })
+
+  it('ignores stale restore failures after a manual login starts', async () => {
+    FakeWebSocket.instances = []
+    let socketCount = 0
+    let clearCount = 0
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: class {
+        constructor(url) {
+          socketCount++
+          return socketCount === 1
+            ? new DelayedRejectingAuthWebSocket(url)
+            : new FakeWebSocket(url)
+        }
+      },
+      credentialStore: {
+        loadSession: () => ({
+          serverUrl: 'https://online-go.com',
+          jwtToken: 'stale-jwt',
+          user: {id: '7', username: 'sente'},
+        }),
+        saveSession: () => true,
+        clearSession: () => {
+          clearCount++
+          return true
+        },
+      },
+    })
+
+    let restorePromise = client.restoreStoredSession()
+    await client.login({username: 'sente', password: 'secret'})
+    await restorePromise
+
+    assert.strictEqual(client.getSession().username, 'sente')
+    assert.strictEqual(client.getState().socket.status, 'authenticated')
+    assert.strictEqual(clearCount, 0)
+  })
+
+  it('ignores stale restore successes after a manual login starts', async () => {
+    FakeWebSocket.instances = []
+    let socketCount = 0
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: class {
+        constructor(url) {
+          socketCount++
+          return socketCount === 1
+            ? new DelayedAuthWebSocket(url)
+            : new FakeWebSocket(url)
+        }
+      },
+      credentialStore: {
+        loadSession: () => ({
+          serverUrl: 'https://online-go.com',
+          jwtToken: 'stale-jwt',
+          user: {id: '7', username: 'old-user'},
+        }),
+        saveSession: () => true,
+        clearSession: () => true,
+      },
+    })
+
+    let restorePromise = client.restoreStoredSession()
+    await client.login({username: 'sente', password: 'secret'})
+    await restorePromise
+
+    assert.strictEqual(client.getSession().username, 'sente')
+    assert.strictEqual(client.getState().socket.status, 'authenticated')
+    assert.strictEqual(
+      JSON.parse(FakeWebSocket.instances.at(-1).sent[0])[1].jwt,
+      'jwt-token',
+    )
+  })
+
+  it('reuses an in-flight OGS session restore', async () => {
+    FakeWebSocket.instances = []
+    let clearCount = 0
+    let client = new OgsClient({
+      webSocketImpl: DelayedAuthWebSocket,
+      credentialStore: {
+        loadSession: () => ({
+          serverUrl: 'https://online-go.com',
+          jwtToken: 'stored-jwt',
+          user: {id: '7', username: 'sente'},
+        }),
+        clearSession: () => {
+          clearCount++
+          return true
+        },
+      },
+    })
+
+    let [firstState, secondState] = await Promise.all([
+      client.restoreStoredSession(),
+      client.restoreStoredSession(),
+    ])
+
+    assert.strictEqual(FakeWebSocket.instances.length, 1)
+    assert.strictEqual(clearCount, 0)
+    assert.strictEqual(firstState.user.username, 'sente')
+    assert.deepStrictEqual(secondState, firstState)
+    assert.strictEqual(client.getState().socket.status, 'authenticated')
+  })
+
+  it('clears persisted sessions with malformed stored users', async () => {
+    FakeWebSocket.instances = []
+    let clearCount = 0
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      credentialStore: {
+        loadSession: () => ({
+          serverUrl: 'https://online-go.com',
+          jwtToken: 'stored-jwt',
+          user: 'invalid-user',
+        }),
+        clearSession: () => {
+          clearCount++
+          return true
+        },
+      },
+    })
+
+    let state = await client.restoreStoredSession()
+
+    assert.strictEqual(state.user, null)
+    assert.strictEqual(clearCount, 1)
+    assert.strictEqual(FakeWebSocket.instances.length, 0)
+  })
+
+  it('keeps persisted sessions when manual relogin fails', async () => {
+    let clearCount = 0
+    let client = new OgsClient({
+      fetchImpl: async (url) => {
+        if (url.endsWith('/api/v1/ui/config')) {
+          return response({body: {csrf_token: 'csrf'}})
+        }
+
+        return response({status: 403, body: {}})
+      },
+      credentialStore: {
+        clearSession: () => {
+          clearCount++
+          return true
+        },
+      },
+    })
+
+    await assert.rejects(
+      () => client.login({username: 'bad', password: 'bad'}),
+      (err) => err instanceof OgsError && err.code === 'invalid-credentials',
+    )
+    assert.strictEqual(clearCount, 0)
+  })
+
+  it('clears stale persisted sessions when saving a successful login fails', async () => {
+    let clearCount = 0
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+      credentialStore: {
+        saveSession: () => false,
+        clearSession: () => {
+          clearCount++
+          return true
+        },
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+
+    assert.strictEqual(client.getSession().username, 'sente')
+    assert.strictEqual(clearCount, 1)
   })
 
   it('tracks OGS network latency, drift, and reports game latency', async () => {

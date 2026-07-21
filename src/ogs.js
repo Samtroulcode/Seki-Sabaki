@@ -60,6 +60,7 @@ const {
   encodeOgsCoordinates,
   mergeMoves,
 } = require('./ogs/moves.js')
+const {createElectronOgsCredentialStore} = require('./ogs/credentialstore.js')
 
 const DEFAULT_SERVER_URL = 'https://online-go.com'
 const USER_AGENT = 'Seki-Sabaki/0.1'
@@ -384,6 +385,7 @@ class OgsClient {
     webSocketImpl = globalThis.WebSocket,
     now = () => Date.now(),
     onStateChange = null,
+    credentialStore = null,
   } = {}) {
     this.serverUrl = serverUrl.replace(/\/$/, '')
     this.fetch = fetchImpl
@@ -395,6 +397,10 @@ class OgsClient {
       onStateChange: () => this.emitStateChange(),
     })
     this.onStateChange = onStateChange
+    this.credentialStore = credentialStore
+    this.sessionRevision = 0
+    this.socketAuthRevision = 0
+    this.restoreStoredSessionPromise = null
     this.session = null
     this.matchmaking = getInitialMatchmakingState()
     this.onlineGame = getInitialOnlineGameState()
@@ -428,6 +434,13 @@ class OgsClient {
   }
 
   logout() {
+    this.sessionRevision = (this.sessionRevision || 0) + 1
+    this.socketAuthRevision = this.sessionRevision
+    return this.resetSession({clearStoredSession: true})
+  }
+
+  resetSession({clearStoredSession = false} = {}) {
+    if (clearStoredSession) this.credentialStore?.clearSession?.()
     this.session = null
     this.socket.disconnect()
     this.matchmaking = getInitialMatchmakingState()
@@ -444,7 +457,10 @@ class OgsClient {
 
   async login({username, password}) {
     assertLoginInput(username, password)
-    this.logout()
+    this.sessionRevision = (this.sessionRevision || 0) + 1
+    let sessionRevision = this.sessionRevision
+    this.socketAuthRevision = sessionRevision
+    this.resetSession({clearStoredSession: false})
 
     if (typeof this.fetch !== 'function') {
       throw new OgsError('network', 'Fetch is not available.')
@@ -501,10 +517,124 @@ class OgsClient {
     await this.socket.connect(jwtToken)
     this.sendNetworkPing()
 
+    if (
+      sessionRevision !== this.sessionRevision ||
+      sessionRevision !== this.socketAuthRevision
+    ) {
+      return this.getSession()
+    }
+
     this.session = {jwtToken, user}
+    if (!this.persistSession({jwtToken, user})) {
+      this.credentialStore?.clearSession?.()
+    }
     this.emitStateChange()
 
     return user
+  }
+
+  async restoreStoredSession() {
+    if (this.restoreStoredSessionPromise != null) {
+      return await this.restoreStoredSessionPromise
+    }
+
+    this.restoreStoredSessionPromise = this.restoreStoredSessionOnce().finally(
+      () => {
+        this.restoreStoredSessionPromise = null
+      },
+    )
+
+    return await this.restoreStoredSessionPromise
+  }
+
+  async restoreStoredSessionOnce() {
+    if (this.session != null || this.credentialStore == null) {
+      return this.getState()
+    }
+
+    let sessionRevision = this.sessionRevision || 0
+
+    let storedSession = null
+
+    try {
+      storedSession = this.credentialStore.loadSession?.()
+    } catch (err) {
+      this.credentialStore.clearSession?.()
+      return this.getState()
+    }
+
+    if (
+      storedSession == null ||
+      storedSession.serverUrl !== this.serverUrl ||
+      typeof storedSession.jwtToken !== 'string' ||
+      storedSession.jwtToken === '' ||
+      storedSession.user == null
+    ) {
+      return this.getState()
+    }
+
+    if (
+      typeof storedSession.user !== 'object' ||
+      Array.isArray(storedSession.user)
+    ) {
+      this.credentialStore.clearSession?.()
+      return this.getState()
+    }
+
+    let user = null
+
+    try {
+      user = sanitizeUser(this.serverUrl, {
+        ...storedSession.user,
+        icon: storedSession.user.iconUrl,
+      })
+    } catch (err) {
+      this.credentialStore.clearSession?.()
+      return this.getState()
+    }
+
+    try {
+      this.socketAuthRevision = sessionRevision
+      await this.socket.connect(storedSession.jwtToken)
+      this.sendNetworkPing()
+
+      if (
+        sessionRevision !== (this.sessionRevision || 0) ||
+        sessionRevision !== this.socketAuthRevision
+      ) {
+        return this.getState()
+      }
+
+      this.session = {
+        jwtToken: storedSession.jwtToken,
+        user,
+      }
+      this.emitStateChange()
+    } catch (err) {
+      if (sessionRevision !== (this.sessionRevision || 0)) {
+        return this.getState()
+      }
+
+      this.credentialStore.clearSession?.()
+      this.sessionRevision = (this.sessionRevision || 0) + 1
+      this.socketAuthRevision = this.sessionRevision
+      this.resetSession({clearStoredSession: false})
+    }
+
+    return this.getState()
+  }
+
+  persistSession({jwtToken, user}) {
+    try {
+      return !!this.credentialStore?.saveSession?.({
+        serverUrl: this.serverUrl,
+        jwtToken,
+        user,
+        createdAt: this.now(),
+      })
+    } catch (err) {
+      return false
+    }
   }
 
   setMatchmakingOptions(options) {
@@ -1501,9 +1631,15 @@ function serializeError(err) {
 
 function setupOgsIpcHandlers(
   ipcMain,
-  client = new OgsClient(),
+  client = null,
   {sendStateChange = null} = {},
 ) {
+  if (client == null) {
+    client = new OgsClient({
+      credentialStore: createElectronOgsCredentialStore(),
+    })
+  }
+
   if (typeof sendStateChange === 'function') {
     let previousOnStateChange = client.onStateChange
     let scheduledStateChange = false
@@ -1531,6 +1667,14 @@ function setupOgsIpcHandlers(
   ipcMain.handle('ogs:getSession', () => client.getSession())
 
   ipcMain.handle('ogs:getState', () => client.getState())
+
+  ipcMain.handle('ogs:restoreSession', async () => {
+    try {
+      return {ok: true, state: await client.restoreStoredSession()}
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
 
   ipcMain.handle('ogs:logout', () => client.logout())
 
