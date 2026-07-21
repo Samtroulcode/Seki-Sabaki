@@ -39,7 +39,10 @@ describe('analyze-sgf packaging', () => {
     assert.deepStrictEqual(packageJson.build.extraResources, [
       {from: 'build/analyze-sgf', to: 'analyze-sgf'},
     ])
-    assert.strictEqual(packageJson.devDependencies['analyze-sgf'], '0.4.8')
+    assert.strictEqual(
+      packageJson.devDependencies['analyze-sgf'],
+      'git+https://github.com/Samtroulcode/analyze-sgf.git#9a9ac836c6bdc16847b2dbb3b8b28dcc0b0bf020',
+    )
     assert.strictEqual(packageJson.dependencies.katago, undefined)
   })
 

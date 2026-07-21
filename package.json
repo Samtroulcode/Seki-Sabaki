@@ -149,7 +149,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",
-    "analyze-sgf": "0.4.8",
+    "analyze-sgf": "git+https://github.com/Samtroulcode/analyze-sgf.git#9a9ac836c6bdc16847b2dbb3b8b28dcc0b0bf020",
     "concurrently": "^10.0.3",
     "electron": "^43.0.0",
     "electron-builder": "^26.8.1",
@@ -167,6 +167,7 @@
     "start": "electron ./",
     "bundle": "webpack --mode production",
     "prepare:analyze-sgf": "node ./scripts/prepare-analyze-sgf-binaries.js",
+    "diagnose:analyze-sgf": "node ./scripts/diagnose-analyze-sgf.js",
     "build": "npm run bundle && npm run prepare:analyze-sgf && electron-builder --dir",
     "format-base": "prettier \"**/*.{js,html,md}\" \"!{{dist,i18n}/**,bundle.js*}\"",
     "format-check": "npm run format-base -- --check",
