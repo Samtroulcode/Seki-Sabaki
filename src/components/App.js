@@ -254,9 +254,13 @@ class App extends Component {
 
     let {showSidebar: prevShowSidebar} = sabaki.getInferredState(prevState)
 
-    if (
+    let sidebarVisibilityChanged =
       prevState.showLeftSidebar !== sabaki.state.showLeftSidebar ||
       prevShowSidebar !== sabaki.inferredState.showSidebar
+
+    if (
+      sidebarVisibilityChanged ||
+      prevState.activeWorkspace !== sabaki.state.activeWorkspace
     ) {
       let [width, height] = sabaki.window.getContentSize()
       let widthDiff = 0
@@ -274,6 +278,7 @@ class App extends Component {
       }
 
       if (
+        sidebarVisibilityChanged &&
         !sabaki.window.isMaximized() &&
         !sabaki.window.isMinimized() &&
         !sabaki.window.isFullScreen()

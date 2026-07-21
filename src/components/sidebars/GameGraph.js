@@ -145,16 +145,15 @@ class GameGraph extends Component {
   constructor(props) {
     super(props)
 
+    this.mousePosition = [-100, -100]
+    this.matrixDictCache = {}
+
     this.state = {
       cameraPosition: [-props.gridSize, -props.gridSize],
       viewportSize: [0, 0],
       viewportPosition: [0, 0],
-      matrixDict: null,
+      matrixDict: this.getMatrixDict(props.gameTree),
     }
-
-    this.mousePosition = [-100, -100]
-    this.matrixDictHash = null
-    this.matrixDictCache = {}
 
     this.handleNodeClick = this.handleNodeClick.bind(this)
     this.handleGraphMouseDown = this.handleGraphMouseDown.bind(this)
@@ -224,7 +223,10 @@ class GameGraph extends Component {
     }
 
     if (showGameGraph !== this.props.showGameGraph) {
-      setTimeout(() => this.updateCameraPosition(), 200)
+      setTimeout(() => {
+        this.remeasure()
+        this.updateCameraPosition()
+      }, 200)
     }
   }
 
