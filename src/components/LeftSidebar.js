@@ -1,6 +1,9 @@
 import {h, Component} from 'preact'
 
 import sabaki from '../modules/sabaki.js'
+import analysisStore, {
+  hasRunnableAnalysisConfig,
+} from '../modules/analysisstore.js'
 import i18n from '../i18n.js'
 import SplitContainer from './helpers/SplitContainer.js'
 import ToolBar, {ToolBarButton} from './ToolBar.js'
@@ -22,6 +25,17 @@ export default class LeftSidebar extends Component {
     this.state = {
       peerListHeight: setting.get('view.peerlist_height'),
       selectedEngineSyncerId: null,
+      analysisConfig: analysisStore.getState().config,
+      analysisConfigDirty: analysisStore.getState().configDirty,
+      analysisBusy: analysisStore.getState().busy,
+    }
+
+    this.handleAnalysisStoreState = (state) => {
+      this.setState({
+        analysisConfig: state.config,
+        analysisConfigDirty: state.configDirty,
+        analysisBusy: state.busy,
+      })
     }
 
     this.handlePeerListHeightChange = ({sideSize}) => {
@@ -81,6 +95,10 @@ export default class LeftSidebar extends Component {
       sabaki.startStopEngineGame(sabaki.state.treePosition)
     }
 
+    this.handleAnalyzeCurrentGameButtonClick = () => {
+      sabaki.startCurrentGameSgfAnalysis()
+    }
+
     this.handleOgsPassButtonClick = () => sabaki.makePass()
 
     this.handleOgsResignButtonClick = () => sabaki.makeResign()
@@ -97,6 +115,17 @@ export default class LeftSidebar extends Component {
 
       return result
     }
+  }
+
+  componentDidMount() {
+    this.unsubscribeAnalysisStore = analysisStore.subscribe(
+      this.handleAnalysisStoreState,
+    )
+    analysisStore.initialize()
+  }
+
+  componentWillUnmount() {
+    this.unsubscribeAnalysisStore?.()
   }
 
   shouldComponentUpdate(nextProps) {
@@ -117,8 +146,19 @@ export default class LeftSidebar extends Component {
       showLeftSidebar,
       consoleLog,
     },
-    {peerListHeight, selectedEngineSyncerId},
+    {
+      peerListHeight,
+      selectedEngineSyncerId,
+      analysisConfig,
+      analysisConfigDirty,
+      analysisBusy,
+    },
   ) {
+    let currentGameAnalysisConfigured =
+      hasRunnableAnalysisConfig(analysisConfig)
+    let currentGameAnalysisDisabled =
+      analysisBusy || analysisConfigDirty || !currentGameAnalysisConfigured
+
     return h(
       'section',
       {
@@ -146,6 +186,15 @@ export default class LeftSidebar extends Component {
                 : t('Stop Engine vs. Engine Game'),
               checked: !!engineGameOngoing,
               onClick: this.handleStartStopGameButtonClick,
+            }),
+
+            h(ToolBarButton, {
+              icon: './node_modules/@primer/octicons/build/svg/pulse-16.svg',
+              tooltip: currentGameAnalysisConfigured
+                ? t('Analyze Current Game')
+                : t('Configure SGF analysis first.'),
+              disabled: currentGameAnalysisDisabled,
+              onClick: this.handleAnalyzeCurrentGameButtonClick,
             }),
           ),
 

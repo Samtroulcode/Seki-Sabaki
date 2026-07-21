@@ -65,3 +65,17 @@ KataGo is not bundled. Install KataGo separately, then configure:
 Click **Apply settings**, choose an SGF file, then click **Start analysis**. The
 KataGo path, model, config, and output folder are saved for future sessions.
 Seki-Sabaki generates the KataGo analysis arguments from those fields.
+
+You can also analyze the current board as an SGF job. After applying valid
+KataGo analysis settings, click **Analyze Current Game** in the left sidebar
+toolbar. Seki-Sabaki exports the current game tree to SGF, starts an analysis
+job, and switches to the Analysis workspace.
+
+This button is disabled while analysis is busy, while settings have unapplied
+changes, or when required KataGo paths or the output folder are missing. During
+a live OGS game, the engine toolbar is replaced by OGS controls and current-game
+analysis is blocked until the game ends.
+
+When an attached OGS game ends, the game-over dialog offers **Analyze Game**.
+Choosing it analyzes the final projected SGF using the same SGF analysis
+settings.

@@ -12,6 +12,7 @@ import sgf from '@sabaki/sgf'
 
 import i18n from '../i18n.js'
 import EngineSyncer from './enginesyncer.js'
+import analysisStore from './analysisstore.js'
 import * as dialog from './dialog.js'
 import * as fileformats from './fileformats/index.js'
 import * as gametree from './gametree.js'
@@ -863,8 +864,25 @@ class Sabaki extends EventEmitter {
 
     this.ogsGameEndNoticeKey = key
     this.ogsGameEndNoticeGameId = onlineGame.gameId
+    let sgfContent = this.getCurrentGameSGF()
     this.ogsGameEndNoticePromise = dialog
-      .showMessageBox(getOgsGameEndMessage(onlineGame), 'info')
+      .showMessageBox(
+        getOgsGameEndMessage(onlineGame),
+        'info',
+        [
+          i18n.context('sabaki.ogs')('OK'),
+          i18n.context('sabaki.ogs')('Analyze Game'),
+        ],
+        0,
+      )
+      .then(async (answer) => {
+        if (answer === 1) {
+          await this.startCurrentGameSgfAnalysis({
+            allowOnlineGame: true,
+            sgfContent,
+          })
+        }
+      })
       .finally(() => {
         if (this.ogsGameEndNoticeKey === key) {
           this.ogsGameEndNoticePromise = null
@@ -996,6 +1014,53 @@ class Sabaki extends EventEmitter {
         linebreak: setting.get('sgf.format_code') ? helper.linebreak : '',
       },
     )
+  }
+
+  getCurrentGameSGF() {
+    let tree = this.state.gameTrees[this.state.gameIndex]
+
+    tree = tree.mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AP', [
+        `${this.appName}:${this.version}`,
+      ])
+      draft.updateProperty(draft.root.id, 'CA', ['UTF-8'])
+    })
+
+    return sgf.stringify([tree.root], {
+      linebreak: setting.get('sgf.format_code') ? helper.linebreak : '',
+    })
+  }
+
+  async startCurrentGameSgfAnalysis({
+    allowOnlineGame = false,
+    sgfContent = null,
+  } = {}) {
+    let t = i18n.context('sabaki.analysis')
+
+    if (this.state.onlineGameId != null && !allowOnlineGame) {
+      await dialog.showMessageBox(
+        t('Current game analysis is not available during online games.'),
+        'warning',
+      )
+      return null
+    }
+
+    let result = await analysisStore.startBoardAnalysis(
+      sgfContent || this.getCurrentGameSGF(),
+    )
+
+    if (result?.ok) {
+      this.setState({activeWorkspace: 'analysis'})
+    } else if (result?.error?.message != null) {
+      await dialog.showMessageBox(result.error.message, 'warning')
+    } else if (result == null) {
+      await dialog.showMessageBox(
+        t('Unable to start analysis. Check analysis settings.'),
+        'warning',
+      )
+    }
+
+    return result
   }
 
   getBoardAscii() {

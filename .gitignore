@@ -22,5 +22,8 @@ test-results/
 # GTP communication logs written at runtime when engines are attached
 gtp_logs/
 
+# SGF analysis logs written at runtime
+analysis_logs/
+
 # Local architecture tracking checklist
 OGS_RESTRUCTURING_TODO.md

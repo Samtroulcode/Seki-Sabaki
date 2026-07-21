@@ -25,7 +25,8 @@ Current OGS work supports a minimal online-play slice:
 - Attached games project into SGF, preserve the OGS source URL, and use
   `boardAttachment` plus temporary `onlineGameId` compatibility state.
 - The in-game OGS context panel supports clocks, captures, pass/resign, chat,
-  stone removal, rejected-move recovery, and game-end detach behavior.
+  stone removal, rejected-move recovery, game-end detach behavior, and optional
+  post-game SGF analysis.
 - Automated coverage uses fake OGS state rather than live OGS accounts.
 
 Cleanup still in progress:

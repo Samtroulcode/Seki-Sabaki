@@ -47,9 +47,9 @@ the board and restoring local editing behavior.
   Opening the OGS workspace should not attach or detach a game merely because of
   navigation. Explicit online lifecycle flows, such as an automatch result that
   has connected a game, may attach the matched game and switch to the Board.
-- **SGF Explorer** and **Analysis** are placeholder workspaces whose full
-  behavior is future work. They should operate on explicit document/job
-  identities rather than stealing board state implicitly.
+- **SGF Explorer** remains a placeholder workspace. **Analysis** owns SGF
+  analysis jobs and should only receive board content through explicit user
+  actions such as **Analyze Current Game** or post-game OGS analysis.
 
 Current compatibility behavior that is preserved for now:
 

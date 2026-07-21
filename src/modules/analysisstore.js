@@ -264,10 +264,28 @@ export class AnalysisStore {
     let path = this.state.selectedInputPath.trim()
     if (path === '' || this.state.configDirty) return null
 
+    return await this.startAnalysisRequest({source: {type: 'file', path}})
+  }
+
+  async startBoardAnalysis(sgfContent) {
+    if (
+      typeof sgfContent !== 'string' ||
+      sgfContent.trim() === '' ||
+      this.state.configDirty
+    ) {
+      return null
+    }
+
+    return await this.startAnalysisRequest({
+      source: {type: 'board', sgfContent},
+    })
+  }
+
+  async startAnalysisRequest(request) {
     this.setState({busy: true, error: null})
 
     try {
-      let result = await this.analysis().start({source: {type: 'file', path}})
+      let result = await this.analysis().start(request)
 
       if (result?.state != null) this.applyAnalysisState(result.state)
 
@@ -369,6 +387,18 @@ export class AnalysisStore {
       this.refreshGames()
     }
   }
+}
+
+export function hasRunnableAnalysisConfig(config) {
+  return (
+    config != null &&
+    [
+      config.katagoPath,
+      config.katagoModelPath,
+      config.katagoConfigPath,
+      config.outputDirectory,
+    ].every((value) => typeof value === 'string' && value.trim() !== '')
+  )
 }
 
 function getErrorMessage(err, fallback) {

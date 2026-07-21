@@ -1,6 +1,9 @@
 import assert from 'assert'
 
-import {AnalysisStore} from '../src/modules/analysisstore.js'
+import {
+  AnalysisStore,
+  hasRunnableAnalysisConfig,
+} from '../src/modules/analysisstore.js'
 
 function createAnalysisApi(overrides = {}) {
   let stateChangeCallback = null
@@ -130,6 +133,36 @@ describe('AnalysisStore', () => {
     assert.strictEqual(store.getState().analysisState.currentJob.id, 'job-1')
   })
 
+  it('starts analysis from current board SGF content', async () => {
+    let receivedRequest = null
+    let api = createAnalysisApi({
+      start: async (request) => {
+        receivedRequest = request
+
+        return {
+          ok: true,
+          job: {id: 'job-1'},
+          state: {
+            currentJob: {id: 'job-1', sourceType: request.source.type},
+            queuedJobs: [],
+            completedJobs: [],
+          },
+        }
+      },
+    })
+    let store = new AnalysisStore({analysis: () => api})
+
+    await store.startBoardAnalysis('(;GM[1]SZ[19])')
+
+    assert.deepStrictEqual(receivedRequest, {
+      source: {type: 'board', sgfContent: '(;GM[1]SZ[19])'},
+    })
+    assert.strictEqual(
+      store.getState().analysisState.currentJob.sourceType,
+      'board',
+    )
+  })
+
   it('edits draft settings and starts only after applying them', async () => {
     let receivedRequest = null
     let api = createAnalysisApi({
@@ -189,6 +222,28 @@ describe('AnalysisStore', () => {
     assert.deepStrictEqual(store.getState().analyzedGames, [
       {path: '/tmp/analysis/game.sgf'},
     ])
+  })
+
+  it('detects whether analysis config has required user settings', () => {
+    assert.strictEqual(
+      hasRunnableAnalysisConfig({
+        katagoPath: '/usr/bin/katago',
+        katagoModelPath: '/models/model.bin.gz',
+        katagoConfigPath: '/configs/analysis.cfg',
+        outputDirectory: '/tmp/analysis',
+      }),
+      true,
+    )
+
+    assert.strictEqual(
+      hasRunnableAnalysisConfig({
+        katagoPath: '/usr/bin/katago',
+        katagoModelPath: '',
+        katagoConfigPath: '/configs/analysis.cfg',
+        outputDirectory: '/tmp/analysis',
+      }),
+      false,
+    )
   })
 
   it('selects KataGo executable, model, and config into draft settings', async () => {
