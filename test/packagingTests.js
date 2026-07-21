@@ -41,7 +41,7 @@ describe('analyze-sgf packaging', () => {
     ])
     assert.strictEqual(
       packageJson.devDependencies['analyze-sgf'],
-      'git+https://github.com/Samtroulcode/analyze-sgf.git#9a9ac836c6bdc16847b2dbb3b8b28dcc0b0bf020',
+      'git+https://github.com/Samtroulcode/analyze-sgf.git#8c05132107bb1a1b27d915ab79d5fdaeb3da9125',
     )
     assert.strictEqual(packageJson.dependencies.katago, undefined)
   })

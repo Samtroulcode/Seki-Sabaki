@@ -452,6 +452,38 @@ describe('SGF analysis runner', () => {
     }
   })
 
+  it('parses structured progress split across stream chunks', async () => {
+    let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
+    let inputPath = join(directory, 'source.sgf')
+    let outputPath = join(directory, 'final.sgf')
+    let generatedPath = getAnalyzeSgfGeneratedPath(inputPath, '.tmp')
+    let progress = []
+
+    try {
+      writeFileSync(inputPath, '(;GM[1])')
+
+      await runSgfAnalysis({
+        inputPath,
+        outputPath,
+        config: config(),
+        generatedFileSuffix: '.tmp',
+        onProgress: (value) => progress.push(value),
+        spawnImpl: createFakeSpawn(({child}) => {
+          child.stderr.write('ANALYZE_SGF_PROGRESS {"percent":42,')
+          child.stderr.write('"currentMove":8,"totalMoves":19,"visits":1600}\n')
+          writeFileSync(generatedPath, '(;GM[1]GN[generated])')
+          child.emit('close', 0, null)
+        }),
+      })
+
+      assert.deepStrictEqual(progress, [
+        {percent: 42, currentMove: 8, totalMoves: 19, visits: 1600},
+      ])
+    } finally {
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
   it('sanitizes stderr failure messages', async () => {
     let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
     let inputPath = join(directory, 'source.sgf')

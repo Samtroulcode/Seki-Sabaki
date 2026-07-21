@@ -3,6 +3,44 @@ import assert from 'assert'
 import {parseAnalyzeSgfProgress} from '../src/modules/sgfanalysisprogress.js'
 
 describe('SGF analysis progress parser', () => {
+  it('parses a structured progress line', () => {
+    assert.deepStrictEqual(
+      parseAnalyzeSgfProgress(
+        'ANALYZE_SGF_PROGRESS {"percent":42,"currentMove":8,"totalMoves":19,"visits":1600}',
+      ),
+      {
+        percent: 42,
+        currentMove: 8,
+        totalMoves: 19,
+        visits: 1600,
+      },
+    )
+  })
+
+  it('ignores invalid structured progress JSON', () => {
+    assert.strictEqual(
+      parseAnalyzeSgfProgress('ANALYZE_SGF_PROGRESS {"percent":42'),
+      null,
+    )
+  })
+
+  it('rejects structured progress values outside valid ranges', () => {
+    for (let payload of [
+      {percent: 101, currentMove: 8, totalMoves: 19, visits: 1600},
+      {percent: 42.5, currentMove: 8, totalMoves: 19, visits: 1600},
+      {percent: 42, currentMove: 20, totalMoves: 19, visits: 1600},
+      {percent: 42, currentMove: 8, totalMoves: 19, visits: -1},
+      {percent: 42, currentMove: 8, totalMoves: 19, visits: 1.5},
+    ]) {
+      assert.strictEqual(
+        parseAnalyzeSgfProgress(
+          `ANALYZE_SGF_PROGRESS ${JSON.stringify(payload)}`,
+        ),
+        null,
+      )
+    }
+  })
+
   it('parses a standard progress line', () => {
     assert.deepStrictEqual(
       parseAnalyzeSgfProgress('63% (132/208, 4200 visits)'),
