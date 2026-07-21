@@ -253,12 +253,18 @@ describe('SGF analysis IPC handlers', () => {
         katagoArguments: 'ignored',
         outputDirectory: '/analysis',
         maxVisits: 1,
+        language: 'fr',
+        commentStyle: 'compact',
+        analyzeSgfArgs: ['/tmp/evil.js'],
       }),
       {
         katagoPath: '/usr/bin/katago',
         katagoModelPath: '/models/model.bin.gz',
         katagoConfigPath: '/configs/analysis.cfg',
         outputDirectory: '/analysis',
+        maxVisits: 1,
+        language: 'fr',
+        commentStyle: 'compact',
       },
     )
   })
@@ -269,6 +275,14 @@ describe('SGF analysis IPC handlers', () => {
       'analysis.katago_model_path': '/bin/sh',
       'analysis.katago_config_path': '/bin/sh',
       'analysis.output_directory': '/tmp',
+      'analysis.max_visits': 800,
+      'analysis.rules': 'japanese',
+      'analysis.komi': 6.5,
+      'analysis.comment_style': 'compact',
+      'analysis.language': 'fr',
+      'analysis.annotation_style': 'classification',
+      'analysis.max_variations_for_each_move': 3,
+      'analysis.min_winrate_drop_for_variations': 2,
     }
     let setCalls = []
     let setting = {
@@ -296,15 +310,31 @@ describe('SGF analysis IPC handlers', () => {
         katagoModelPath: '/bin/sh',
         katagoConfigPath: '/bin/sh',
         outputDirectory: '/tmp',
+        maxVisits: 800,
+        rules: 'japanese',
+        komi: 6.5,
+        commentStyle: 'compact',
+        language: 'fr',
+        annotationStyle: 'classification',
+        maxVariationsForEachMove: 3,
+        minWinrateDropForVariations: 2,
       },
     )
 
-    assert.strictEqual(service.getConfig().analyzeSgfPath, 'analyze-sgf')
+    assert.notStrictEqual(service.getConfig().analyzeSgfPath, '/tmp/ignored')
     assert.deepStrictEqual(setCalls, [
       ['analysis.katago_path', '/bin/sh'],
       ['analysis.katago_model_path', '/bin/sh'],
       ['analysis.katago_config_path', '/bin/sh'],
       ['analysis.output_directory', '/tmp'],
+      ['analysis.max_visits', 800],
+      ['analysis.rules', 'japanese'],
+      ['analysis.komi', 6.5],
+      ['analysis.comment_style', 'compact'],
+      ['analysis.language', 'fr'],
+      ['analysis.annotation_style', 'classification'],
+      ['analysis.max_variations_for_each_move', 3],
+      ['analysis.min_winrate_drop_for_variations', 2],
     ])
   })
 

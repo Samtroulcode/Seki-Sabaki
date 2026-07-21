@@ -62,11 +62,14 @@ async function runSgfAnalysis({
     })
   }
 
-  let args = buildAnalyzeSgfArguments({
-    inputPath,
-    config,
-    fileSuffix: generatedFileSuffix,
-  })
+  let args = [
+    ...(Array.isArray(config.analyzeSgfArgs) ? config.analyzeSgfArgs : []),
+    ...buildAnalyzeSgfArguments({
+      inputPath,
+      config,
+      fileSuffix: generatedFileSuffix,
+    }),
+  ]
   writeLog(logPath, onLog, now, `Starting analysis for ${inputPath}`)
   writeLog(logPath, onLog, now, `Output path: ${outputPath}`)
   writeLog(
@@ -134,7 +137,7 @@ async function runSgfAnalysis({
 
     child.on?.('error', (error) => {
       signal?.removeEventListener?.('abort', abort)
-      fail({code: 'spawn-failed', message: error.message})
+      fail(classifySpawnError(error))
     })
 
     child.on?.('close', (code, closeSignal) => {
@@ -157,8 +160,11 @@ async function runSgfAnalysis({
 
       if (code !== 0) {
         fail({
-          code: 'process-failed',
-          message: getProcessErrorMessage(stderr, code, closeSignal),
+          ...classifyProcessFailure(stderr, code, closeSignal),
+          exitCode: code,
+          signal: closeSignal,
+          stderrLastLine: getProcessErrorMessage(stderr, code, closeSignal),
+          logPath,
         })
         return
       }
@@ -313,6 +319,53 @@ function getProcessErrorMessage(stderr, code, closeSignal) {
   return `analyze-sgf exited with code ${code}.`
 }
 
+function classifySpawnError(error) {
+  if (error?.code === 'ENOENT') {
+    return {
+      code: 'analyze-sgf-not-found',
+      message: 'analyze-sgf was not found.',
+    }
+  }
+
+  return {
+    code: 'spawn-failed',
+    message: error?.message || 'Failed to start analyze-sgf.',
+  }
+}
+
+function classifyProcessFailure(stderr, code, closeSignal) {
+  let message = getProcessErrorMessage(stderr, code, closeSignal)
+  let normalized = message.toLowerCase()
+
+  if (
+    /katago/.test(normalized) &&
+    /no such file|not found|enoent/.test(normalized)
+  ) {
+    return {code: 'katago-not-found', message}
+  }
+  if (
+    /model/.test(normalized) &&
+    /no such file|not found|enoent/.test(normalized)
+  ) {
+    return {code: 'katago-model-not-found', message}
+  }
+  if (
+    /config|cfg/.test(normalized) &&
+    /no such file|not found|enoent/.test(normalized)
+  ) {
+    return {code: 'katago-config-not-found', message}
+  }
+  if (
+    /commentstyle|language|annotationstyle|maxvariationsforeachmove|minwinratedropforvariations|unexpected token|json/.test(
+      normalized,
+    )
+  ) {
+    return {code: 'analyze-sgf-incompatible', message}
+  }
+
+  return {code: 'process-failed', message}
+}
+
 function writeFinalSgf(outputPath, content) {
   let fd = null
 
@@ -372,10 +425,13 @@ function toSgfAnalysisRunnerError(error) {
 }
 
 class SgfAnalysisRunnerError extends Error {
-  constructor({code, message}) {
+  constructor({code, message, ...details}) {
     super(message)
     this.name = 'SgfAnalysisRunnerError'
     this.code = code
+    for (let [key, value] of Object.entries(details)) {
+      if (!(key in this)) this[key] = value
+    }
   }
 }
 

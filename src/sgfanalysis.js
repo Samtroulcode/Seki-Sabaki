@@ -12,6 +12,14 @@ const USER_CONFIG_KEYS = [
   'katagoModelPath',
   'katagoConfigPath',
   'outputDirectory',
+  'maxVisits',
+  'rules',
+  'komi',
+  'commentStyle',
+  'language',
+  'annotationStyle',
+  'maxVariationsForEachMove',
+  'minWinrateDropForVariations',
 ]
 
 function setupSgfAnalysisIpcHandlers(
@@ -184,12 +192,16 @@ function setupSgfAnalysisIpcHandlers(
 }
 
 function createSgfAnalysisService({app = null, setting = null} = {}) {
-  let analyzeSgfPath = resolveAnalyzeSgfPath({
+  let analyzeSgf = resolveAnalyzeSgfPath({
     isPackaged: app?.isPackaged === true,
+    appPath: app?.getAppPath?.(),
   })
   let config = {
-    analyzeSgfPath,
-    analyzeSgfStatus: getAnalyzeSgfStatus({analyzeSgfPath}),
+    analyzeSgfPath: analyzeSgf.path,
+    analyzeSgfStatus:
+      analyzeSgf.status ||
+      getAnalyzeSgfStatus({analyzeSgfPath: analyzeSgf.path}),
+    analyzeSgfArgs: analyzeSgf.args || [],
     ...loadUserSgfAnalysisConfig(setting),
   }
 
@@ -214,6 +226,18 @@ function loadUserSgfAnalysisConfig(setting) {
         'config',
       ),
     outputDirectory: setting.get('analysis.output_directory') || '',
+    maxVisits: setting.get('analysis.max_visits'),
+    rules: setting.get('analysis.rules'),
+    komi: setting.get('analysis.komi'),
+    commentStyle: setting.get('analysis.comment_style'),
+    language: setting.get('analysis.language'),
+    annotationStyle: setting.get('analysis.annotation_style'),
+    maxVariationsForEachMove: setting.get(
+      'analysis.max_variations_for_each_move',
+    ),
+    minWinrateDropForVariations: setting.get(
+      'analysis.min_winrate_drop_for_variations',
+    ),
   }
 }
 
@@ -235,6 +259,20 @@ function persistUserSgfAnalysisConfig(setting, config) {
     .set('analysis.katago_model_path', config.katagoModelPath || '')
     .set('analysis.katago_config_path', config.katagoConfigPath || '')
     .set('analysis.output_directory', config.outputDirectory || '')
+    .set('analysis.max_visits', config.maxVisits)
+    .set('analysis.rules', config.rules)
+    .set('analysis.komi', config.komi)
+    .set('analysis.comment_style', config.commentStyle)
+    .set('analysis.language', config.language)
+    .set('analysis.annotation_style', config.annotationStyle)
+    .set(
+      'analysis.max_variations_for_each_move',
+      config.maxVariationsForEachMove,
+    )
+    .set(
+      'analysis.min_winrate_drop_for_variations',
+      config.minWinrateDropForVariations,
+    )
 }
 
 function filterUserSgfAnalysisConfig(config) {

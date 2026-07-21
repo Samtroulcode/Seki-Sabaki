@@ -22,7 +22,16 @@ const {SgfAnalysisQueue} = require('./sgfanalysisqueue.js')
 const {runSgfAnalysis} = require('./sgfanalysisrunner.js')
 
 const MAX_SOURCE_FILE_BYTES = 50 * 1024 * 1024
-const PER_JOB_OPTION_KEYS = ['maxVisits', 'rules', 'komi']
+const PER_JOB_OPTION_KEYS = [
+  'maxVisits',
+  'rules',
+  'komi',
+  'commentStyle',
+  'language',
+  'annotationStyle',
+  'maxVariationsForEachMove',
+  'minWinrateDropForVariations',
+]
 
 class SgfAnalysisService {
   constructor({
@@ -77,11 +86,11 @@ class SgfAnalysisService {
   }
 
   setConfig(config) {
-    let nextConfig = normalizeSgfAnalysisConfig({...this.config, ...config})
+    let nextConfig = {...this.config, ...config}
     let errors = this.validateConfig(nextConfig)
     if (errors.length > 0) throw new SgfAnalysisServiceError(errors[0])
 
-    this.config = nextConfig
+    this.config = normalizeSgfAnalysisConfig(nextConfig)
     return this.getConfig()
   }
 
@@ -99,13 +108,15 @@ class SgfAnalysisService {
   }
 
   startAnalysis(request) {
-    let config = normalizeSgfAnalysisConfig({
+    let config = {
       ...this.config,
       ...pickPerJobOptions(request?.options || {}),
-    })
+    }
     let configErrors = this.validateConfig(config)
     if (configErrors.length > 0)
       throw new SgfAnalysisServiceError(configErrors[0])
+
+    config = normalizeSgfAnalysisConfig(config)
 
     let jobId = this.createId()
     let logPath = this.getAnalysisLogPath(config, jobId)

@@ -605,6 +605,7 @@ function getStatusLabel({currentJob, queuedJobs, configMissing}) {
 
 function getAnalyzerStatusLabel(status) {
   if (status === 'bundled') return t('SGF analyzer: bundled with Seki-Sabaki.')
+  if (status === 'local') return t('SGF analyzer: local development package.')
   if (status === 'path') return t('SGF analyzer: available from PATH.')
 
   return t('SGF analyzer: missing from bundled resources.')
@@ -615,7 +616,33 @@ function getJobTitle(job) {
 }
 
 function getJobStateLabel(job) {
-  return job.error?.message || job.status || t('Unknown')
+  if (job.error != null) return getJobErrorLabel(job.error)
+  return job.status || t('Unknown')
+}
+
+function getJobErrorLabel(error) {
+  let labels = {
+    'analyze-sgf-not-found': t('analyze-sgf was not found.'),
+    'analyze-sgf-incompatible': t(
+      'analyze-sgf is not compatible with readable comments.',
+    ),
+    'katago-not-found': t('KataGo executable was not found.'),
+    'katago-model-not-found': t('KataGo model was not found.'),
+    'katago-config-not-found': t('KataGo analysis config was not found.'),
+    'spawn-failed': t('Could not start analyze-sgf.'),
+    'process-failed': t('Analysis process failed.'),
+    'output-missing': t('Analysis output was not generated.'),
+    'output-invalid': t('Analysis output is not valid SGF.'),
+    cancelled: t('Analysis was cancelled.'),
+  }
+  let label = labels[error.code] || error.message || t('Analysis failed.')
+  let detail = error.stderrLastLine || error.message
+
+  if (error.code === 'process-failed' && detail && detail !== label) {
+    return `${label} ${detail}`
+  }
+
+  return label
 }
 
 function getJobProgressPercent(job) {

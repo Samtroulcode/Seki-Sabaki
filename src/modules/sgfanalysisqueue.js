@@ -191,6 +191,10 @@ function serializeQueueError(error) {
       typeof error?.message === 'string' && error.message !== ''
         ? error.message
         : 'Analysis failed.',
+    exitCode: error?.exitCode,
+    signal: error?.signal,
+    stderrLastLine: error?.stderrLastLine,
+    logPath: error?.logPath,
   }
 }
 

@@ -26,6 +26,7 @@ describe('SGF analysis config', () => {
     assert.deepStrictEqual(createDefaultSgfAnalysisConfig(), {
       analyzeSgfPath: 'analyze-sgf',
       analyzeSgfStatus: 'path',
+      analyzeSgfArgs: [],
       katagoPath: '',
       katagoModelPath: '',
       katagoConfigPath: '',
@@ -238,6 +239,21 @@ describe('SGF analysis config', () => {
         'commentStyle:"compact",language:"en",annotationStyle:"auto",maxVariationsForEachMove:10,minWinrateDropForVariations:5,fileSuffix:".partial"',
         '/tmp/source.sgf',
       ],
+    )
+  })
+
+  it('quotes KataGo executable, model, and config paths with spaces on POSIX', () => {
+    assert.strictEqual(
+      buildAnalyzeSgfArguments({
+        inputPath: '/tmp/source.sgf',
+        fileSuffix: '.partial',
+        config: validConfig({
+          katagoPath: '/tmp/KataGo/katago path',
+          katagoModelPath: '/tmp/KataGo/model file.bin.gz',
+          katagoConfigPath: '/tmp/KataGo/analysis config.cfg',
+        }),
+      })[1],
+      `path:"'/tmp/KataGo/katago path'",arguments:"analysis -model '/tmp/KataGo/model file.bin.gz' -config '/tmp/KataGo/analysis config.cfg'"`,
     )
   })
 

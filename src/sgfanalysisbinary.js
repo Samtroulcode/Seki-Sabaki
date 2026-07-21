@@ -1,5 +1,5 @@
 const {existsSync} = require('fs')
-const {join} = require('path')
+const {join, resolve} = require('path')
 
 const ANALYZE_SGF_COMMAND = 'analyze-sgf'
 
@@ -25,6 +25,7 @@ function getAnalyzeSgfResourcePath({
 function resolveAnalyzeSgfPath({
   isPackaged = false,
   resourcesPath = process.resourcesPath,
+  appPath = resolve(__dirname, '..'),
   platform = process.platform,
   arch = process.arch,
   exists = existsSync,
@@ -32,10 +33,35 @@ function resolveAnalyzeSgfPath({
   let bundledPath = getAnalyzeSgfResourcePath({resourcesPath, platform, arch})
 
   if (bundledPath != null && (isPackaged || exists(bundledPath))) {
-    return bundledPath
+    return {path: bundledPath, status: 'bundled', args: []}
   }
 
-  return ANALYZE_SGF_COMMAND
+  let localPath = getAnalyzeSgfLocalPath({appPath, platform})
+  if (exists(localPath.displayPath)) {
+    return {path: localPath.path, status: 'local', args: localPath.args}
+  }
+
+  return {path: ANALYZE_SGF_COMMAND, status: 'path', args: []}
+}
+
+function getAnalyzeSgfLocalPath({
+  appPath = resolve(__dirname, '..'),
+  platform = process.platform,
+  nodeExecutable = process.execPath,
+} = {}) {
+  if (platform === 'win32') {
+    let scriptPath = join(
+      appPath,
+      'node_modules',
+      'analyze-sgf',
+      'src',
+      'index.js',
+    )
+    return {path: nodeExecutable, displayPath: scriptPath, args: [scriptPath]}
+  }
+
+  let binPath = join(appPath, 'node_modules', '.bin', ANALYZE_SGF_COMMAND)
+  return {path: binPath, displayPath: binPath, args: []}
 }
 
 function getAnalyzeSgfStatus({
@@ -55,12 +81,13 @@ function getAnalyzeSgfStatus({
     return 'path'
   }
 
-  return exists(analyzeSgfPath) ? 'bundled' : 'missing'
+  return exists(analyzeSgfPath) ? 'local' : 'missing'
 }
 
 module.exports = {
   ANALYZE_SGF_COMMAND,
   getAnalyzeSgfExecutableName,
+  getAnalyzeSgfLocalPath,
   getAnalyzeSgfResourcePath,
   getAnalyzeSgfStatus,
   resolveAnalyzeSgfPath,

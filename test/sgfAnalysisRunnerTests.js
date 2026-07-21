@@ -105,6 +105,44 @@ describe('SGF analysis runner', () => {
     }
   })
 
+  it('prepends local analyzer script arguments without using shell', async () => {
+    let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
+    let inputPath = join(directory, 'source with spaces.sgf')
+    let outputPath = join(directory, 'final.sgf')
+    let generatedPath = getAnalyzeSgfGeneratedPath(inputPath, '.tmp')
+    let spawnCalls = []
+
+    try {
+      writeFileSync(inputPath, '(;GM[1])')
+
+      await runSgfAnalysis({
+        inputPath,
+        outputPath,
+        config: {
+          ...config(),
+          analyzeSgfPath: process.execPath,
+          analyzeSgfArgs: ['/repo/node_modules/analyze-sgf/src/index.js'],
+        },
+        generatedFileSuffix: '.tmp',
+        spawnImpl: createFakeSpawn(({child, executable, args, options}) => {
+          spawnCalls.push({executable, args, options})
+          writeFileSync(generatedPath, '(;GM[1]GN[generated])')
+          child.emit('close', 0, null)
+        }),
+      })
+
+      assert.strictEqual(spawnCalls[0].executable, process.execPath)
+      assert.strictEqual(spawnCalls[0].options.shell, false)
+      assert.strictEqual(
+        spawnCalls[0].args[0],
+        '/repo/node_modules/analyze-sgf/src/index.js',
+      )
+      assert(spawnCalls[0].args.includes(inputPath))
+    } finally {
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
   it('continues analysis when the diagnostic log cannot be written', async () => {
     let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
     let inputPath = join(directory, 'source.sgf')
@@ -165,6 +203,35 @@ describe('SGF analysis runner', () => {
           error.message === 'KataGo failed',
       )
       assert.strictEqual(existsSync(outputPath), false)
+    } finally {
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
+  it('distinguishes missing analyze-sgf spawn failures', async () => {
+    let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
+    let inputPath = join(directory, 'source.sgf')
+    let outputPath = join(directory, 'final.sgf')
+
+    try {
+      writeFileSync(inputPath, '(;GM[1])')
+
+      await assert.rejects(
+        () =>
+          runSgfAnalysis({
+            inputPath,
+            outputPath,
+            config: config(),
+            spawnImpl: createFakeSpawn(({child}) => {
+              let error = new Error('spawn analyze-sgf ENOENT')
+              error.code = 'ENOENT'
+              child.emit('error', error)
+            }),
+          }),
+        (error) =>
+          error instanceof SgfAnalysisRunnerError &&
+          error.code === 'analyze-sgf-not-found',
+      )
     } finally {
       rmSync(directory, {recursive: true, force: true})
     }

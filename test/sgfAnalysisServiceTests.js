@@ -161,6 +161,29 @@ describe('SGF analysis service', () => {
     }
   })
 
+  it('rejects invalid persisted and per-job user options before normalization', () => {
+    let {directory, service} = createService()
+
+    try {
+      assert.throws(
+        () => service.setConfig({maxVisits: 'abc'}),
+        (error) => error.code === 'invalid-max-visits',
+      )
+
+      assert.throws(
+        () =>
+          service.startAnalysis({
+            source: {type: 'file', path: '/games/game.sgf'},
+            options: {maxVisits: 'abc'},
+          }),
+        (error) => error.code === 'invalid-max-visits',
+      )
+    } finally {
+      service.dispose()
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
   it('leaves board temporary source while analysis is running', () => {
     let run = deferred()
     let {directory, service} = createService({runner: () => run.promise})

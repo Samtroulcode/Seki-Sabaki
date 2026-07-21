@@ -6,6 +6,7 @@ function createDefaultSgfAnalysisConfig() {
   return {
     analyzeSgfPath: 'analyze-sgf',
     analyzeSgfStatus: 'path',
+    analyzeSgfArgs: [],
     katagoPath: '',
     katagoModelPath: '',
     katagoConfigPath: '',
@@ -42,6 +43,9 @@ function normalizeSgfAnalysisConfig(config = {}) {
   }
 
   normalized.katagoArguments = buildKatagoArguments(normalized)
+  normalized.analyzeSgfArgs = Array.isArray(normalized.analyzeSgfArgs)
+    ? normalized.analyzeSgfArgs.filter((arg) => typeof arg === 'string')
+    : defaults.analyzeSgfArgs
 
   return normalized
 }

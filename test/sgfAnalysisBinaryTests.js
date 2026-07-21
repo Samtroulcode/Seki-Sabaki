@@ -20,8 +20,8 @@ describe('SGF analysis binary resolver', () => {
     assert.strictEqual(getAnalyzeSgfExecutableName('win32'), 'analyze-sgf.exe')
   })
 
-  it('uses bundled resources in packaged apps and PATH in development', () => {
-    assert.strictEqual(
+  it('uses bundled resources in packaged apps and local package in development', () => {
+    assert.deepStrictEqual(
       resolveAnalyzeSgfPath({
         isPackaged: true,
         resourcesPath: '/app/resources',
@@ -29,18 +29,55 @@ describe('SGF analysis binary resolver', () => {
         arch: 'arm64',
         exists: () => false,
       }),
-      '/app/resources/analyze-sgf/darwin-arm64/analyze-sgf',
+      {
+        path: '/app/resources/analyze-sgf/darwin-arm64/analyze-sgf',
+        status: 'bundled',
+        args: [],
+      },
     )
 
-    assert.strictEqual(
+    assert.deepStrictEqual(
       resolveAnalyzeSgfPath({
         isPackaged: false,
         resourcesPath: '/app/resources',
+        appPath: '/repo',
+        platform: 'linux',
+        arch: 'x64',
+        exists: (path) => path === '/repo/node_modules/.bin/analyze-sgf',
+      }),
+      {path: '/repo/node_modules/.bin/analyze-sgf', status: 'local', args: []},
+    )
+  })
+
+  it('falls back to PATH only when packaged and local analyzers are missing', () => {
+    assert.deepStrictEqual(
+      resolveAnalyzeSgfPath({
+        isPackaged: false,
+        resourcesPath: '/app/resources',
+        appPath: '/repo',
         platform: 'linux',
         arch: 'x64',
         exists: () => false,
       }),
-      'analyze-sgf',
+      {path: 'analyze-sgf', status: 'path', args: []},
+    )
+  })
+
+  it('uses node to run the local package on Windows without shell:true', () => {
+    assert.deepStrictEqual(
+      resolveAnalyzeSgfPath({
+        isPackaged: false,
+        appPath: 'C:\\repo',
+        platform: 'win32',
+        arch: 'x64',
+        exists: (path) =>
+          path.endsWith('node_modules/analyze-sgf/src/index.js'),
+      }),
+      {
+        path: process.execPath,
+        status: 'local',
+        args: ['C:\\repo/node_modules/analyze-sgf/src/index.js'],
+      },
     )
   })
 
@@ -54,7 +91,7 @@ describe('SGF analysis binary resolver', () => {
         analyzeSgfPath: '/app/analyze-sgf',
         exists: () => true,
       }),
-      'bundled',
+      'local',
     )
     assert.strictEqual(
       getAnalyzeSgfStatus({
