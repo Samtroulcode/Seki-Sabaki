@@ -1,22 +1,23 @@
 {
-  "name": "sabaki",
-  "productName": "Sabaki",
-  "version": "0.60.2",
-  "description": "An elegant Go/Baduk/Weiqi board and SGF editor for a more civilized age.",
-  "author": "Yichuan Shen <shen.yichuan@gmail.com>",
-  "homepage": "http://sabaki.yichuanshen.de",
+  "name": "seki",
+  "productName": "Seki",
+  "version": "0.1.0-alpha.1",
+  "description": "An elegant Go/Baduk/Weiqi board and SGF editor with OGS integration and AI-powered analysis.",
+  "author": "Duarte Adrien <contact@samda.net>",
+  "homepage": "https://github.com/Samtroulcode/Seki-Sabaki",
   "license": "MIT",
   "main": "./src/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SabakiHQ/Sabaki"
+    "url": "git+https://github.com/Samtroulcode/Seki-Sabaki.git"
   },
   "bugs": {
-    "url": "https://github.com/SabakiHQ/Sabaki/issues"
+    "url": "https://github.com/Samtroulcode/Seki-Sabaki/issues"
   },
   "build": {
-    "appId": "de.yichuanshen.sabaki",
-    "copyright": "Copyright © 2015-2026 Yichuan Shen",
+    "appId": "net.samda.seki",
+    "productName": "Seki",
+    "copyright": "Copyright © 2026 Duarte Adrien",
     "compression": "normal",
     "electronFuses": {
       "runAsNode": false,
@@ -29,9 +30,12 @@
       "appimage": "1.0.2"
     },
     "linux": {
-      "target": "AppImage",
+      "target": [
+        "AppImage"
+      ],
       "category": "Game",
-      "artifactName": "sabaki-v${version}-linux-${arch}.${ext}"
+      "executableName": "seki",
+      "artifactName": "seki-v${version}-linux-${arch}.${ext}"
     },
     "flatpak": {
       "runtimeVersion": "23.08",
@@ -46,7 +50,7 @@
         "--filesystem=home",
         "--talk-name=org.freedesktop.Flatpak"
       ],
-      "artifactName": "sabaki-v${version}-linux-${arch}-beta.${ext}"
+      "artifactName": "seki-v${version}-linux-${arch}-beta.${ext}"
     },
     "mac": {
       "target": [
@@ -54,35 +58,38 @@
       ],
       "notarize": true,
       "category": "public.app-category.board-games",
-      "artifactName": "sabaki-v${version}-mac-${arch}.${ext}"
+      "artifactName": "seki-v${version}-mac-${arch}.${ext}"
     },
     "win": {
-      "artifactName": "sabaki-v${version}-win.exe"
+      "artifactName": "seki-v${version}-windows.exe"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Seki"
     },
     "fileAssociations": [
       {
         "ext": "sgf",
-        "name": "SGF",
+        "name": "Seki SGF",
         "description": "Smart Game Format"
       },
       {
         "ext": "ngf",
-        "name": "NGF",
+        "name": "Seki NGF",
         "description": "wBaduk NGF"
       },
       {
         "ext": "gib",
-        "name": "GIB",
+        "name": "Seki GIB",
         "description": "Tygem GIB"
       },
       {
         "ext": "ugf",
-        "name": "UGF",
+        "name": "Seki UGF",
         "description": "PandaNET UGF"
       }
     ],
@@ -174,11 +181,13 @@
     "format": "npm run format-base -- --write",
     "watch-format": "onchange \"**/*.{js,html,md}\" \"!{{dist,i18n}/**,bundle.js*}\" -- prettier --write {{changed}}",
     "watch": "concurrently \"webpack --mode development --watch\" \"npm run watch-format\"",
+    "dist:linux": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --x64 --publish never",
+    "dist:linux:arm64": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --arm64 --publish never",
+    "dist:linux:all": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --x64 --arm64 --publish never",
+    "dist:flatpak": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l flatpak --x64 --publish never",
     "dist:macos": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -m --x64 --arm64 --publish never",
-    "dist:linux": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l --x64 --arm64 --publish never && node ./ci/normalizeArtifactNames.js",
-    "dist:flatpak": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l flatpak --publish never",
-    "dist:win64": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w --x64 --publish never && node ./ci/mv.js ./dist/sabaki-vx.x.x-win.exe ./dist/sabaki-vx.x.x-win-x64-setup.exe",
-    "dist:win64-portable": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w portable --x64 --publish never && node ./ci/mv.js ./dist/sabaki-vx.x.x-win.exe ./dist/sabaki-vx.x.x-win-x64-portable.exe",
+    "dist:win64": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w nsis --x64 --publish never && node ./ci/mv.js ./dist/seki-vx.x.x-windows.exe ./dist/seki-vx.x.x-windows-x64-setup.exe",
+    "dist:win64-portable": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w portable --x64 --publish never && node ./ci/mv.js ./dist/seki-vx.x.x-windows.exe ./dist/seki-vx.x.x-windows-x64-portable.exe",
     "dist:win": "npm run dist:win64 && npm run dist:win64-portable",
     "i18n": "node ./ci/createI18n.js",
     "gen:engine-transcripts": "node ./scripts/engine-transcripts/capture.mjs",
