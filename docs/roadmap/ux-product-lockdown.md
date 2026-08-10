@@ -229,6 +229,17 @@ the target Online Game workspace must explicitly isolate or disable:
 - Decide storage location, download trust model, checksums, and platform limits
   before implementation.
 
+### Phase 7 — Product Identity and Documentation
+
+- Rewrite the README around Seki's own product direction: online play, library,
+  analysis, and game review.
+- Clearly separate Seki's identity from upstream Sabaki while preserving fork
+  history, credits, license obligations, and compatibility notes.
+- Update screenshots and feature descriptions after the UX modules stabilize.
+- Align contributor docs with the new architecture: Home modules, Library,
+  Analysis, OGS, and Online Game workspace.
+- Keep migration/compatibility language explicit for users who know Sabaki.
+
 ## Localization Notes
 
 Seki currently reuses Sabaki's i18n pattern but not a full translation workflow.
@@ -251,6 +262,8 @@ is stable.
 4. Draft the Analysis panel polish target: setup, queue, results, report.
 5. Implement the smallest read-only Library preview module.
 6. Add targeted E2E coverage for the new Home dashboard behavior.
+7. Defer the README rewrite until the UX direction is implemented enough to
+   document accurately.
 
 ## Non-Goals For This Branch Start
 
