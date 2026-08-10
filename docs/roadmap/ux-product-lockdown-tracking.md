@@ -30,11 +30,10 @@ identity, unblock smoke/E2E tests, and inventory the current user journeys.
   editing/review behavior.
 - README/product identity rewrite is deferred until the UX direction is stable
   enough to document accurately.
+- Product/window title checks should use `Seki` as the user-facing app identity.
 
 ## Open Decisions
 
-- Confirm product/window title policy: should all user-facing title checks
-  expect `Seki` rather than `Sabaki`?
 - Choose the first Library root location and whether it is user-configurable in
   the MVP or only later.
 - Decide the initial Home dashboard card order and minimum empty states.
@@ -50,7 +49,7 @@ identity, unblock smoke/E2E tests, and inventory the current user journeys.
 - [x] Create dedicated UX branch.
 - [x] Add UX product lockdown roadmap.
 - [x] Add roadmap tracking file.
-- [ ] Fix smoke title mismatch (`Sabaki` vs `Seki`) or document a different
+- [x] Fix smoke title mismatch (`Sabaki` vs `Seki`) or document a different
       product-title decision.
 - [ ] Inventory current Home, OGS, Analysis, and Board interactions.
 - [ ] Draft Home dashboard module layout.
@@ -118,4 +117,4 @@ identity, unblock smoke/E2E tests, and inventory the current user journeys.
 
 ## Last Updated
 
-2026-08-11 — Initial tracking file created.
+2026-08-11 — Product title policy set to `Seki`; smoke title test updated.
