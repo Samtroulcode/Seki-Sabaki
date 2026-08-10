@@ -11,6 +11,7 @@ const {
   writeFileSync,
 } = require('fs')
 const {dirname, extname, join, basename, resolve} = require('path')
+const sgf = require('@sabaki/sgf')
 
 const {buildAnalyzeSgfArguments} = require('./sgfanalysisconfig.js')
 const {extractSgfAnalysisMetadata} = require('./sgfanalysisfiles.js')
@@ -100,7 +101,9 @@ async function runSgfAnalysis({
       settled = true
 
       try {
-        let content = readValidGeneratedSgf(generatedPath)
+        let content = addScoreLeadProperties(
+          readValidGeneratedSgf(generatedPath),
+        )
         writeFinalSgf(outputPath, content)
         cleanupFile(generatedPath)
         writeLog(logPath, onLog, now, 'Analysis completed successfully.')
@@ -387,6 +390,55 @@ function writeFinalSgf(outputPath, content) {
   }
 }
 
+function addScoreLeadProperties(content) {
+  let roots
+
+  try {
+    roots = sgf.parse(content)
+  } catch (err) {
+    return content
+  }
+
+  let changed = false
+
+  for (let root of roots) {
+    walkSgfNodes(root, (node) => {
+      if (node.data?.SBKS != null) return
+
+      let scoreLead = extractScoreLeadFromComment(node.data?.C?.[0])
+      if (scoreLead == null) return
+
+      node.data.SBKS = [formatScoreLeadProperty(scoreLead)]
+      changed = true
+    })
+  }
+
+  return changed ? sgf.stringify(roots, {linebreak: ''}) : content
+}
+
+function walkSgfNodes(node, callback) {
+  callback(node)
+  for (let child of node.children || []) walkSgfNodes(child, callback)
+}
+
+function extractScoreLeadFromComment(comment) {
+  if (typeof comment !== 'string') return null
+
+  let match = comment.match(
+    /(?:Score estimé|Estimated score|Score lead)\s*:\s*([BW])\s*\+?(-?\d+(?:[.,]\d+)?)/i,
+  )
+  if (match == null) return null
+
+  let value = Number(match[2].replace(',', '.'))
+  if (!Number.isFinite(value) || value < 0) return null
+
+  return match[1].toUpperCase() === 'B' ? value : -value
+}
+
+function formatScoreLeadProperty(value) {
+  return (Math.round(value * 100) / 100).toString()
+}
+
 function cleanupFile(path) {
   try {
     if (path != null && pathEntryExists(path)) unlinkSync(path)
@@ -438,4 +490,6 @@ class SgfAnalysisRunnerError extends Error {
 exports.runSgfAnalysis = runSgfAnalysis
 exports.createDefaultGeneratedFileSuffix = createDefaultGeneratedFileSuffix
 exports.getAnalyzeSgfGeneratedPath = getAnalyzeSgfGeneratedPath
+exports.addScoreLeadProperties = addScoreLeadProperties
+exports.extractScoreLeadFromComment = extractScoreLeadFromComment
 exports.SgfAnalysisRunnerError = SgfAnalysisRunnerError

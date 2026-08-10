@@ -15,6 +15,8 @@ import {tmpdir} from 'os'
 
 import {createDefaultSgfAnalysisConfig} from '../src/modules/sgfanalysisconfig.js'
 import {
+  addScoreLeadProperties,
+  extractScoreLeadFromComment,
   getAnalyzeSgfGeneratedPath,
   runSgfAnalysis,
   SgfAnalysisRunnerError,
@@ -103,6 +105,63 @@ describe('SGF analysis runner', () => {
     } finally {
       rmSync(directory, {recursive: true, force: true})
     }
+  })
+
+  it('adds SBKS score lead properties to generated readable analysis SGFs', async () => {
+    let directory = mkdtempSync(join(tmpdir(), 'seki-runner-'))
+    let inputPath = join(directory, 'source.sgf')
+    let outputPath = join(directory, 'final.sgf')
+    let generatedPath = getAnalyzeSgfGeneratedPath(inputPath, '.tmp')
+
+    try {
+      writeFileSync(inputPath, '(;GM[1]FF[4]SZ[9])')
+
+      await runSgfAnalysis({
+        inputPath,
+        outputPath,
+        config: config(),
+        generatedFileSuffix: '.tmp',
+        spawnImpl: createFakeSpawn(({child}) => {
+          writeFileSync(
+            generatedPath,
+            '(;GM[1]FF[4]SZ[9];B[ee]C[Score estimé: B +6.43]SBKV[95.98];W[dd]C[Estimated score: W +1.03]SBKV[37.20])',
+          )
+          child.emit('close', 0, null)
+        }),
+      })
+
+      let content = readFileSync(outputPath, 'utf8')
+      assert.match(content, /;B\[ee\].*SBKS\[6\.43\]/)
+      assert.match(content, /;W\[dd\].*SBKS\[-1\.03\]/)
+    } finally {
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
+  it('extracts score lead comments using Black perspective', () => {
+    assert.strictEqual(
+      extractScoreLeadFromComment('Score estimé: B +6.43'),
+      6.43,
+    )
+    assert.strictEqual(
+      extractScoreLeadFromComment('Estimated score: W +1.03'),
+      -1.03,
+    )
+    assert.strictEqual(
+      extractScoreLeadFromComment('* Score lead: W 0.20'),
+      -0.2,
+    )
+    assert.strictEqual(extractScoreLeadFromComment('Score lead: B -0.20'), null)
+    assert.strictEqual(extractScoreLeadFromComment('Perte estimée: 1.0'), null)
+  })
+
+  it('preserves existing SBKS values when enriching SGF analysis', () => {
+    let content = addScoreLeadProperties(
+      '(;GM[1]FF[4]SZ[9];B[ee]C[Score estimé: B +6.43]SBKS[1.5])',
+    )
+
+    assert.match(content, /SBKS\[1\.5\]/)
+    assert.doesNotMatch(content, /SBKS\[6\.43\]/)
   })
 
   it('prepends local analyzer script arguments without using shell', async () => {
