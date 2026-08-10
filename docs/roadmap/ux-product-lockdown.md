@@ -81,12 +81,17 @@ later phase can embed the same module in Home or Board side panels.
 
 ### Analysis
 
-Analysis remains the batch-analysis manager, then gains better report browsing:
+The current Analysis panel is transitional. It should be polished into a full
+analysis experience, not kept as a technical job launcher:
 
 - clear KataGo/model/config status
 - user-friendly analysis options
-- analyzed SGF list
+- understandable job queue and progress states
+- analyzed SGF/library result browsing
+- clear report entry point after a job completes
 - access to analysis reports attached to library games
+- graceful empty/error states for missing KataGo, model, config, output folder,
+  failed jobs, and no analyzed games
 
 Kaya is a useful reference for report clarity, but Seki should keep its own
 visual direction and broader online-play focus.
@@ -122,6 +127,8 @@ Initial module candidates:
 - `GameInfoModule`: displays SGF/OGS metadata cleanly.
 - `AnalysisSummaryModule`: shows accuracy, move distribution, key mistakes, and
   graph/report entry points.
+- `AnalysisJobsModule`: shows analyzer setup, current job progress, queued jobs,
+  and recent results.
 - `OgsStatusModule`: connection/account/current-game status.
 - `QuickActionsModule`: primary app actions for Home.
 
@@ -177,13 +184,20 @@ MVP order and empty states:
 - Handle external file edits, missing files, empty folders, and invalid SGFs.
 - Add tests for listing, metadata, import, and open actions.
 
-### Phase 3 — Game Info and Analysis Report
+### Phase 3 — Analysis Polish and Reports
 
 - Create a reusable Game Info panel.
-- Create a readable Analysis Report panel.
+- Redesign the current Analysis panel into clearer setup, queue, result, and
+  report areas.
+- Create a readable Analysis Report panel with accuracy, move distribution, key
+  mistakes, and graph/report navigation.
 - Use existing SGF analysis properties and generated summaries first.
 - Later, consider structured report metadata instead of relying only on SGF
   comments.
+
+The first polish pass should decide which parts of Analysis belong on Home,
+which belong in the Analysis workspace, and which should be reusable from
+Library or Board.
 
 ### Phase 4 — OGS Panel Polish
 
@@ -234,8 +248,9 @@ is stable.
 1. Fix the smoke test title mismatch so E2E dependencies are reliable.
 2. Inventory current Home, OGS, Analysis, and Board interactions.
 3. Draft the Home dashboard module layout.
-4. Implement the smallest read-only Library preview module.
-5. Add targeted E2E coverage for the new Home dashboard behavior.
+4. Draft the Analysis panel polish target: setup, queue, results, report.
+5. Implement the smallest read-only Library preview module.
+6. Add targeted E2E coverage for the new Home dashboard behavior.
 
 ## Non-Goals For This Branch Start
 
