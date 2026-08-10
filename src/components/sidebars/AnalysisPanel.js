@@ -46,9 +46,11 @@ export default class AnalysisPanel extends Component {
     }
 
     this.handleConfigInput = (evt) => {
-      let {name, value} = evt.currentTarget
+      let {name, type, value, checked} = evt.currentTarget
 
-      analysisStore.updateConfigDraft({[name]: value})
+      analysisStore.updateConfigDraft({
+        [name]: type === 'checkbox' ? checked : value,
+      })
     }
 
     this.handleApplyConfig = async () => {
@@ -361,6 +363,131 @@ function ConfigSummary({
         placeholder: t('Folder for analyzed SGF files'),
         onInput: onConfigInput,
       }),
+    ),
+    h('h4', {}, t('Game settings')),
+    h(
+      'label',
+      {class: 'analysis-checkbox-label'},
+      h('input', {
+        type: 'checkbox',
+        name: 'inferGameSettingsFromSgf',
+        checked: displayedConfig.inferGameSettingsFromSgf !== false,
+        onChange: onConfigInput,
+      }),
+      h('span', {}, t('Use rules and komi from the SGF when available')),
+    ),
+    h(
+      'p',
+      {class: 'analysis-config-hint'},
+      t('Fallback if missing: {rules}, komi {komi}', {
+        rules: displayedConfig.rules || 'tromp-taylor',
+        komi: displayedConfig.komi ?? 7.5,
+      }),
+    ),
+    h('h4', {}, t('Analysis options')),
+    h(
+      'div',
+      {class: 'analysis-config-inline'},
+      h(
+        'label',
+        {},
+        h('span', {}, t('Max visits')),
+        h('input', {
+          type: 'number',
+          min: 1,
+          step: 1,
+          name: 'maxVisits',
+          value: displayedConfig.maxVisits ?? 1600,
+          onInput: onConfigInput,
+        }),
+      ),
+      h(
+        'label',
+        {},
+        h('span', {}, t('Variations per move')),
+        h('input', {
+          type: 'number',
+          min: 1,
+          step: 1,
+          name: 'maxVariationsForEachMove',
+          value: displayedConfig.maxVariationsForEachMove ?? 10,
+          onInput: onConfigInput,
+        }),
+      ),
+    ),
+    h(
+      'div',
+      {class: 'analysis-config-inline'},
+      h(
+        'label',
+        {},
+        h('span', {}, t('Comment language')),
+        h(
+          'select',
+          {
+            name: 'language',
+            value: displayedConfig.language || 'fr',
+            onChange: onConfigInput,
+          },
+          h('option', {value: 'fr'}, t('French')),
+          h('option', {value: 'en'}, t('English')),
+        ),
+      ),
+      h(
+        'label',
+        {},
+        h('span', {}, t('Comment detail')),
+        h(
+          'select',
+          {
+            name: 'commentStyle',
+            value: displayedConfig.commentStyle || 'compact',
+            onChange: onConfigInput,
+          },
+          h('option', {value: 'compact'}, t('Compact')),
+          h('option', {value: 'legacy'}, t('Technical')),
+          h('option', {value: 'detailed'}, t('Detailed')),
+        ),
+      ),
+    ),
+    h(
+      'details',
+      {class: 'analysis-advanced-options'},
+      h('summary', {}, t('Advanced SGF output')),
+      h(
+        'div',
+        {class: 'analysis-config-inline'},
+        h(
+          'label',
+          {},
+          h('span', {}, t('Move annotations')),
+          h(
+            'select',
+            {
+              name: 'annotationStyle',
+              value: displayedConfig.annotationStyle || 'auto',
+              onChange: onConfigInput,
+            },
+            h('option', {value: 'auto'}, t('Automatic')),
+            h('option', {value: 'classification'}, t('By score loss')),
+            h('option', {value: 'legacy'}, t('By winrate loss')),
+            h('option', {value: 'none'}, t('None')),
+          ),
+        ),
+        h(
+          'label',
+          {},
+          h('span', {}, t('Variation threshold')),
+          h('input', {
+            type: 'number',
+            min: 0,
+            step: 0.1,
+            name: 'minWinrateDropForVariations',
+            value: displayedConfig.minWinrateDropForVariations ?? 5,
+            onInput: onConfigInput,
+          }),
+        ),
+      ),
     ),
     h(
       'div',

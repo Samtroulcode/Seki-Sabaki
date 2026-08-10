@@ -34,7 +34,10 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#sgf-explorer')).toBeVisible()
     await expect(page.locator('#sgf-explorer')).toContainText('Folder browsing')
 
-    await page.getByTitle('Analysis').click()
+    await page
+      .locator('#apprail')
+      .getByRole('button', {name: 'Analysis'})
+      .click()
     await expect(page.locator('#analysis-dashboard')).toBeVisible()
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Analysis Manager',
@@ -68,10 +71,21 @@ test.describe('Home panel navigation', () => {
     ).toBeVisible()
     await expect(
       page.locator('#analysis-dashboard input[name="maxVisits"]'),
-    ).toHaveCount(0)
+    ).toBeVisible()
     await expect(
-      page.locator('#analysis-dashboard input[name="komi"]'),
-    ).toHaveCount(0)
+      page.locator('#analysis-dashboard input[name="maxVisits"]'),
+    ).toHaveValue('1600')
+    await expect(
+      page.locator(
+        '#analysis-dashboard input[name="inferGameSettingsFromSgf"]',
+      ),
+    ).toBeChecked()
+    await expect(page.locator('#analysis-dashboard')).toContainText(
+      'Use rules and komi from the SGF when available',
+    )
+    await expect(
+      page.locator('#analysis-dashboard select[name="language"]'),
+    ).toHaveValue('fr')
     await expect(
       page.getByRole('button', {name: 'Start analysis'}),
     ).toBeDisabled()

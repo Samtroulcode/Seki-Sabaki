@@ -12,6 +12,7 @@ const USER_CONFIG_KEYS = [
   'katagoModelPath',
   'katagoConfigPath',
   'outputDirectory',
+  'inferGameSettingsFromSgf',
   'maxVisits',
   'rules',
   'komi',
@@ -226,6 +227,9 @@ function loadUserSgfAnalysisConfig(setting) {
         'config',
       ),
     outputDirectory: setting.get('analysis.output_directory') || '',
+    inferGameSettingsFromSgf: setting.get(
+      'analysis.infer_game_settings_from_sgf',
+    ),
     maxVisits: setting.get('analysis.max_visits'),
     rules: setting.get('analysis.rules'),
     komi: setting.get('analysis.komi'),
@@ -259,6 +263,10 @@ function persistUserSgfAnalysisConfig(setting, config) {
     .set('analysis.katago_model_path', config.katagoModelPath || '')
     .set('analysis.katago_config_path', config.katagoConfigPath || '')
     .set('analysis.output_directory', config.outputDirectory || '')
+    .set(
+      'analysis.infer_game_settings_from_sgf',
+      config.inferGameSettingsFromSgf,
+    )
     .set('analysis.max_visits', config.maxVisits)
     .set('analysis.rules', config.rules)
     .set('analysis.komi', config.komi)

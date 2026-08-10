@@ -62,7 +62,7 @@ describe('SGF analysis service', () => {
     try {
       writeFileSync(
         sourcePath,
-        '(;GM[1]FF[4]SZ[9]GN[Test Game]PB[Black]PW[White]DT[2026-07-20])',
+        '(;GM[1]FF[4]SZ[9]GN[Test Game]PB[Black]PW[White]DT[2026-07-20]KM[0.5]RU[Japanese])',
       )
 
       let job = service.startAnalysis({
@@ -76,6 +76,8 @@ describe('SGF analysis service', () => {
       assert.strictEqual(job.sourcePath, sourcePath)
       assert.strictEqual(job.displayName, 'Override')
       assert.strictEqual(job.config.maxVisits, 800)
+      assert.strictEqual(job.config.komi, 0.5)
+      assert.strictEqual(job.config.rules, 'japanese')
       assert.strictEqual(
         job.outputPath,
         join(directory, '9x9-override-2026-07-20.sgf'),
@@ -90,6 +92,31 @@ describe('SGF analysis service', () => {
         service.getAnalysisState().completedJobs[0].status,
         'completed',
       )
+    } finally {
+      service.dispose()
+      rmSync(directory, {recursive: true, force: true})
+    }
+  })
+
+  it('can keep fallback komi and rules when SGF game-setting inference is disabled', async () => {
+    let calls = []
+    let {directory, service} = createService({
+      runner: async (job) => calls.push(job),
+    })
+    let sourcePath = join(directory, 'source.sgf')
+
+    try {
+      writeFileSync(sourcePath, '(;GM[1]FF[4]SZ[9]KM[0.5]RU[Japanese])')
+
+      let job = service.startAnalysis({
+        source: {type: 'file', path: sourcePath},
+        options: {inferGameSettingsFromSgf: false},
+      })
+      await Promise.resolve()
+
+      assert.strictEqual(job.config.komi, 7.5)
+      assert.strictEqual(job.config.rules, 'tromp-taylor')
+      assert.strictEqual(calls[0].config.inferGameSettingsFromSgf, false)
     } finally {
       service.dispose()
       rmSync(directory, {recursive: true, force: true})

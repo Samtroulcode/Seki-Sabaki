@@ -49,6 +49,7 @@ let defaults = {
   'analysis.max_visits': 1600,
   'analysis.min_winrate_drop_for_variations': 5,
   'analysis.output_directory': '',
+  'analysis.infer_game_settings_from_sgf': true,
   'analysis.rules': 'tromp-taylor',
   'analysis.annotation_style': 'auto',
   'analysis.comment_style': 'compact',

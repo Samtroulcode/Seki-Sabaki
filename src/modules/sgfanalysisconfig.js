@@ -13,6 +13,7 @@ function createDefaultSgfAnalysisConfig() {
     katagoShellQuoting: process.platform === 'win32' ? 'cmd' : 'posix',
     katagoArguments: 'analysis',
     outputDirectory: '',
+    inferGameSettingsFromSgf: true,
     maxVisits: 1600,
     rules: 'tromp-taylor',
     komi: 7.5,
@@ -31,6 +32,10 @@ function normalizeSgfAnalysisConfig(config = {}) {
     ...defaults,
     ...pickKnownConfigKeys(config),
     maxVisits: normalizeInteger(config.maxVisits, defaults.maxVisits),
+    inferGameSettingsFromSgf: normalizeBoolean(
+      config.inferGameSettingsFromSgf,
+      defaults.inferGameSettingsFromSgf,
+    ),
     komi: normalizeNumber(config.komi, defaults.komi),
     maxVariationsForEachMove: normalizeInteger(
       config.maxVariationsForEachMove,
@@ -48,6 +53,12 @@ function normalizeSgfAnalysisConfig(config = {}) {
     : defaults.analyzeSgfArgs
 
   return normalized
+}
+
+function normalizeBoolean(value, fallback) {
+  if (value === true || value === 'true') return true
+  if (value === false || value === 'false') return false
+  return fallback
 }
 
 function buildKatagoArguments(config = {}) {

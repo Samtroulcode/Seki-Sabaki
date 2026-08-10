@@ -33,6 +33,7 @@ describe('SGF analysis config', () => {
       katagoShellQuoting: process.platform === 'win32' ? 'cmd' : 'posix',
       katagoArguments: 'analysis',
       outputDirectory: '',
+      inferGameSettingsFromSgf: true,
       maxVisits: 1600,
       rules: 'tromp-taylor',
       komi: 7.5,

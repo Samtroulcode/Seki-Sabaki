@@ -103,6 +103,7 @@ function extractSgfAnalysisMetadata(content) {
     boardWidth: size[0],
     boardHeight: size[1],
     komi: parseKomi(getRootProperty(root, 'KM')),
+    rules: parseRules(getRootProperty(root, 'RU')),
     summary: getRootProperty(root, 'C', '') || '',
   }
 }
@@ -185,6 +186,32 @@ function parseKomi(value) {
   return Number.isFinite(komi) ? komi : null
 }
 
+function parseRules(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null
+
+  let normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-')
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  let rules = {
+    japanese: 'japanese',
+    chinese: 'chinese',
+    korean: 'korean',
+    aga: 'aga',
+    'tromp-taylor': 'tromp-taylor',
+    tromptaylor: 'tromp-taylor',
+    'new-zealand': 'new-zealand',
+    newzealand: 'new-zealand',
+    nz: 'new-zealand',
+  }
+
+  return rules[normalized] || null
+}
+
 exports.slugifyAnalysisName = slugifyAnalysisName
 exports.normalizeAnalysisDate = normalizeAnalysisDate
 exports.getAnalysisBoardSize = getAnalysisBoardSize
@@ -192,6 +219,7 @@ exports.buildAnalysisFilename = buildAnalysisFilename
 exports.getUniqueAnalysisOutputPath = getUniqueAnalysisOutputPath
 exports.getPartialAnalysisOutputPath = getPartialAnalysisOutputPath
 exports.extractSgfAnalysisMetadata = extractSgfAnalysisMetadata
+exports.parseRules = parseRules
 exports.readSgfAnalysisMetadata = readSgfAnalysisMetadata
 exports.createAnalyzedGame = createAnalyzedGame
 exports.listAnalyzedGames = listAnalyzedGames

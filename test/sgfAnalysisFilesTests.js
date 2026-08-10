@@ -94,7 +94,7 @@ describe('SGF analysis files', () => {
 
   it('extracts root SGF metadata for analyzed game cards', () => {
     let metadata = extractSgfAnalysisMetadata(
-      '(;GM[1]FF[4]SZ[13]GN[Test Game]PB[Black]PW[White]BR[1d]WR[2d]DT[2026-07-20]RE[B+R]KM[7.5]C[Root summary];B[dd];W[pq])',
+      '(;GM[1]FF[4]SZ[13]GN[Test Game]PB[Black]PW[White]BR[1d]WR[2d]DT[2026-07-20]RE[B+R]KM[7.5]RU[Japanese]C[Root summary];B[dd];W[pq])',
     )
 
     assert.deepStrictEqual(metadata, {
@@ -108,6 +108,7 @@ describe('SGF analysis files', () => {
       boardWidth: 13,
       boardHeight: 13,
       komi: 7.5,
+      rules: 'japanese',
       summary: 'Root summary',
     })
   })

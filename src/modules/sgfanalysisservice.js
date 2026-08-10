@@ -23,6 +23,7 @@ const {runSgfAnalysis} = require('./sgfanalysisrunner.js')
 
 const MAX_SOURCE_FILE_BYTES = 50 * 1024 * 1024
 const PER_JOB_OPTION_KEYS = [
+  'inferGameSettingsFromSgf',
   'maxVisits',
   'rules',
   'komi',
@@ -121,6 +122,7 @@ class SgfAnalysisService {
     let jobId = this.createId()
     let logPath = this.getAnalysisLogPath(config, jobId)
     let source = this.prepareSource(request, config, jobId)
+    config = applySgfGameSettings(config, source.metadata)
     let metadata = {...source.metadata, ...(request.metadata || {})}
     let outputPath = getUniqueAnalysisOutputPath(
       config.outputDirectory,
@@ -380,5 +382,18 @@ class SgfAnalysisServiceError extends Error {
   }
 }
 
+function applySgfGameSettings(config, metadata = {}) {
+  if (config.inferGameSettingsFromSgf !== true) return config
+
+  let inferred = {}
+  if (Number.isFinite(metadata.komi)) inferred.komi = metadata.komi
+  if (typeof metadata.rules === 'string' && metadata.rules !== '') {
+    inferred.rules = metadata.rules
+  }
+
+  return Object.keys(inferred).length === 0 ? config : {...config, ...inferred}
+}
+
 exports.SgfAnalysisService = SgfAnalysisService
+exports.applySgfGameSettings = applySgfGameSettings
 exports.SgfAnalysisServiceError = SgfAnalysisServiceError

@@ -66,6 +66,16 @@ Click **Apply settings**, choose an SGF file, then click **Start analysis**. The
 KataGo path, model, config, and output folder are saved for future sessions.
 Seki-Sabaki generates the KataGo analysis arguments from those fields.
 
+Additional Analysis panel options control each SGF job:
+
+- Game settings: by default, Seki-Sabaki uses rules (`RU`) and komi (`KM`) from
+  the input SGF when available. If either value is missing, it falls back to the
+  configured rules and komi. Clear **Use rules and komi from the SGF when
+  available** to always use the fallback values.
+- Analysis options: max visits, variations per move, comment language, comment
+  detail, and advanced SGF output settings for move annotations and variation
+  threshold.
+
 You can also analyze the current board as an SGF job. After applying valid
 KataGo analysis settings, click **Analyze Current Game** in the left sidebar
 toolbar. Seki-Sabaki exports the current game tree to SGF, starts an analysis
