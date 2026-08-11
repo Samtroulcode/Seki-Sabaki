@@ -110,7 +110,7 @@ const test = base.extend({
 
     // Wait for the app shell to fully render. The default workspace can be the
     // central Home view, so don't require the goban to be mounted here.
-    await page.waitForSelector('#apprail', {timeout: 30000})
+    await page.waitForSelector('#apptabs', {timeout: 30000})
 
     // Most legacy E2E suites are board-centric and predate the Home workspace.
     // Keep their starting point stable while smoke/home specs cover Home itself.

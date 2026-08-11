@@ -8,7 +8,7 @@ import influence from '@sabaki/influence'
 import TripleSplitContainer from './helpers/TripleSplitContainer.js'
 import ThemeManager from './ThemeManager.js'
 import MainMenu from './MainMenu.js'
-import AppRail from './AppRail.js'
+import AppTabs from './AppTabs.js'
 import HomeView from './HomeView.js'
 import MainView from './MainView.js'
 import LeftSidebar from './LeftSidebar.js'
@@ -58,8 +58,13 @@ class App extends Component {
     super(props)
 
     this.state = sabaki.state
+    this.activityWorkspace = 'board'
 
     sabaki.on('change', ({change, callback}) => {
+      if (change.activeWorkspace != null && change.activeWorkspace !== 'home') {
+        this.activityWorkspace = change.activeWorkspace
+      }
+
       this.setState(change, callback)
     })
 
@@ -406,7 +411,12 @@ class App extends Component {
         onlineGameId: state.onlineGameId,
       }),
 
-      h(AppRail, {activeWorkspace: state.activeWorkspace}),
+      h(AppTabs, {
+        activeWorkspace: state.activeWorkspace,
+        activityWorkspace: this.activityWorkspace,
+        onlineGameId: state.onlineGameId,
+        representedFilename: state.representedFilename,
+      }),
 
       h(TripleSplitContainer, {
         id: 'mainlayout',

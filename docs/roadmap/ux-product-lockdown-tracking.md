@@ -7,13 +7,13 @@ Companion roadmap: [`ux-product-lockdown.md`](./ux-product-lockdown.md)
 
 ## Current Phase
 
-Phase 1 — Home Dashboard Redesign
+Phase 2 — Navigation Tabs Foundation
 
 ## Active Goal
 
-Turn Home into the first coherent product hub slice: define the MVP layout,
-implement quick actions and continue/resume modules, add an honest read-only
-Library preview, and cover the new dashboard behavior with targeted E2E tests.
+Replace the visible feature rail with the first safe navigation tab shell: Home
+as a permanent anchor plus the current open activity, without claiming true
+multi-board or full activity-tab persistence yet.
 
 ## Working Branch
 
@@ -321,11 +321,11 @@ Purpose: answer “What should I learn from this game?”
 
 ### Phase 2 — Navigation Tabs Foundation
 
-- [ ] Review staged navigation tab spec.
-- [ ] Define the first TabBar shell UX without recreating AppRail horizontally.
-- [ ] Keep Home permanent and non-closeable.
-- [ ] Define how New Board behaves before true multi-board state exists.
-- [ ] Add targeted navigation E2E coverage.
+- [x] Review staged navigation tab spec.
+- [x] Define the first TabBar shell UX without recreating AppRail horizontally.
+- [x] Keep Home permanent and non-closeable.
+- [x] Define how New Board behaves before true multi-board state exists.
+- [x] Add targeted navigation E2E coverage.
 
 ### Phase 3 — Library MVP
 
@@ -379,6 +379,9 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-11 — Phase 2 started; AppRail replaced by Home anchor plus current
+activity TabBar shell.
 
 2026-08-11 — Home dashboard MVP implemented with quick actions, continue, status
 cards, and targeted E2E coverage.

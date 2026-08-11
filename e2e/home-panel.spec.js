@@ -5,7 +5,7 @@ test.describe('Home panel navigation', () => {
   test('navigates between home, board, OGS, and placeholders', async ({
     page,
   }) => {
-    await expect(page.locator('#apprail')).toBeVisible()
+    await expect(page.locator('#apptabs')).toBeVisible()
     await expect(page.locator('#home')).toBeVisible()
     await expect(page.getByTitle('Home')).toHaveAttribute(
       'aria-current',
@@ -30,9 +30,9 @@ test.describe('Home panel navigation', () => {
       'No online game on the board',
     )
 
-    await page.getByTitle('Board').click()
+    await page.getByTitle('Untitled Board').click()
     await expect(page.locator('#goban')).toBeVisible()
-    await expect(page.getByTitle('Board')).toHaveAttribute(
+    await expect(page.getByTitle('Untitled Board')).toHaveAttribute(
       'aria-current',
       'page',
     )
@@ -45,18 +45,25 @@ test.describe('Home panel navigation', () => {
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(
-      page.locator('#apprail').getByRole('button', {name: 'OGS'}),
+      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
     ).toHaveAttribute('aria-current', 'page')
 
-    await page.getByTitle('SGF Explorer').click()
-    await expect(page.locator('#sgf-explorer')).toBeVisible()
-    await expect(page.locator('#sgf-explorer')).toContainText('Folder browsing')
-
+    await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await expect(
+      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+    ).toBeVisible()
+    await expect(
+      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+    ).not.toHaveAttribute('aria-current', 'page')
     await page
-      .locator('#apprail')
-      .getByRole('button', {name: 'Analysis'})
+      .locator('#home')
+      .getByRole('button', {name: /Analyze/})
       .click()
     await expect(page.locator('#analysis-dashboard')).toBeVisible()
+    await expect(
+      page.locator('#apptabs').getByRole('button', {name: 'Analysis Setup'}),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Analysis Manager',
     )

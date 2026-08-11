@@ -19,7 +19,7 @@ test.describe('Smoke Tests', () => {
   }) => {
     await expect(page.locator('#home')).toBeVisible()
 
-    await page.getByTitle('Board').click()
+    await page.getByTitle('Untitled Board').click()
 
     const goban = page.locator('#goban')
     await expect(goban).toBeVisible()
@@ -31,7 +31,7 @@ test.describe('Smoke Tests', () => {
   })
 
   test('main layout elements present', async ({page}) => {
-    await expect(page.locator('#apprail')).toBeVisible()
+    await expect(page.locator('#apptabs')).toBeVisible()
     await expect(page.locator('#home')).toBeVisible()
     await expect(page.locator('#mainlayout')).toBeVisible()
   })
