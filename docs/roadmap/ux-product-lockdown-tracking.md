@@ -7,12 +7,13 @@ Companion roadmap: [`ux-product-lockdown.md`](./ux-product-lockdown.md)
 
 ## Current Phase
 
-Phase 0 — Product Lockdown Setup
+Phase 1 — Home Dashboard Redesign
 
 ## Active Goal
 
-Stabilize the product foundation before UX implementation work: confirm Seki's
-identity, unblock smoke/E2E tests, and inventory the current user journeys.
+Turn Home into the first coherent product hub slice: define the MVP layout,
+implement quick actions and continue/resume modules, add an honest read-only
+Library preview, and cover the new dashboard behavior with targeted E2E tests.
 
 ## Working Branch
 
@@ -32,6 +33,9 @@ identity, unblock smoke/E2E tests, and inventory the current user journeys.
 - Home modules should speak in user intents first: play, continue, find,
   analyze, connect. Implementation details such as file paths, logs, engines,
   sockets, and protocol state should be secondary or advanced information.
+- Analysis polish target is a four-step workflow: setup, queue, results, report.
+  The first pass should keep existing analyzer/backend behavior stable and make
+  technical KataGo paths, logs, and SGF output controls secondary or advanced.
 - Library should start as a standalone workspace/module before becoming an
   optional Board side panel.
 - Live OGS play should eventually move away from unrestricted local Board
@@ -170,6 +174,79 @@ Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
 - Avoid placeholder-heavy surfaces on the main path; prefer honest empty states
   with one clear next action.
 
+## Analysis Panel Polish Target
+
+The Analysis workspace should become a guided review workflow, not a technical
+KataGo launcher. The existing store and backend behavior should remain stable at
+first; the first polish pass is mostly presentation, copy, hierarchy, and module
+boundaries.
+
+### 1. Setup
+
+Purpose: answer “Can Seki analyze this game?”
+
+- Default view should show analyzer readiness, the selected game/source, output
+  destination summary, and a clear Start Analysis action.
+- Blocked states should explain the user-facing reason: no SGF selected, setup
+  incomplete, unapplied settings, or another operation running.
+- Raw KataGo executable/model/config paths, max visits, variation counts,
+  language/comment settings, and SGF output details should remain available but
+  move toward advanced settings.
+- Reusable target: `AnalysisSetupModule` for full Analysis setup, compact Home
+  readiness, Board “Analyze current game”, and future Library “Analyze this
+  game”.
+
+### 2. Queue
+
+Purpose: answer “What is happening now?”
+
+- Default view should emphasize current job title, friendly status, progress,
+  move progress when known, queue count, and cancel controls.
+- Logs, raw log path, raw process status, visits, and show-log actions should be
+  technical details hidden by default.
+- Completed/failed recent jobs should point users toward Results or a concise
+  failure reason instead of foregrounding logs.
+- Reusable target: `AnalysisJobsModule` for full queue management in Analysis,
+  compact running/queued status on Home, and future Library/Board badges.
+
+### 3. Results
+
+Purpose: answer “What has been analyzed and what should I open?”
+
+- Default result cards should show game title/file, players, date/result/board
+  size, analysis availability, and clear primary/secondary actions.
+- Primary action target: Read Report.
+- Secondary action target: Open Board.
+- Show in folder remains useful but should be secondary rather than the main
+  user path.
+- Reusable target: `AnalysisResultsModule` for full results in Analysis, recent
+  analysis preview on Home, and analysis status/action rows in Library.
+
+### 4. Report
+
+Purpose: answer “What should I learn from this game?”
+
+- There is no dedicated report view yet. The first report slice can be
+  metadata-only plus Open Board, Show in Folder, and Back to Results actions.
+- Later report sections should use existing analyzed SGF output before adding
+  new formats: summary, key moments, move quality, and graph/board navigation.
+- Raw SGF properties, full engine variation lists, generated comments, logs, and
+  transcripts should stay out of the default report.
+- Reusable target: `AnalysisReportModule` plus pure `analysisreport.js` helpers
+  later for extracting summary/key-move data from analyzed SGFs.
+
+### Suggested Analysis Implementation Slices
+
+1. Setup clarity only: reword the current source card, add readiness summary,
+   and move raw KataGo paths into advanced settings without changing store
+   behavior.
+2. Queue readability: improve hierarchy and hide logs under technical details.
+3. Results actions: rename Open to Open Board and add a Report entry point.
+4. Minimal report panel: selected analyzed game state, metadata-only report,
+   Back/Open Board/Show Folder actions.
+5. Report extraction: pure helper and unit tests for summary/key moments from
+   existing analyzed SGF data.
+
 ## Phase Progress
 
 ### Phase 0 — Product Lockdown Setup
@@ -181,7 +258,7 @@ Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
       product-title decision.
 - [x] Inventory current Home, OGS, Analysis, and Board interactions.
 - [x] Draft Home dashboard module layout.
-- [ ] Draft Analysis panel polish target: setup, queue, results, report.
+- [x] Draft Analysis panel polish target: setup, queue, results, report.
 
 ### Phase 1 — Home Dashboard Redesign
 
@@ -207,7 +284,7 @@ Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
 
 - [ ] Split setup, queue, results, and report responsibilities.
 - [ ] Create AnalysisJobsModule target design.
-- [ ] Create AnalysisSummaryModule target design.
+- [ ] Create AnalysisReportModule target design.
 - [ ] Define report data source for the first implementation pass.
 - [ ] Add targeted tests for the polished Analysis UX.
 
@@ -245,6 +322,10 @@ Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-11 — Phase 0 completed; Phase 1 Home Dashboard Redesign started.
+
+2026-08-11 — Analysis setup/queue/results/report polish target drafted.
 
 2026-08-11 — Interaction inventory and Home dashboard MVP layout drafted.
 

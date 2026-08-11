@@ -125,10 +125,9 @@ Initial module candidates:
 
 - `LibraryModule`: lists folders/games, supports open/import actions.
 - `GameInfoModule`: displays SGF/OGS metadata cleanly.
-- `AnalysisSummaryModule`: shows accuracy, move distribution, key mistakes, and
-  graph/report entry points.
-- `AnalysisJobsModule`: shows analyzer setup, current job progress, queued jobs,
-  and recent results.
+- `AnalysisReportModule`: shows summary, move distribution, key mistakes, and
+  graph/board navigation.
+- `AnalysisJobsModule`: shows current job progress and queued jobs.
 - `OgsStatusModule`: connection/account/current-game status.
 - `QuickActionsModule`: primary app actions for Home.
 
@@ -202,6 +201,34 @@ The first polish pass should decide which parts of Analysis belong on Home,
 which belong in the Analysis workspace, and which should be reusable from
 Library or Board.
 
+Analysis polish target:
+
+1. **Setup** should answer whether Seki can analyze the selected game. Keep
+   analyzer readiness, source selection, output destination, and Start Analysis
+   visible by default; move raw KataGo paths and SGF output controls toward
+   advanced settings.
+2. **Queue** should answer what is happening now. Emphasize current job,
+   friendly status, progress, queued jobs, and cancel actions; hide log paths
+   and log tails under technical details.
+3. **Results** should answer what has been analyzed. Show game metadata and make
+   Read Report the primary action, Open Board the secondary action, and Show in
+   Folder a secondary utility.
+4. **Report** should answer what the user should learn. The first slice can be a
+   metadata-only report using existing analyzed SGF outputs; later slices can
+   add summary, key moments, move quality, and graph/board navigation through
+   pure extraction helpers.
+
+Reusable module targets:
+
+- `AnalysisSetupModule`
+- `AnalysisJobsModule`
+- `AnalysisResultsModule`
+- `AnalysisReportModule`
+
+Keep the first implementation slices presentational and modular: no new analyzer
+protocol assumptions, no new persistence format, no model-management workflow,
+and no board behavior changes beyond named analysis actions.
+
 ### Phase 4 — OGS Panel Polish
 
 - Redesign OGS account/connection state.
@@ -263,11 +290,12 @@ Completed setup tasks are tracked in
 [`ux-product-lockdown-tracking.md`](./ux-product-lockdown-tracking.md). The next
 active tasks are:
 
-1. Draft the Analysis panel polish target: setup, queue, results, report.
-2. Define the Home dashboard MVP layout from the tracked draft.
-3. Implement quick actions and continue/resume Home modules.
-4. Implement the smallest read-only Library preview module.
-5. Add targeted E2E coverage for the new Home dashboard behavior.
+1. Define the Home dashboard MVP layout from the tracked draft.
+2. Implement quick actions and continue/resume Home modules.
+3. Implement the smallest read-only Library preview module.
+4. Add targeted E2E coverage for the new Home dashboard behavior.
+5. Start Analysis setup clarity as the first Analysis polish slice after the
+   Home MVP begins.
 6. Defer the README rewrite until the UX direction is implemented enough to
    document accurately.
 
