@@ -71,16 +71,23 @@
 .workspace-placeholder {
   display: grid;
   align-content: start;
-  gap: 1.5rem;
+  gap: 1.75rem;
   height: 100%;
   box-sizing: border-box;
   padding: 3rem;
-  background: #181818;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(0, 130, 240, 0.14),
+      transparent 22rem
+    ),
+    #181818;
   color: #d0d0d0;
   overflow: auto;
 }
 .home-view h1,
 .home-view h2,
+.home-view h3,
 .home-view p,
 .workspace-placeholder h1,
 .workspace-placeholder p {
@@ -89,7 +96,7 @@
 .home-hero {
   display: grid;
   gap: 0.5rem;
-  max-width: 46rem;
+  max-width: 52rem;
 }
 .home-kicker,
 .home-card-meta {
@@ -99,6 +106,56 @@
 .workspace-placeholder h1 {
   color: white;
   font-size: 2.4rem;
+}
+.home-section {
+  display: grid;
+  gap: 0.85rem;
+}
+.home-section-heading {
+  display: grid;
+  gap: 0.25rem;
+}
+.home-section-heading h2 {
+  color: white;
+  font-size: 1.15rem;
+}
+.home-section-heading p {
+  color: #aaa;
+}
+.home-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+.home-action {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 5.5rem;
+  text-align: left;
+  border: 1px solid #323338;
+}
+.home-action strong {
+  color: white;
+  font-size: 1rem;
+}
+.home-action span {
+  color: #b8b8b8;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+.home-action.primary {
+  background: #005fae;
+  border-color: #168bee;
+}
+.home-action.primary:not(:disabled):hover,
+.home-action.primary:not(:disabled):focus {
+  background: #0072d0;
+}
+.home-continue .home-card {
+  min-height: auto;
+  max-width: 42rem;
+  border-color: #3f5668;
+  background: rgba(17, 24, 29, 0.92);
 }
 .home-card-grid {
   display: grid;
@@ -113,14 +170,10 @@
   padding: 1rem;
   background: #111;
   border: 1px solid #292a2d;
+  border-radius: 6px;
 }
-.home-card h2 {
+.home-card h3 {
   color: white;
-}
-.home-actions {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
 }
 .home-view button,
 .workspace-placeholder button {
@@ -128,12 +181,32 @@
   padding: 0.45rem 0.8rem;
   background: #292a2d;
   color: #eee;
+  border-radius: 4px;
 }
 .home-view button:not(:disabled):hover,
 .home-view button:not(:disabled):focus,
 .workspace-placeholder button:not(:disabled):hover,
 .workspace-placeholder button:not(:disabled):focus {
   background: #222;
+}
+
+@media (max-width: 760px) {
+  .home-view,
+  .workspace-placeholder {
+    padding: 1.5rem;
+  }
+
+  .home-hero h1,
+  .workspace-placeholder h1 {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .home-action-grid,
+  .home-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 #main {

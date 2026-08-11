@@ -262,13 +262,13 @@ Purpose: answer “What should I learn from this game?”
 
 ### Phase 1 — Home Dashboard Redesign
 
-- [ ] Define Home dashboard MVP layout.
-- [ ] Add quick actions module/card.
-- [ ] Add continue/resume module/card.
-- [ ] Add read-only Library preview module/card.
-- [ ] Add Analysis status module/card.
-- [ ] Add OGS status module/card.
-- [ ] Add targeted Home dashboard E2E coverage.
+- [x] Define Home dashboard MVP layout.
+- [x] Add quick actions module/card.
+- [x] Add continue/resume module/card.
+- [x] Add read-only Library preview module/card.
+- [x] Add Analysis status module/card.
+- [x] Add OGS status module/card.
+- [x] Add targeted Home dashboard E2E coverage.
 
 ### Phase 2 — Library MVP
 
@@ -322,6 +322,9 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-11 — Home dashboard MVP implemented with quick actions, continue, status
+cards, and targeted E2E coverage.
 
 2026-08-11 — Phase 0 completed; Phase 1 Home Dashboard Redesign started.
 

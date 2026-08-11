@@ -14,8 +14,10 @@ export default class HomeView extends Component {
     }
 
     this.handleNewGameButtonClick = async () => {
+      if (!(await sabaki.askForSave())) return
+
+      await sabaki.newFile({suppressAskForSave: true})
       sabaki.setState({activeWorkspace: 'board'})
-      await sabaki.newFile()
     }
 
     this.handleOpenFileButtonClick = async () => {
@@ -24,6 +26,9 @@ export default class HomeView extends Component {
   }
 
   render({onlineGameId, attachedEngineSyncers = []}) {
+    let hasOnlineGame = onlineGameId != null
+    let attachedEngineCount = attachedEngineSyncers.length
+
     return h(
       'section',
       {id: 'home', class: 'home-view'},
@@ -31,79 +36,133 @@ export default class HomeView extends Component {
         'div',
         {class: 'home-hero'},
         h('p', {class: 'home-kicker'}, t('Seki Sabaki')),
-        h('h1', {}, t('Home')),
+        h('h1', {}, t('Your Go workspace')),
         h(
           'p',
           {},
-          t('Choose a workspace, resume the board, or open online play.'),
+          t(
+            'Play, review, analyze, and continue your games from one calm starting point.',
+          ),
         ),
       ),
       h(
-        'div',
-        {class: 'home-card-grid'},
-        h(HomeCard, {
-          title: t('Board'),
-          description: t('Return to the current goban and local SGF workflow.'),
-          meta:
-            onlineGameId == null
-              ? t('Local board ready')
-              : t('Online game #') + String(onlineGameId) + t(' loaded'),
-          action: t('Resume board'),
+        'section',
+        {class: 'home-section home-quick-actions'},
+        h('div', {class: 'home-section-heading'}, h('h2', {}, t('Start'))),
+        h(
+          'div',
+          {class: 'home-action-grid'},
+          h(ActionButton, {
+            title: t('New board'),
+            description: t('Start a fresh local game or review board.'),
+            primary: true,
+            onClick: this.handleNewGameButtonClick,
+          }),
+          h(ActionButton, {
+            title: t('Open SGF'),
+            description: t('Load a game file from your computer.'),
+            onClick: this.handleOpenFileButtonClick,
+          }),
+          h(ActionButton, {
+            title: t('Analyze'),
+            description: t('Set up KataGo analysis and view analyzed games.'),
+            onClick: () => this.handleOpenWorkspace('analysis'),
+          }),
+          h(ActionButton, {
+            title: t('Online play'),
+            description: t('Open OGS connection, games, and matchmaking.'),
+            onClick: () => this.handleOpenWorkspace('online'),
+          }),
+        ),
+      ),
+      h(
+        'section',
+        {class: 'home-section home-continue'},
+        h('div', {class: 'home-section-heading'}, h('h2', {}, t('Continue'))),
+        h(HomePanel, {
+          title: hasOnlineGame
+            ? t('Online game on the board')
+            : t('Local board ready'),
+          description: hasOnlineGame
+            ? t('Continue game #') +
+              String(onlineGameId) +
+              t(' from the board workspace.')
+            : t('Return to the current board without changing your position.'),
+          meta: hasOnlineGame ? t('Online mode') : t('Local review mode'),
+          action: hasOnlineGame ? t('Continue game') : t('Resume board'),
           onClick: () => this.handleOpenWorkspace('board'),
         }),
-        h(HomeCard, {
-          title: t('Online Go Server'),
-          description: t(
-            'Manage OGS connection, active games, and matchmaking.',
-          ),
-          meta:
-            onlineGameId == null
-              ? t('No online game on the board')
-              : t('Viewing game #') + String(onlineGameId),
-          action: t('Open OGS'),
-          onClick: () => this.handleOpenWorkspace('online'),
-        }),
-        h(HomeCard, {
-          title: t('SGF Explorer'),
-          description: t('Browse local folders and open games from a library.'),
-          meta: t('Coming soon'),
-          action: t('Open explorer'),
-          onClick: () => this.handleOpenWorkspace('sgf-explorer'),
-        }),
-        h(HomeCard, {
-          title: t('Analysis Manager'),
-          description: t('Track batch analyses and browse analyzed games.'),
-          meta:
-            String(attachedEngineSyncers.length) +
-            ' ' +
-            t('engine(s) attached'),
-          action: t('Open analysis'),
-          onClick: () => this.handleOpenWorkspace('analysis'),
-        }),
       ),
       h(
-        'div',
-        {class: 'home-actions'},
+        'section',
+        {class: 'home-section'},
         h(
-          'button',
-          {type: 'button', onClick: this.handleNewGameButtonClick},
-          t('New game'),
+          'div',
+          {class: 'home-section-heading'},
+          h('h2', {}, t('Status')),
+          h('p', {}, t('Honest entry points for the larger Seki workspace.')),
         ),
         h(
-          'button',
-          {type: 'button', onClick: this.handleOpenFileButtonClick},
-          t('Open SGF…'),
+          'div',
+          {class: 'home-card-grid'},
+          h(HomePanel, {
+            title: t('Library'),
+            description: t(
+              'A dedicated game library is coming. For now, open SGF files directly.',
+            ),
+            meta: t('No library folder selected'),
+            action: t('Open SGF'),
+            onClick: this.handleOpenFileButtonClick,
+          }),
+          h(HomePanel, {
+            title: t('Analysis'),
+            description: t(
+              'Prepare analysis jobs and browse generated review files.',
+            ),
+            meta:
+              attachedEngineCount === 0
+                ? t('No live engines attached')
+                : String(attachedEngineCount) +
+                  ' ' +
+                  t('live engine(s) attached'),
+            action: t('Open analysis'),
+            onClick: () => this.handleOpenWorkspace('analysis'),
+          }),
+          h(HomePanel, {
+            title: t('OGS'),
+            description: hasOnlineGame
+              ? t('An online game is attached to the board.')
+              : t('Connect to OGS, find games, or start matchmaking.'),
+            meta: hasOnlineGame
+              ? t('Viewing game #') + String(onlineGameId)
+              : t('No online game on the board'),
+            action: t('Open OGS'),
+            onClick: () => this.handleOpenWorkspace('online'),
+          }),
         ),
       ),
     )
   }
 }
 
-function HomeCard({title, description, meta, action, onClick}) {
+function ActionButton({title, description, primary, onClick}) {
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: primary ? 'home-action primary' : 'home-action',
+      onClick,
+    },
+    h('strong', {}, title),
+    h('span', {}, description),
+  )
+}
+
+function HomePanel({title, description, meta, action, onClick}) {
   return h(
     'article',
     {class: 'home-card'},
-    h('h2', {}, title),
+    h('h3', {}, title),
     h('p', {}, description),
     h('p', {class: 'home-card-meta'}, meta),
     h('button', {type: 'button', onClick}, action),

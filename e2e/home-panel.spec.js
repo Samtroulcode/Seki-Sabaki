@@ -11,6 +11,24 @@ test.describe('Home panel navigation', () => {
       'aria-current',
       'page',
     )
+    await expect(page.locator('#home')).toContainText('Your Go workspace')
+    await expect(page.locator('#home')).toContainText('Start')
+    await expect(page.locator('#home')).toContainText('Continue')
+    await expect(page.locator('#home')).toContainText('Status')
+    await expect(page.getByRole('button', {name: /New board/})).toBeVisible()
+    await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(2)
+    await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
+    await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
+    await expect(page.locator('#home')).toContainText('Local board ready')
+    await expect(page.locator('#home')).toContainText(
+      'No library folder selected',
+    )
+    await expect(page.locator('#home')).toContainText(
+      'No live engines attached',
+    )
+    await expect(page.locator('#home')).toContainText(
+      'No online game on the board',
+    )
 
     await page.getByTitle('Board').click()
     await expect(page.locator('#goban')).toBeVisible()
@@ -24,7 +42,7 @@ test.describe('Home panel navigation', () => {
     )
     await expect(page.locator('#home')).toBeVisible()
 
-    await page.getByRole('button', {name: 'Open OGS'}).click()
+    await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(
       page.locator('#apprail').getByRole('button', {name: 'OGS'}),
