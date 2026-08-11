@@ -40,6 +40,13 @@ domains.
 
 ## Core Workspaces
 
+The current implementation still has workspace-like routes, but the product
+direction is shifting away from a permanent feature navbar. Home should be the
+main hub, and tabs should eventually represent open user activities: boards,
+opened SGFs, online games, and analysis reports.
+
+Companion navigation model: [`navigation-tabs.md`](./navigation-tabs.md)
+
 ### Home
 
 Home becomes the product dashboard:
@@ -162,7 +169,8 @@ Minimum module contract:
 - Add quick actions and status cards.
 - Add a first read-only Library preview module.
 - Add a first analysis/OGS status module.
-- Keep AppRail navigation; refine labels and active states only if needed.
+- Treat AppRail as transitional. Do not deepen it into the final product
+  navigation; define the tab migration before replacing it.
 
 MVP order and empty states:
 
@@ -174,7 +182,21 @@ MVP order and empty states:
 4. Analysis status, with a not-configured state for KataGo/model/config;
 5. OGS status, with disconnected and no-current-game states.
 
-### Phase 2 — Library MVP
+### Phase 2 — Navigation Tabs Foundation
+
+- Replace the product decision “feature rail” with “Home plus open activity
+  tabs”.
+- Start with a top TabBar shell only after the staged tab model is agreed.
+- Keep Home permanent and non-closeable.
+- Do not present Home, Board, OGS, Library, and Analysis as equal permanent
+  tabs; that would only recreate the AppRail horizontally.
+- Keep current singleton workspaces internally until board/file state can safely
+  become tab-owned.
+- Do not advertise true multi-board behavior until closing, dirty state,
+  file/save behavior, engines, OGS attachment, and analysis actions are scoped
+  to tabs.
+
+### Phase 3 — Library MVP
 
 - Define the app-linked SGF library directory.
 - Decide the default root location and expose a later user override.
@@ -186,7 +208,7 @@ MVP order and empty states:
 - Handle external file edits, missing files, empty folders, and invalid SGFs.
 - Add tests for listing, metadata, import, and open actions.
 
-### Phase 3 — Analysis Polish and Reports
+### Phase 4 — Analysis Polish and Reports
 
 - Create a reusable Game Info panel.
 - Redesign the current Analysis panel into clearer setup, queue, result, and
@@ -229,7 +251,7 @@ Keep the first implementation slices presentational and modular: no new analyzer
 protocol assumptions, no new persistence format, no model-management workflow,
 and no board behavior changes beyond named analysis actions.
 
-### Phase 4 — OGS Panel Polish
+### Phase 5 — OGS Panel Polish
 
 - Redesign OGS account/connection state.
 - Clarify current games, actions, and failures.
@@ -244,7 +266,7 @@ the target Online Game workspace must explicitly isolate or disable:
 - free game-tree navigation that affects live play;
 - SGF-editing actions that are not valid OGS game actions.
 
-### Phase 5 — Dedicated Online Game Workspace
+### Phase 6 — Dedicated Online Game Workspace
 
 - Separate live OGS gameplay from local Board editing/review.
 - Reuse board rendering where appropriate.
@@ -252,14 +274,14 @@ the target Online Game workspace must explicitly isolate or disable:
   online play.
 - Define post-game save/export flow into the Library.
 
-### Phase 6 — KataGo Model Management Optional Post-Lockdown
+### Phase 7 — KataGo Model Management Optional Post-Lockdown
 
 - Improve analyzer onboarding.
 - Consider model download/management inspired by Kaya.
 - Decide storage location, download trust model, checksums, and platform limits
   before implementation.
 
-### Phase 7 — Product Identity and Documentation
+### Phase 8 — Product Identity and Documentation
 
 - Rewrite the README around Seki's own product direction: online play, library,
   analysis, and game review.
@@ -290,13 +312,11 @@ Completed setup tasks are tracked in
 [`ux-product-lockdown-tracking.md`](./ux-product-lockdown-tracking.md). The next
 active tasks are:
 
-1. Define the Home dashboard MVP layout from the tracked draft.
-2. Implement quick actions and continue/resume Home modules.
-3. Implement the smallest read-only Library preview module.
-4. Add targeted E2E coverage for the new Home dashboard behavior.
-5. Start Analysis setup clarity as the first Analysis polish slice after the
+1. Review and implement the staged navigation tab foundation.
+2. Implement the smallest read-only Library preview module.
+3. Start Analysis setup clarity as the first Analysis polish slice after the
    Home MVP begins.
-6. Defer the README rewrite until the UX direction is implemented enough to
+4. Defer the README rewrite until the UX direction is implemented enough to
    document accurately.
 
 ## Non-Goals For This Branch Start

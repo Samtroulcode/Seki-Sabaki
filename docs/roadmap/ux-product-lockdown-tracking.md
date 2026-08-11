@@ -22,10 +22,14 @@ Library preview, and cover the new dashboard behavior with targeted E2E tests.
 ## Decisions
 
 - Home is the central product hub.
+- Target navigation model: Home is permanent and non-closeable; tabs should
+  represent open activities such as boards, SGFs, OGS games, and reports rather
+  than merely replacing AppRail with feature-category tabs.
 - Seki's first polished product promise is a Go game hub: play locally, surface
   online game status and continuation paths, find saved games, and
   analyze/review games from one coherent starting point.
-- AppRail navigation stays for now.
+- AppRail navigation is transitional. It should not be deepened as the final
+  product navigation; replace it only after the staged tab model is safe.
 - UI should move toward reusable modules mounted in Home first, then reused in
   Library, Analysis, Board, or OGS surfaces.
 - Initial Home dashboard MVP order is: quick actions, continue/resume, Library
@@ -52,6 +56,51 @@ Library preview, and cover the new dashboard behavior with targeted E2E tests.
   reusable Library/Board modules.
 - Decide the temporary OGS/live-game UX boundaries before the dedicated Online
   Game workspace exists.
+- Decide whether Library is a closeable tab, singleton tab, or Home-driven
+  workspace/module.
+- Decide whether opening an SGF always creates a new board tab or may reuse a
+  clean untitled board tab.
+- Decide startup restoration policy for tabs: Home only, previous tabs, or later
+  user preference.
+
+## Navigation Tabs Target
+
+Companion spec: [`navigation-tabs.md`](./navigation-tabs.md)
+
+Product rule:
+
+> Home is the permanent hub. Tabs are open activities.
+
+This means Seki should not simply move the existing AppRail entries into a top
+tab bar. Tabs should eventually represent user work objects, for example:
+
+- Home;
+- Untitled Board;
+- opened SGF file or named game;
+- OGS game;
+- analysis report.
+
+### Staged Navigation Migration
+
+1. Keep the current `activeWorkspace` implementation stable while the tab model
+   is documented.
+2. Introduce a top TabBar shell only as a transitional UI if it still maps to
+   singleton workspaces internally.
+3. Add Home plus one board activity tab before attempting true multi-board
+   behavior.
+4. Move board document state behind tab-owned state only when save/dirty state,
+   file paths, engines, OGS attachment, analysis actions, menus, and sidebars
+   can safely follow the active tab.
+5. Add online-game and report tabs after their state boundaries are clearer.
+
+### Navigation Risks
+
+- `gameTrees` and `gameIndex` are not app-level tabs; they are games inside the
+  active SGF collection.
+- A visual-only TabBar can mislead users if it appears to support true
+  multi-document behavior before the state model does.
+- Closing tabs must not lose unsaved SGF work or live OGS state.
+- Seki should stay calm and focused, not become an IDE-style docking system.
 
 ## Current Interaction Inventory
 
@@ -270,7 +319,15 @@ Purpose: answer “What should I learn from this game?”
 - [x] Add OGS status module/card.
 - [x] Add targeted Home dashboard E2E coverage.
 
-### Phase 2 — Library MVP
+### Phase 2 — Navigation Tabs Foundation
+
+- [ ] Review staged navigation tab spec.
+- [ ] Define the first TabBar shell UX without recreating AppRail horizontally.
+- [ ] Keep Home permanent and non-closeable.
+- [ ] Define how New Board behaves before true multi-board state exists.
+- [ ] Add targeted navigation E2E coverage.
+
+### Phase 3 — Library MVP
 
 - [ ] Decide default library root.
 - [ ] Add library listing logic.
@@ -280,7 +337,7 @@ Purpose: answer “What should I learn from this game?”
 - [ ] Add open-from-library behavior.
 - [ ] Cover empty, missing, invalid, and externally edited file states.
 
-### Phase 3 — Analysis Polish and Reports
+### Phase 4 — Analysis Polish and Reports
 
 - [ ] Split setup, queue, results, and report responsibilities.
 - [ ] Create AnalysisJobsModule target design.
@@ -288,26 +345,26 @@ Purpose: answer “What should I learn from this game?”
 - [ ] Define report data source for the first implementation pass.
 - [ ] Add targeted tests for the polished Analysis UX.
 
-### Phase 4 — OGS Panel Polish
+### Phase 5 — OGS Panel Polish
 
 - [ ] Inventory current OGS panel states and user actions.
 - [ ] Redesign account/connection/current-game states.
 - [ ] Clarify reconnect/error states.
 - [ ] Add deterministic fake-transport tests for visible state changes.
 
-### Phase 5 — Dedicated Online Game Workspace
+### Phase 6 — Dedicated Online Game Workspace
 
 - [ ] Define online game state boundaries separate from local SGF editing.
 - [ ] Identify Board rendering pieces to reuse.
 - [ ] Define disabled/isolated actions during live play.
 - [ ] Define post-game save/export flow into Library.
 
-### Phase 6 — KataGo Model Management Optional Post-Lockdown
+### Phase 7 — KataGo Model Management Optional Post-Lockdown
 
 - [ ] Decide if this remains post-lockdown.
 - [ ] Draft download/storage/trust model before any implementation.
 
-### Phase 7 — Product Identity and Documentation
+### Phase 8 — Product Identity and Documentation
 
 - [ ] Rewrite README around Seki's product identity.
 - [ ] Preserve Sabaki fork history, credits, license obligations, and

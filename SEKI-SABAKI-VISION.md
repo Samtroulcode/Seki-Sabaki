@@ -206,15 +206,31 @@ These could then be reused by:
 
 This keeps a coherent visual style without mixing unrelated state models.
 
-## Architecture Direction
+## Navigation And Architecture Direction
 
-A future architecture could introduce a top-level workspace concept:
+A previous direction considered a top-level workspace concept:
 
 ```text
 activeWorkspace: 'home' | 'board' | 'library' | 'ogs' | 'analysis'
 ```
 
-The exact name and implementation can change, but the concept is useful:
+That remains useful as a transitional implementation detail, but it should not
+be the final user-facing navigation model. Seki should move toward this product
+rule:
+
+> Home is the permanent hub. Tabs are open activities.
+
+In that model, the user does not primarily switch between feature categories.
+They switch between things they are doing:
+
+- `Home`;
+- `Untitled Board`;
+- `Lee vs Kim.sgf`;
+- `OGS #12345`;
+- `Report: Lee vs Kim`.
+
+The old workspace concept can still guide internal routing while the app moves
+gradually toward tabs:
 
 - Home is the navigation hub;
 - Board is the classic Sabaki workspace;
@@ -222,18 +238,27 @@ The exact name and implementation can change, but the concept is useful:
 - OGS is for online game overview;
 - Analysis is for queues/results.
 
+But the final UI should avoid presenting those categories as the only persistent
+navigation. Home should expose product areas, and tabs should represent open
+work.
+
 This should be introduced gradually. Avoid large rewrites unless a smaller step
 would clearly create worse long-term complexity.
+
+See [`docs/roadmap/navigation-tabs.md`](docs/roadmap/navigation-tabs.md) for the
+tab navigation product model and staged migration plan.
 
 ## Suggested Implementation Order
 
 1. Add a minimal Home/Dashboard view without changing classic Sabaki behavior.
 2. Add a persistent Home button/action.
-3. Surface OGS active games on Home using existing OGS state.
-4. Extract reusable game-card/grid UI from the Game Chooser where helpful.
-5. Add a read-only SGF Library prototype for one configured directory.
-6. Add caching/lazy parsing for larger libraries.
-7. Integrate analysis results into the library once analysis tooling is ready.
+3. Define the navigation tab model before replacing global navigation.
+4. Introduce a transitional top TabBar shell without true multi-board state.
+5. Surface OGS active games on Home using existing OGS state.
+6. Extract reusable game-card/grid UI from the Game Chooser where helpful.
+7. Add a read-only SGF Library prototype for one configured directory.
+8. Add caching/lazy parsing for larger libraries.
+9. Integrate analysis results into the library once analysis tooling is ready.
 
 Each step should be small enough to test and review.
 
