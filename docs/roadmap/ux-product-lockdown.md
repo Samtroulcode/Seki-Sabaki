@@ -23,6 +23,9 @@ domains.
 
 - **Home is the hub.** The Home workspace should become a dashboard for recent
   games, analysis jobs, OGS status, and quick actions.
+- **Global areas stay in Home.** Singleton overviews such as OGS connection,
+  account, matchmaking, Library overview, Analysis setup, and engine status
+  should be Home sections with internal navigation, not permanent app tabs.
 - **Modules are reusable.** Library, game info, analysis report, OGS account,
   and online-game UI should be designed as reusable panels rather than one-off
   screens.
@@ -65,6 +68,11 @@ Home becomes the product dashboard:
 
 Home should compose reusable modules that can later appear elsewhere.
 
+Home may use internal navigation, such as a sidebar, to switch between hub
+sections. This internal navigation replaces feature-category app tabs for global
+areas: Dashboard, OGS overview, Library overview, Analysis setup, Engines, and
+similar singleton surfaces.
+
 ### Board
 
 Board remains the local SGF workspace:
@@ -101,8 +109,9 @@ Library is the user's Seki-linked SGF directory:
 - metadata display: players, date, result, rules, komi, source
 - analysis status: not analyzed, analyzed, stale/partial if applicable
 
-Implementation should start as a standalone workspace and a reusable module. A
-later phase can embed the same module in Home or Board side panels.
+Implementation should start as a reusable Home module/section. A later phase can
+reuse the same module in Board side panels if there is a specific board-scoped
+reason, but the global Library overview should not become a permanent app tab.
 
 ### Analysis
 
@@ -123,14 +132,16 @@ visual direction and broader online-play focus.
 
 ### OGS
 
-OGS should become a clear online area:
+OGS should become a clear online area inside Home:
 
 - account/connection status
 - current games and invitations
 - matchmaking or game entry points
 - deterministic reconnect/error states
 
-OGS UI should not rely on local SGF editing metaphors for live play.
+The OGS overview itself should not be an app tab. It belongs to Home internal
+navigation. OGS UI should not rely on local SGF editing metaphors for live play.
+Opening a concrete live game should create an `online-game` activity tab.
 
 ### Online Game
 
@@ -155,6 +166,10 @@ Initial module candidates:
 - `AnalysisJobsModule`: shows current job progress and queued jobs.
 - `OgsStatusModule`: connection/account/current-game status.
 - `QuickActionsModule`: primary app actions for Home.
+
+Global modules are mounted in Home first. App tabs are reserved for repeatable
+activity instances such as boards, online games, chats, reports, and concrete
+review documents.
 
 Modules should have narrow props and avoid direct assumptions about the parent
 workspace. They can be mounted in Home first, then reused in Library, Analysis,
@@ -208,6 +223,8 @@ MVP order and empty states:
 - Keep Home permanent and non-closeable.
 - Do not present Home, Board, OGS, Library, and Analysis as equal permanent
   tabs; that would only recreate the AppRail horizontally.
+- Move OGS Overview and other singleton overviews into Home internal navigation
+  instead of keeping them as activity tabs.
 - Keep current singleton workspaces internally until board/file state can safely
   become tab-owned.
 - Do not advertise true multi-board behavior until closing, dirty state,

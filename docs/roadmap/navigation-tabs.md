@@ -13,6 +13,10 @@ Target principle:
 
 > Home is the permanent hub. Tabs are open activities.
 
+Corollary:
+
+> Global singleton areas live inside Home, not as app tabs.
+
 Examples of good tabs:
 
 - `Home`
@@ -27,6 +31,7 @@ Examples of tabs to avoid as the only model:
 
 - `Board`
 - `OGS`
+- `OGS Overview`
 - `Library`
 - `Analysis`
 
@@ -59,6 +64,22 @@ not:
 - The safe fallback when no other tabs are open.
 - Owns product discovery, quick actions, recent/continue cards, and module
   previews.
+- Owns singleton/global areas through internal Home navigation, rather than
+  promoting them to app tabs.
+
+Home internal navigation can use a sidebar or similar local navigation pattern.
+It should organize global sections such as:
+
+- Dashboard;
+- OGS overview: account, connection, active games, matchmaking, invitations;
+- Library / SGF Explorer overview;
+- Analysis setup, queue, and global status;
+- Engines and reusable service status.
+
+These Home sections are not closeable app tabs. They are part of the permanent
+hub. Selecting a concrete item from them can still open an activity tab: for
+example, choosing an active OGS game opens an `online-game` tab, and choosing an
+SGF opens a `board` tab.
 
 ### Activity Tabs
 
@@ -74,8 +95,6 @@ Initial activity tab candidates:
 
 Later candidates:
 
-- library tab or library workspace;
-- analysis setup tab;
 - game info/review tab.
 - OGS chat tab;
 - OGS community/club tab;
@@ -86,6 +105,10 @@ The system should stay activity-based as it grows. A future OGS chat, community,
 profile, or study-room tab is a good fit when it represents a clear user task. A
 generic permanent `OGS`, `Settings`, or `Analysis` feature tab is a poor fit
 unless it is scoped to a concrete activity.
+
+`OGS Overview` is specifically **not** a target app tab. It should become a Home
+section. The app tab should appear only when the user opens a concrete online
+game, chat, community page, player profile, or another repeatable OGS activity.
 
 ## Tab Types
 

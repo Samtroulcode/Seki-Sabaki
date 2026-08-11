@@ -25,6 +25,9 @@ multi-board or full activity-tab persistence yet.
 - Target navigation model: Home is permanent and non-closeable; tabs should
   represent open activities such as boards, SGFs, OGS games, and reports rather
   than merely replacing AppRail with feature-category tabs.
+- Global singleton areas belong inside Home internal navigation, not in app
+  tabs. This includes OGS Overview, Library overview, Analysis setup/status, and
+  engine status.
 - Manage Games remains a board-internal SGF collection tool, not an app-level
   tab system. Its UI should be clarified so users understand those mini-gobans
   are games inside the current board document.
@@ -36,6 +39,9 @@ multi-board or full activity-tab persistence yet.
   engine configuration remains global.
 - OGS live games should become dedicated online-game tabs, not local board tabs
   with restrictions layered on top.
+- OGS Overview should move into Home as an internal section; only concrete OGS
+  activities such as live games, chats, communities, profiles, or study rooms
+  should become app tabs.
 - Future OGS chat/community/profile/study workflows can become tabs when they
   represent concrete user activities.
 - Seki's first polished product promise is a Go game hub: play locally, surface
@@ -69,8 +75,8 @@ multi-board or full activity-tab persistence yet.
   reusable Library/Board modules.
 - Decide the temporary OGS/live-game UX boundaries before the dedicated Online
   Game workspace exists.
-- Decide whether Library is a closeable tab, singleton tab, or Home-driven
-  workspace/module.
+- Decide the exact Home internal navigation shape, likely a sidebar, for
+  Dashboard, OGS, Library, Analysis, Engines, and future global sections.
 - Decide startup restoration policy for tabs: Home only, previous tabs, or later
   user preference.
 - Decide the final user-facing label for Manage Games: `Games in this file`,
@@ -85,6 +91,10 @@ Companion spec: [`navigation-tabs.md`](./navigation-tabs.md)
 Product rule:
 
 > Home is the permanent hub. Tabs are open activities.
+
+Global singleton areas are Home sections, not app tabs. `OGS Overview` is the
+clearest example: it should live under Home internal navigation, while a
+specific OGS game opens an online-game tab.
 
 This means Seki should not simply move the existing AppRail entries into a top
 tab bar. Tabs should eventually represent user work objects, for example:
@@ -120,6 +130,9 @@ tab bar. Tabs should eventually represent user work objects, for example:
 - Board tabs own live engines and live board analysis state.
 - OGS live games, future OGS chats, communities, profiles, study rooms, and
   reports are valid future tab types when scoped to concrete activities.
+- OGS Overview, Library overview, Analysis setup/status, and engine status
+  should be modeled as Home sections unless a future flow turns into a concrete
+  repeatable activity.
 - A visual-only TabBar can mislead users if it appears to support true
   multi-document behavior before the state model does.
 - Closing tabs must not lose unsaved SGF work or live OGS state.
@@ -169,6 +182,8 @@ tab bar. Tabs should eventually represent user work objects, for example:
 - Main UX gap: OGS is useful but still feels like an integration panel rather
   than a polished online area. Reconnect/error/session states and the temporary
   Board-based live-game boundary need clearer UX rules.
+- Direction update: OGS Overview should be a Home section, not an app-level tab.
+  Opening a specific online game should create an online-game activity tab.
 
 ## Home Dashboard MVP Layout Draft
 
