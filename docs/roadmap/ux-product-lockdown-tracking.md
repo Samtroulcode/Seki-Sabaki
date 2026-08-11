@@ -28,6 +28,16 @@ multi-board or full activity-tab persistence yet.
 - Manage Games remains a board-internal SGF collection tool, not an app-level
   tab system. Its UI should be clarified so users understand those mini-gobans
   are games inside the current board document.
+- Target Phase D board tabs should be real activity tabs: New Board creates a
+  new board tab; opening SGF from Home/Library creates a new board tab; opening
+  SGF from an active board replaces that board tab after save/discard/cancel if
+  needed.
+- Attached live engines and live board analysis belong to their board tab;
+  engine configuration remains global.
+- OGS live games should become dedicated online-game tabs, not local board tabs
+  with restrictions layered on top.
+- Future OGS chat/community/profile/study workflows can become tabs when they
+  represent concrete user activities.
 - Seki's first polished product promise is a Go game hub: play locally, surface
   online game status and continuation paths, find saved games, and
   analyze/review games from one coherent starting point.
@@ -61,12 +71,12 @@ multi-board or full activity-tab persistence yet.
   Game workspace exists.
 - Decide whether Library is a closeable tab, singleton tab, or Home-driven
   workspace/module.
-- Decide whether opening an SGF always creates a new board tab or may reuse a
-  clean untitled board tab.
 - Decide startup restoration policy for tabs: Home only, previous tabs, or later
   user preference.
 - Decide the final user-facing label for Manage Games: `Games in this file`,
   `SGF Collection`, or `Games in this collection`.
+- Decide exact close behavior for board-owned engines: stop immediately, prompt,
+  or move future long-running work to an analysis queue.
 
 ## Navigation Tabs Target
 
@@ -104,6 +114,12 @@ tab bar. Tabs should eventually represent user work objects, for example:
   active SGF collection.
 - The current Manage Games drawer shows mini-gobans for games inside the active
   board document. It should not be treated as a competing list of open app tabs.
+- In the target true board-tabs model, New Board should always create a board
+  tab. Home/Library Open SGF should create a board tab. Board Open SGF should
+  replace the current board tab.
+- Board tabs own live engines and live board analysis state.
+- OGS live games, future OGS chats, communities, profiles, study rooms, and
+  reports are valid future tab types when scoped to concrete activities.
 - A visual-only TabBar can mislead users if it appears to support true
   multi-document behavior before the state model does.
 - Closing tabs must not lose unsaved SGF work or live OGS state.
@@ -331,7 +347,10 @@ Purpose: answer “What should I learn from this game?”
 - [x] Review staged navigation tab spec.
 - [x] Define the first TabBar shell UX without recreating AppRail horizontally.
 - [x] Keep Home permanent and non-closeable.
-- [x] Define how New Board behaves before true multi-board state exists.
+- [x] Define how New Board and Open SGF behave in the target tab model.
+- [x] Define attached live engines and live analysis as board-tab-owned state.
+- [x] Define OGS live games as future dedicated online-game tabs.
+- [x] Define future OGS chat/community/profile tabs as concrete activity tabs.
 - [x] Add targeted navigation E2E coverage.
 
 ### Phase 3 — Library MVP

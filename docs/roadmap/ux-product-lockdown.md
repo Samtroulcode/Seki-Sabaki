@@ -45,6 +45,11 @@ direction is shifting away from a permanent feature navbar. Home should be the
 main hub, and tabs should eventually represent open user activities: boards,
 opened SGFs, online games, and analysis reports.
 
+The tab system is also the long-term place for substantial future workflows such
+as OGS chat, community/club pages, player profiles, study rooms, and analysis
+reports. These should become tabs only when they are concrete activities, not
+because every feature needs a permanent tab.
+
 Companion navigation model: [`navigation-tabs.md`](./navigation-tabs.md)
 
 ### Home
@@ -77,6 +82,13 @@ tool, not a competing app-level tab system. It should eventually be clarified as
 “Games in this file” or “SGF Collection”: adding existing files there adds games
 to the current board document, while opening from Home/Library should open board
 activity tabs once true board tabs exist.
+
+Board tabs should become real multi-document workspaces. New Board creates a new
+board tab. Opening an SGF from Home or the future Library creates a new board
+tab. Opening an SGF from inside an existing board tab replaces that board tab
+after the normal save/discard/cancel flow. Live engines and live board analysis
+belong to the board tab they are attached to, while engine configuration remains
+global.
 
 ### Library
 
@@ -203,6 +215,10 @@ MVP order and empty states:
   to tabs.
 - Clarify the existing Manage Games drawer as games inside the current board
   file/collection, not as open app-level board tabs.
+- Lock the target board-tab behavior for the true board-tabs phase: New Board
+  creates a tab, Home/Library Open SGF creates a tab, and Board Open SGF
+  replaces the current board tab with confirmation when needed.
+- Treat attached live engines and live board analysis as board-tab-owned state.
 
 ### Phase 3 — Library MVP
 
@@ -281,6 +297,19 @@ the target Online Game workspace must explicitly isolate or disable:
 - Disable analysis, free navigation, and local variation editing during live
   online play.
 - Define post-game save/export flow into the Library.
+
+The target should be a dedicated `online-game` activity tab, not a local board
+tab with OGS restrictions layered on top. It can reuse goban rendering, but the
+surrounding layout and allowed actions should be designed for live online play:
+clocks, players, captures, pass/resign, chat, connection state, scoring, and
+post-game export/review.
+
+### Phase 6.5 — OGS Social And Community Tabs
+
+- Keep OGS account/session state global.
+- Open substantial chat, community/club, and player-profile workflows as
+  concrete tabs when they become more than compact Home/OGS overview modules.
+- Do not create permanent feature-category tabs for every OGS surface.
 
 ### Phase 7 — KataGo Model Management Optional Post-Lockdown
 
