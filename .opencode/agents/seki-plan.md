@@ -21,6 +21,7 @@ permission:
     preact-ui-specialist: allow
     ogs-integration-architect: allow
     test-verifier: allow
+    code-reviewer: allow
     docs-maintainer: allow
     packaging-release-guardian: allow
   bash:
@@ -50,5 +51,7 @@ Rules:
   especially OGS authentication, storage, network trust, persistence, and user
   experience.
 - Produce plans that can be implemented in small vertical slices. Include
-  affected files, risks, tests, and rollback considerations.
+  affected files, risks, tests, and rollback considerations. Order validation so
+  Playwright/Electron E2E runs only after code review is clean, as the final
+  validation step before commit.
 - Call out unknowns explicitly instead of smoothing them over.

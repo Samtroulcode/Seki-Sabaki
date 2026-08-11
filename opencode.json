@@ -105,7 +105,7 @@
     "dev-task": {
       "description": "Explore, implement, verify, review",
       "agent": "seki-dev",
-      "template": "Treat this as a full development task for Seki-Sabaki: $ARGUMENTS\n\nFollow the project pipeline from AGENTS.md. First gather code context, then ask blocking questions with the question tool if product or security decisions are unclear. Delegate focused research or review to relevant subagents through the task tool. Implement the smallest correct change, run the targeted verification, review the result, then call git-committer to create clean atomic commits. Do not push. Finish with commit hashes, changed files, and verification results."
+      "template": "Treat this as a full development task for Seki-Sabaki: $ARGUMENTS\n\nFollow the project pipeline from AGENTS.md. First gather code context, then ask blocking questions with the question tool if product or security decisions are unclear. Delegate focused research or review to relevant subagents through the task tool. Implement the smallest correct change. Run cheap non-Electron verification first, then run code-reviewer and resolve findings. Run Playwright/Electron E2E only as the final validation step after review is clean and before git-committer. Then call git-committer to create clean atomic commits. Do not push. Finish with commit hashes, changed files, and verification results."
     },
     "feature-online": {
       "description": "Design OGS/online feature safely",
@@ -127,7 +127,7 @@
     "e2e-spec": {
       "description": "Add Playwright Electron coverage",
       "agent": "seki-dev",
-      "template": "Add or adjust Playwright Electron E2E coverage for: $ARGUMENTS\n\nUse existing e2e fixtures and helpers. Prefer deterministic app-state waits over sleeps. Delegate test strategy to test-verifier if scope is unclear. After verification and review, call git-committer to create clean atomic commits. Do not push."
+      "template": "Add or adjust Playwright Electron E2E coverage for: $ARGUMENTS\n\nUse existing e2e fixtures and helpers. Prefer deterministic app-state waits over sleeps. Delegate test strategy to test-verifier if scope is unclear. Implement or adjust coverage, run cheap non-Electron checks first, then run code-reviewer and resolve findings. Run the Playwright/Electron E2E command only as the final validation step after review is clean and before git-committer. Then call git-committer to create clean atomic commits. Do not push."
     },
     "upstream-awareness": {
       "description": "Compare with upstream-sensitive areas",

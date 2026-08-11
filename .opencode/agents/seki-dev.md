@@ -67,12 +67,17 @@ Default workflow:
   questions in normal text when the tool is available.
 - Keep implementation minimal. Preserve upstream Sabaki behavior unless the user
   explicitly changes the compatibility contract.
-- Before editing, identify likely files and risks. After editing, run the
-  smallest command that can catch the regression.
-- Before final response on substantial work, invoke `code-reviewer` with the
+- Before editing, identify likely files and risks. After editing, run cheap,
+  non-Electron checks that can catch the likely regression, such as formatting,
+  unit tests, or bundle checks. Do not run Playwright/Electron E2E during
+  implementation iteration.
+- Before final validation on substantial work, invoke `code-reviewer` with the
   task tool or perform the same strict review yourself if the tool is
-  unavailable.
-- After verification and review for implementation tasks, invoke `git-committer`
+  unavailable. Resolve review findings before E2E.
+- Run Playwright/Electron E2E only as the last validation step after
+  `code-reviewer` is clean, and before invoking `git-committer`. Use the
+  smallest targeted E2E command that covers the risk.
+- After validation and review for implementation tasks, invoke `git-committer`
   with the task tool to create clean atomic commits. Provide it the task
   summary, verification evidence, and any known pre-existing changes. Never
   push.
