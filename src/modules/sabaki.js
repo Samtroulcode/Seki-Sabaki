@@ -245,19 +245,11 @@ class Sabaki extends EventEmitter {
     this.fileHash = this.generateFileHash()
     this.historyPointer = 0
     this.history = []
-    this.state.activeBoardTabId = createBoardTabSnapshot({
-      state: this.state,
-      history: this.history,
-      historyPointer: this.historyPointer,
-      treeHash: this.treeHash,
-      fileHash: this.fileHash,
-    }).id
     this.ogsBoardSession = new OgsBoardSessionController()
     this.ogsGameEndNoticeKey = null
     this.ogsGameEndNoticeGameId = null
     this.ogsGameEndNoticePromise = null
     this.recordHistory()
-    this.state.boardTabs = [this.createBoardTabSnapshot()]
 
     // Bind state to settings
     window.sabaki.setting.onDidChange(({key, value}) => {
@@ -270,6 +262,7 @@ class Sabaki extends EventEmitter {
   async _initAppInfo() {
     this.appName = await window.sabaki.app.getName()
     this.version = await window.sabaki.app.getVersion()
+    this.setState({})
   }
 
   async _setupWindowStateSync() {
@@ -386,6 +379,7 @@ class Sabaki extends EventEmitter {
   ) {
     let tab = createBoardTab(gameTrees, {representedFilename, boardAttachment})
 
+    this.setMode('play')
     this.syncActiveBoardTab()
     this.state.boardTabs = [...this.state.boardTabs, tab]
     this.applyBoardTab(tab)
@@ -403,7 +397,7 @@ class Sabaki extends EventEmitter {
 
   async closeBoardTab(id) {
     let tab = this.getBoardTab(id)
-    if (tab == null || this.state.boardTabs.length <= 1) return false
+    if (tab == null) return false
 
     let wasActive = id === this.state.activeBoardTabId
     let previousActiveTab = this.getBoardTab(this.state.activeBoardTabId)
@@ -432,7 +426,36 @@ class Sabaki extends EventEmitter {
       ]
 
     this.state.boardTabs = tabs
-    if (wasActive) {
+    if (wasActive && nextTab == null) {
+      let emptyTree = this.getEmptyGameTree()
+
+      this.stopEngineGame()
+      this.stopAnalysis()
+      this.ogsBoardSession.invalidateOperations()
+      this.history = []
+      this.historyPointer = 0
+      this.setState({
+        representedFilename: null,
+        gameIndex: 0,
+        gameTrees: [emptyTree],
+        gameCurrents: [{}],
+        treePosition: emptyTree.root.id,
+        boardAttachment: createLocalDocumentBoardAttachment(),
+        onlineGameId: null,
+        boardTransformation: '',
+        mode: 'play',
+        deadStones: [],
+        blockedGuesses: [],
+        estimateOverrides: {},
+        boardTabs: tabs,
+        activeBoardTabId: null,
+        activeWorkspace:
+          previousWorkspace === 'board' ? 'home' : previousWorkspace,
+        openDrawer: null,
+      })
+      this.treeHash = this.generateTreeHash()
+      this.fileHash = this.generateFileHash()
+    } else if (wasActive) {
       this.applyBoardTab(nextTab, {
         activeWorkspace: previousWorkspace,
         syncCurrent: false,
@@ -838,7 +861,12 @@ class Sabaki extends EventEmitter {
       whiteName,
     })
 
-    await this.loadGameTrees([emptyTree], {suppressAskForSave: true})
+    if (this.state.activeBoardTabId == null) {
+      this.createBoardTab([emptyTree])
+      this.setState({activeWorkspace: 'board'})
+    } else {
+      await this.loadGameTrees([emptyTree], {suppressAskForSave: true})
+    }
 
     if (showInfo) this.openDrawer('info')
     if (playSound) sound.playNewGame()
@@ -973,14 +1001,20 @@ class Sabaki extends EventEmitter {
     }
 
     if (success) {
-      await this.loadGameTrees(gameTrees, {
-        suppressAskForSave: true,
-        clearHistory,
-      })
+      if (this.state.activeBoardTabId == null) {
+        this.createBoardTab(gameTrees, {representedFilename: filename})
+        this.fileHash = this.generateFileHash()
+        this.syncActiveBoardTab({fileHash: this.fileHash})
+      } else {
+        await this.loadGameTrees(gameTrees, {
+          suppressAskForSave: true,
+          clearHistory,
+        })
 
-      this.setState({activeWorkspace: 'board', representedFilename: filename})
-      this.fileHash = this.generateFileHash()
-      this.syncActiveBoardTab({fileHash: this.fileHash})
+        this.setState({activeWorkspace: 'board', representedFilename: filename})
+        this.fileHash = this.generateFileHash()
+        this.syncActiveBoardTab({fileHash: this.fileHash})
+      }
 
       if (setting.get('game.goto_end_after_loading')) {
         this.goToEnd()
@@ -1039,21 +1073,25 @@ class Sabaki extends EventEmitter {
     await helper.wait(setting.get('app.loadgame_delay'))
 
     if (gameTrees.length > 0) {
-      let attachmentState = createBoardAttachmentState(
+      let nextBoardAttachment =
         boardAttachment ??
-          (onlineGameId == null
-            ? createLocalDocumentBoardAttachment()
-            : createOgsBoardAttachment(onlineGameId)),
-      )
+        (onlineGameId == null
+          ? createLocalDocumentBoardAttachment()
+          : createOgsBoardAttachment(onlineGameId))
+      let attachmentState = createBoardAttachmentState(nextBoardAttachment)
 
-      this.setState({
-        representedFilename: null,
-        gameIndex: 0,
-        gameTrees,
-        gameCurrents: gameTrees.map((_) => ({})),
-        boardTransformation: '',
-        ...attachmentState,
-      })
+      if (this.state.activeBoardTabId == null) {
+        this.createBoardTab(gameTrees, {boardAttachment: nextBoardAttachment})
+      } else {
+        this.setState({
+          representedFilename: null,
+          gameIndex: 0,
+          gameTrees,
+          gameCurrents: gameTrees.map((_) => ({})),
+          boardTransformation: '',
+          ...attachmentState,
+        })
+      }
 
       let [firstTree] = gameTrees
       this.setCurrentTreePosition(firstTree, firstTree.root.id, {

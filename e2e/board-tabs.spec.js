@@ -7,6 +7,16 @@ test.describe('Board tabs', () => {
     page,
   }) => {
     await expect(page.locator('#apptabs')).toBeVisible()
+    await expect(page.locator('.app-board-tab')).toHaveCount(0)
+
+    await page.getByTitle('Home').click()
+    await page
+      .getByRole('button', {name: /New board/})
+      .first()
+      .click()
+    await page.waitForFunction(
+      () => window.__sabaki.state.boardTabs.length === 1,
+    )
     await expect(page.locator('.app-board-tab')).toHaveCount(1)
 
     await page.locator('.app-board-tab-button').first().click()
@@ -20,7 +30,10 @@ test.describe('Board tabs', () => {
     )
 
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /New board/}).click()
+    await page
+      .getByRole('button', {name: /New board/})
+      .first()
+      .click()
     await page.waitForFunction(
       () => window.__sabaki.state.boardTabs.length === 2,
     )
@@ -71,25 +84,7 @@ test.describe('Board tabs', () => {
   })
 
   test('prompts for dirty inactive tabs before closing app', async ({page}) => {
-    await page.locator('.app-board-tab-button').first().click()
-    await page.evaluate(() => window.__sabaki.clickVertex([3, 3]))
-    await page.waitForFunction(
-      () =>
-        window.__sabaki.state.boardTabs[0].gameTrees[0].root.children.length ===
-        1,
-    )
-
-    await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /New board/}).click()
-    await page.waitForFunction(
-      () => window.__sabaki.state.boardTabs.length === 2,
-    )
-    await page.evaluate(() => window.__sabaki.clickVertex([16, 16]))
-    await page.waitForFunction(
-      () =>
-        window.__sabaki.state.boardTabs[1].gameTrees[0].root.children.length ===
-        1,
-    )
+    await makeTwoDirtyBoardTabs(page)
 
     let result = await page.evaluate(async () => {
       let prompts = []
@@ -161,7 +156,15 @@ test.describe('Board tabs', () => {
     page,
   }) => {
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /New board/}).click()
+    await page
+      .getByRole('button', {name: /New board/})
+      .first()
+      .click()
+    await page.getByTitle('Home').click()
+    await page
+      .getByRole('button', {name: /New board/})
+      .first()
+      .click()
     await page.getByTitle('Home').click()
 
     await page.locator('.app-board-tab-close').last().click()
@@ -170,6 +173,35 @@ test.describe('Board tabs', () => {
     )
 
     await expect(page.locator('.home-view')).toBeVisible()
+  })
+
+  test('can close the final board tab back to Home', async ({page}) => {
+    await page.getByTitle('Home').click()
+    await page
+      .getByRole('button', {name: /New board/})
+      .first()
+      .click()
+    await page.waitForFunction(
+      () => window.__sabaki.state.boardTabs.length === 1,
+    )
+    await page.evaluate(() => window.__sabaki.clickVertex([3, 3]))
+    await page.waitForFunction(
+      () => window.__sabaki.state.gameTrees[0].root.children.length === 1,
+    )
+    await page.evaluate(() => {
+      window.sabaki.dialog.showMessageBox = async () => ({response: 1})
+    })
+
+    await page.locator('.app-board-tab-close').click()
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.boardTabs.length === 0 &&
+        window.__sabaki.state.activeBoardTabId == null,
+    )
+
+    await expect(page.locator('.home-view')).toBeVisible()
+    await expect(page.locator('.app-board-tab')).toHaveCount(0)
+    expect(await getCurrentRootChildCount(page)).toBe(0)
   })
 })
 
@@ -182,6 +214,12 @@ async function getCurrentRootChildCount(page) {
 }
 
 async function makeTwoDirtyBoardTabs(page) {
+  await page.getByTitle('Home').click()
+  await page
+    .getByRole('button', {name: /New board/})
+    .first()
+    .click()
+  await page.waitForFunction(() => window.__sabaki.state.boardTabs.length === 1)
   await page.locator('.app-board-tab-button').first().click()
   await page.evaluate(() => window.__sabaki.clickVertex([3, 3]))
   await page.waitForFunction(
@@ -191,7 +229,10 @@ async function makeTwoDirtyBoardTabs(page) {
   )
 
   await page.getByTitle('Home').click()
-  await page.getByRole('button', {name: /New board/}).click()
+  await page
+    .getByRole('button', {name: /New board/})
+    .first()
+    .click()
   await page.waitForFunction(() => window.__sabaki.state.boardTabs.length === 2)
   await page.evaluate(() => window.__sabaki.clickVertex([16, 16]))
   await page.waitForFunction(

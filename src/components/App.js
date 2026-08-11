@@ -219,8 +219,6 @@ class App extends Component {
         }
       })
     })
-
-    sabaki.newFile()
   }
 
   componentDidUpdate(_, prevState = {}) {

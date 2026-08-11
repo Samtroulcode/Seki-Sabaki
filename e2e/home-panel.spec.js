@@ -15,11 +15,11 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#home')).toContainText('Start')
     await expect(page.locator('#home')).toContainText('Continue')
     await expect(page.locator('#home')).toContainText('Status')
-    await expect(page.getByRole('button', {name: /New board/})).toBeVisible()
+    await expect(page.getByRole('button', {name: /New board/})).toHaveCount(2)
     await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(2)
     await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
-    await expect(page.locator('#home')).toContainText('Local board ready')
+    await expect(page.locator('#home')).toContainText('No board open')
     await expect(page.locator('#home')).toContainText(
       'No library folder selected',
     )
@@ -30,7 +30,10 @@ test.describe('Home panel navigation', () => {
       'No online game on the board',
     )
 
-    await page.getByTitle('Untitled Board').click()
+    await page
+      .getByRole('button', {name: /^New board$/})
+      .first()
+      .click()
     await expect(page.locator('#goban')).toBeVisible()
     await expect(page.getByTitle('Untitled Board')).toHaveAttribute(
       'aria-current',

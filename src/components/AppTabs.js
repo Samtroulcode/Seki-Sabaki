@@ -68,7 +68,7 @@ export default class AppTabs extends Component {
             tab,
             selected:
               activeWorkspace === 'board' && tab.id === activeBoardTabId,
-            closeable: boardTabs.length > 1,
+            closeable: true,
             onClick: () => this.handleBoardTabClick(tab.id),
             onClose: (evt) => this.handleBoardTabCloseButtonClick(evt, tab.id),
           }),

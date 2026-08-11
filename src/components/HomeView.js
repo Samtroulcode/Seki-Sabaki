@@ -22,8 +22,9 @@ export default class HomeView extends Component {
     }
   }
 
-  render({onlineGameId, attachedEngineSyncers = []}) {
+  render({onlineGameId, attachedEngineSyncers = [], boardTabs = []}) {
     let hasOnlineGame = onlineGameId != null
+    let hasBoardTabs = boardTabs.length > 0
     let attachedEngineCount = attachedEngineSyncers.length
 
     return h(
@@ -79,15 +80,30 @@ export default class HomeView extends Component {
         h(HomePanel, {
           title: hasOnlineGame
             ? t('Online game on the board')
-            : t('Local board ready'),
+            : hasBoardTabs
+              ? t('Local board ready')
+              : t('No board open'),
           description: hasOnlineGame
             ? t('Continue game #') +
               String(onlineGameId) +
               t(' from the board workspace.')
-            : t('Return to the current board without changing your position.'),
-          meta: hasOnlineGame ? t('Online mode') : t('Local review mode'),
-          action: hasOnlineGame ? t('Continue game') : t('Resume board'),
-          onClick: () => this.handleOpenWorkspace('board'),
+            : hasBoardTabs
+              ? t('Return to the current board without changing your position.')
+              : t('Create a board or open an SGF when you are ready.'),
+          meta: hasOnlineGame
+            ? t('Online mode')
+            : hasBoardTabs
+              ? t('Local review mode')
+              : t('Clean start'),
+          action: hasOnlineGame
+            ? t('Continue game')
+            : hasBoardTabs
+              ? t('Resume board')
+              : t('New board'),
+          onClick: () =>
+            hasBoardTabs
+              ? this.handleOpenWorkspace('board')
+              : this.handleNewGameButtonClick(),
         }),
       ),
       h(

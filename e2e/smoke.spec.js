@@ -18,8 +18,12 @@ test.describe('Smoke Tests', () => {
     page,
   }) => {
     await expect(page.locator('#home')).toBeVisible()
+    await expect(page.locator('.app-board-tab')).toHaveCount(0)
 
-    await page.getByTitle('Untitled Board').click()
+    await page
+      .getByRole('button', {name: /New board/})
+      .first()
+      .click()
 
     const goban = page.locator('#goban')
     await expect(goban).toBeVisible()
