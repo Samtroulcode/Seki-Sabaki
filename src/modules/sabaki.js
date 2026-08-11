@@ -3,7 +3,6 @@ import EventEmitter from 'events'
 import {basename, extname} from 'path'
 import {ipcRenderer} from 'electron'
 import {h} from 'preact'
-import {v4 as uuid} from 'uuid'
 
 import Board from '@sabaki/go-board'
 import deadstones from '@sabaki/deadstones'
@@ -25,6 +24,14 @@ import {
   createOgsBoardAttachment,
   isOgsBoardAttachment,
 } from './boardattachment.js'
+import {
+  boardTabStateKeys,
+  createBoardTab,
+  createBoardTabSnapshot,
+  getBoardTabProjection,
+  isBoardTabDirty,
+  updateBoardTab,
+} from './boardtabs.js'
 import OgsBoardSessionController from './ogsboardsessioncontroller.js'
 import {buildOgsGameTree} from './ogsboard.js'
 import {
@@ -103,6 +110,8 @@ class Sabaki extends EventEmitter {
       treePosition: emptyTree.root.id,
       boardAttachment: createLocalDocumentBoardAttachment(),
       onlineGameId: null,
+      boardTabs: [],
+      activeBoardTabId: null,
 
       // Bars
 
@@ -233,13 +242,22 @@ class Sabaki extends EventEmitter {
     this._setupWindowStateSync()
 
     this.treeHash = this.generateTreeHash()
+    this.fileHash = this.generateFileHash()
     this.historyPointer = 0
     this.history = []
+    this.state.activeBoardTabId = createBoardTabSnapshot({
+      state: this.state,
+      history: this.history,
+      historyPointer: this.historyPointer,
+      treeHash: this.treeHash,
+      fileHash: this.fileHash,
+    }).id
     this.ogsBoardSession = new OgsBoardSessionController()
     this.ogsGameEndNoticeKey = null
     this.ogsGameEndNoticeGameId = null
     this.ogsGameEndNoticePromise = null
     this.recordHistory()
+    this.state.boardTabs = [this.createBoardTabSnapshot()]
 
     // Bind state to settings
     window.sabaki.setting.onDidChange(({key, value}) => {
@@ -292,7 +310,188 @@ class Sabaki extends EventEmitter {
 
     Object.assign(this.state, change)
 
+    if (!this.applyingBoardTab && this.shouldSyncActiveBoardTab(change)) {
+      this.syncActiveBoardTab()
+      change = {...change, boardTabs: this.state.boardTabs}
+    }
+
     this.emit('change', {change, callback})
+  }
+
+  shouldSyncActiveBoardTab(change) {
+    if (this.state.activeBoardTabId == null) return false
+    if (change.boardTabs != null || change.activeBoardTabId != null)
+      return false
+
+    return boardTabStateKeys.some((key) => key in change)
+  }
+
+  createBoardTabSnapshot(data = {}) {
+    let snapshot = createBoardTabSnapshot({
+      state: this.state,
+      history: this.history || [],
+      historyPointer: this.historyPointer || 0,
+      treeHash: this.treeHash ?? this.generateTreeHash(),
+      fileHash: this.fileHash ?? this.generateFileHash(),
+      id: this.state.activeBoardTabId,
+    })
+
+    return {...snapshot, ...data}
+  }
+
+  syncActiveBoardTab(data = {}) {
+    let {activeBoardTabId, boardTabs = []} = this.state
+    if (activeBoardTabId == null) return
+
+    let snapshot = this.createBoardTabSnapshot({id: activeBoardTabId, ...data})
+    this.state.boardTabs = updateBoardTab(boardTabs, activeBoardTabId, snapshot)
+  }
+
+  getBoardTab(id) {
+    return this.state.boardTabs.find((tab) => tab.id === id) || null
+  }
+
+  applyBoardTab(tab, {activeWorkspace = 'board', syncCurrent = true} = {}) {
+    if (tab == null) return false
+
+    if (syncCurrent) this.syncActiveBoardTab()
+
+    if (tab.id !== this.state.activeBoardTabId) {
+      this.stopEngineGame()
+      this.stopAnalysis()
+      if (syncCurrent) this.syncActiveBoardTab()
+    }
+
+    this.history = tab.history || []
+    this.historyPointer = tab.historyPointer || 0
+    this.treeHash = tab.treeHash ?? null
+    this.fileHash = tab.fileHash ?? null
+
+    this.applyingBoardTab = true
+    this.setState({
+      ...getBoardTabProjection(tab),
+      boardTabs: this.state.boardTabs,
+      activeBoardTabId: tab.id,
+      activeWorkspace,
+      openDrawer: null,
+    })
+    this.applyingBoardTab = false
+
+    return true
+  }
+
+  createBoardTab(
+    gameTrees,
+    {representedFilename = null, boardAttachment = null} = {},
+  ) {
+    let tab = createBoardTab(gameTrees, {representedFilename, boardAttachment})
+
+    this.syncActiveBoardTab()
+    this.state.boardTabs = [...this.state.boardTabs, tab]
+    this.applyBoardTab(tab)
+    this.treeHash = this.generateTreeHash()
+    this.fileHash = this.generateFileHash()
+    this.clearHistory()
+    this.syncActiveBoardTab({treeHash: this.treeHash, fileHash: this.fileHash})
+
+    return tab
+  }
+
+  switchBoardTab(id) {
+    return this.applyBoardTab(this.getBoardTab(id))
+  }
+
+  async closeBoardTab(id) {
+    let tab = this.getBoardTab(id)
+    if (tab == null || this.state.boardTabs.length <= 1) return false
+
+    let wasActive = id === this.state.activeBoardTabId
+    let previousActiveTab = this.getBoardTab(this.state.activeBoardTabId)
+    let previousWorkspace = this.state.activeWorkspace
+
+    this.syncActiveBoardTab()
+    tab = this.getBoardTab(id)
+
+    if (!wasActive && isBoardTabDirty(tab)) {
+      this.applyBoardTab(tab)
+    }
+
+    if ((wasActive || isBoardTabDirty(tab)) && !(await this.askForSave())) {
+      if (!wasActive) {
+        this.applyBoardTab(previousActiveTab, {
+          activeWorkspace: previousWorkspace,
+        })
+      }
+      return false
+    }
+
+    let tabs = this.state.boardTabs.filter((tab) => tab.id !== id)
+    let nextTab =
+      tabs[
+        Math.max(0, this.state.boardTabs.findIndex((tab) => tab.id === id) - 1)
+      ]
+
+    this.state.boardTabs = tabs
+    if (wasActive) {
+      this.applyBoardTab(nextTab, {
+        activeWorkspace: previousWorkspace,
+        syncCurrent: false,
+      })
+    } else {
+      this.setState({boardTabs: tabs})
+
+      if (
+        previousActiveTab != null &&
+        this.state.activeBoardTabId !== previousActiveTab.id
+      ) {
+        this.applyBoardTab(previousActiveTab, {
+          activeWorkspace: previousWorkspace,
+          syncCurrent: false,
+        })
+      }
+    }
+
+    return true
+  }
+
+  async askForSaveAllBoardTabs() {
+    this.syncActiveBoardTab()
+
+    let originalTabId = this.state.activeBoardTabId
+    let originalWorkspace = this.state.activeWorkspace
+
+    for (let tab of this.state.boardTabs.slice()) {
+      if (!isBoardTabDirty(tab)) continue
+
+      if (tab.id !== this.state.activeBoardTabId) {
+        this.applyBoardTab(tab, {syncCurrent: false})
+      }
+
+      if (!(await this.askForSave())) {
+        if (originalTabId != null) {
+          this.applyBoardTab(this.getBoardTab(originalTabId), {
+            activeWorkspace: originalWorkspace,
+            syncCurrent: false,
+          })
+        }
+
+        return false
+      }
+
+      this.syncActiveBoardTab()
+    }
+
+    if (
+      originalTabId != null &&
+      this.state.activeBoardTabId !== originalTabId
+    ) {
+      this.applyBoardTab(this.getBoardTab(originalTabId), {
+        activeWorkspace: originalWorkspace,
+        syncCurrent: false,
+      })
+    }
+
+    return true
   }
 
   getInferredState(state) {
@@ -538,6 +737,8 @@ class Sabaki extends EventEmitter {
       this.history.push(newEntry)
       this.historyPointer = this.history.length - 1
     }
+
+    this.syncActiveBoardTab()
   }
 
   clearHistory() {
@@ -561,6 +762,7 @@ class Sabaki extends EventEmitter {
     this.setCurrentTreePosition(gameTree, entry.treePosition, {
       clearCache: true,
     })
+    this.syncActiveBoardTab()
   }
 
   undo() {
@@ -642,6 +844,88 @@ class Sabaki extends EventEmitter {
     if (playSound) sound.playNewGame()
   }
 
+  async createNewBoardTab({playSound = false, showInfo = false} = {}) {
+    let [blackName, whiteName] = [
+      this.state.blackEngineSyncerId,
+      this.state.whiteEngineSyncerId,
+    ]
+      .map((id) =>
+        this.state.attachedEngineSyncers.find((syncer) => syncer.id === id),
+      )
+      .map((syncer) => (syncer == null ? null : syncer.engine.name))
+
+    let emptyTree = gametree.setGameInfo(this.getEmptyGameTree(), {
+      blackName,
+      whiteName,
+    })
+
+    this.createBoardTab([emptyTree])
+    this.setState({activeWorkspace: 'board'})
+
+    if (showInfo) this.openDrawer('info')
+    if (playSound) sound.playNewGame()
+  }
+
+  async openFileInNewBoardTab(filename = null, {gotoEnd = null} = {}) {
+    let t = i18n.context('sabaki.file')
+
+    if (!filename) {
+      let result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [
+          ...fileformats.meta,
+          {name: t('All Files'), extensions: ['*']},
+        ],
+      })
+
+      if (result) filename = result[0]
+      if (!filename) return false
+    }
+
+    this.setBusy(true)
+
+    let extension = extname(filename).slice(1)
+    let gameTrees = []
+    let success = true
+    let lastProgress = -1
+
+    try {
+      let fileFormatModule = fileformats.getModuleByExtension(extension)
+
+      gameTrees = fileFormatModule.parseFile(filename, (evt) => {
+        if (evt.progress - lastProgress < 0.1) return
+        this.window.setProgressBar(evt.progress)
+        lastProgress = evt.progress
+      })
+
+      if (gameTrees.length == 0) throw true
+    } catch (err) {
+      await dialog.showMessageBox(t('This file is unreadable.'), 'warning')
+      success = false
+    }
+
+    if (success) {
+      this.createBoardTab(gameTrees, {representedFilename: filename})
+      this.fileHash = this.generateFileHash()
+      this.syncActiveBoardTab({fileHash: this.fileHash})
+
+      if (gotoEnd ?? setting.get('game.goto_end_after_loading')) {
+        this.goToEnd()
+      }
+
+      if (gameTrees.length > 1) {
+        await helper.wait(setting.get('gamechooser.show_delay'))
+        this.openDrawer('gamechooser')
+      }
+    }
+
+    this.setBusy(false)
+    this.window.setProgressBar(-1)
+    this.events.emit('fileLoad')
+
+    return success
+  }
+
   async loadFile(
     filename = null,
     {suppressAskForSave = false, clearHistory = true} = {},
@@ -696,6 +980,7 @@ class Sabaki extends EventEmitter {
 
       this.setState({activeWorkspace: 'board', representedFilename: filename})
       this.fileHash = this.generateFileHash()
+      this.syncActiveBoardTab({fileHash: this.fileHash})
 
       if (setting.get('game.goto_end_after_loading')) {
         this.goToEnd()
@@ -779,6 +1064,10 @@ class Sabaki extends EventEmitter {
       this.fileHash = this.generateFileHash()
 
       if (clearHistory) this.clearHistory()
+      this.syncActiveBoardTab({
+        treeHash: this.treeHash,
+        fileHash: this.fileHash,
+      })
     }
 
     this.setBusy(false)
@@ -989,6 +1278,11 @@ class Sabaki extends EventEmitter {
 
     this.treeHash = this.generateTreeHash()
     this.fileHash = this.generateFileHash()
+    this.syncActiveBoardTab({
+      representedFilename: filename,
+      treeHash: this.treeHash,
+      fileHash: this.fileHash,
+    })
 
     return true
   }

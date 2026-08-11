@@ -56,7 +56,8 @@ exports.get = function (props = {}) {
           label: i18n.t('menu.file', '&New'),
           accelerator: 'CmdOrCtrl+N',
           enabled: !disableGameLoading,
-          click: () => sabaki.newFile({playSound: true, showInfo: true}),
+          click: () =>
+            sabaki.createNewBoardTab({playSound: true, showInfo: true}),
         },
         {
           label: i18n.t('menu.file', 'New &Window'),

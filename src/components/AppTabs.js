@@ -14,6 +14,15 @@ export default class AppTabs extends Component {
     this.handleTabClick = (workspace) => {
       sabaki.setState({activeWorkspace: workspace})
     }
+
+    this.handleBoardTabClick = (id) => {
+      sabaki.switchBoardTab(id)
+    }
+
+    this.handleBoardTabCloseButtonClick = async (evt, id) => {
+      evt.stopPropagation()
+      await sabaki.closeBoardTab(id)
+    }
   }
 
   render({
@@ -21,12 +30,15 @@ export default class AppTabs extends Component {
     activityWorkspace,
     onlineGameId,
     representedFilename,
+    boardTabs = [],
+    activeBoardTabId,
   }) {
     let activity = getCurrentActivity({
       activityWorkspace,
       onlineGameId,
       representedFilename,
     })
+    let showWorkspaceActivity = activity.workspace !== 'board'
 
     return h(
       'nav',
@@ -50,14 +62,63 @@ export default class AppTabs extends Component {
       h(
         'div',
         {class: 'app-activity-tabs'},
-        h(ActivityTab, {
-          activity,
-          selected: activeWorkspace === activity.workspace,
-          onClick: () => this.handleTabClick(activity.workspace),
-        }),
+        boardTabs.map((tab) =>
+          h(BoardTab, {
+            key: tab.id,
+            tab,
+            selected:
+              activeWorkspace === 'board' && tab.id === activeBoardTabId,
+            closeable: boardTabs.length > 1,
+            onClick: () => this.handleBoardTabClick(tab.id),
+            onClose: (evt) => this.handleBoardTabCloseButtonClick(evt, tab.id),
+          }),
+        ),
+        showWorkspaceActivity &&
+          h(ActivityTab, {
+            activity,
+            selected: activeWorkspace === activity.workspace,
+            onClick: () => this.handleTabClick(activity.workspace),
+          }),
       ),
     )
   }
+}
+
+function BoardTab({tab, selected, closeable, onClick, onClose}) {
+  let title = getBoardTitle(tab.representedFilename, tab.onlineGameId)
+  let meta =
+    tab.onlineGameId == null ? null : t('Game #') + String(tab.onlineGameId)
+  let accessibleLabel = meta == null ? title : title + ', ' + meta
+
+  return h(
+    'div',
+    {class: classNames('app-board-tab', {selected})},
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'app-board-tab-button',
+        title,
+        'aria-label': accessibleLabel,
+        'aria-current': selected ? 'page' : undefined,
+        onClick,
+      },
+      h('span', {class: 'app-activity-tab-title'}, title),
+      meta != null && h('span', {class: 'app-activity-tab-meta'}, meta),
+    ),
+    closeable &&
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'app-board-tab-close',
+          title: t('Close tab'),
+          'aria-label': t('Close ') + accessibleLabel,
+          onClick: onClose,
+        },
+        '×',
+      ),
+  )
 }
 
 function ActivityTab({activity, selected, onClick}) {
@@ -112,7 +173,9 @@ function getCurrentActivity({
   }
 }
 
-function getBoardTitle(representedFilename) {
+function getBoardTitle(representedFilename, onlineGameId = null) {
+  if (onlineGameId != null) return t('OGS game on board')
+
   return representedFilename == null || representedFilename === ''
     ? t('Untitled Board')
     : basename(representedFilename)

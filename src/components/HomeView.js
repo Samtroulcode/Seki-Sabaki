@@ -14,14 +14,11 @@ export default class HomeView extends Component {
     }
 
     this.handleNewGameButtonClick = async () => {
-      if (!(await sabaki.askForSave())) return
-
-      await sabaki.newFile({suppressAskForSave: true})
-      sabaki.setState({activeWorkspace: 'board'})
+      await sabaki.createNewBoardTab()
     }
 
     this.handleOpenFileButtonClick = async () => {
-      await sabaki.loadFile()
+      await sabaki.openFileInNewBoardTab()
     }
   }
 

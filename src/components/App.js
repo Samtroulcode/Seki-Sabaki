@@ -204,7 +204,7 @@ class App extends Component {
       evt.returnValue = ' '
 
       setTimeout(async () => {
-        if (await sabaki.askForSave()) {
+        if (await sabaki.askForSaveAllBoardTabs()) {
           sabaki.detachEngines(
             this.state.attachedEngineSyncers.map((syncer) => syncer.id),
           )
@@ -416,6 +416,8 @@ class App extends Component {
         activityWorkspace: this.activityWorkspace,
         onlineGameId: state.onlineGameId,
         representedFilename: state.representedFilename,
+        boardTabs: state.boardTabs,
+        activeBoardTabId: state.activeBoardTabId,
       }),
 
       h(TripleSplitContainer, {

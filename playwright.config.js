@@ -94,5 +94,10 @@ module.exports = defineConfig({
       testMatch: /home-panel\.spec\.js/,
       dependencies: ['smoke'],
     },
+    {
+      name: 'board-tabs',
+      testMatch: /board-tabs\.spec\.js/,
+      dependencies: ['smoke'],
+    },
   ],
 })

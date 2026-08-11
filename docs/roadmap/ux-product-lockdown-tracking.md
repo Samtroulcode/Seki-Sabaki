@@ -352,6 +352,12 @@ Purpose: answer “What should I learn from this game?”
 - [x] Define OGS live games as future dedicated online-game tabs.
 - [x] Define future OGS chat/community/profile tabs as concrete activity tabs.
 - [x] Add targeted navigation E2E coverage.
+- [x] Add first local board-tabs slice with active-state projection.
+- [x] Make Home New Board and Home Open SGF create local board tabs.
+- [x] Keep File menu Open SGF replacement-oriented for the active board tab.
+- [ ] Move attached live engines and live board analysis fully into board-tab
+      state.
+- [ ] Add dedicated online-game tabs for OGS live play.
 
 ### Phase 3 — Library MVP
 
@@ -405,6 +411,9 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-11 — First local board-tabs slice added with active-state projection,
+Home-created board tabs, and targeted unit/E2E coverage.
 
 2026-08-11 — Phase 2 started; AppRail replaced by Home anchor plus current
 activity TabBar shell.
