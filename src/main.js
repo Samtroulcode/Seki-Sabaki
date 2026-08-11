@@ -43,7 +43,7 @@ function newWindow(path) {
   })
 
   windows.push(window)
-  buildMenu()
+  clearApplicationMenu()
   setupWindowEventForwarding(window)
 
   window.once('ready-to-show', () => {
@@ -82,7 +82,16 @@ function newWindow(path) {
   return window
 }
 
+function clearApplicationMenu() {
+  Menu.setApplicationMenu(null)
+}
+
 function buildMenu(props = {}) {
+  if (props == null || props.visible === false) {
+    clearApplicationMenu()
+    return
+  }
+
   let template = require('./menu').get(props)
 
   // Process menu items

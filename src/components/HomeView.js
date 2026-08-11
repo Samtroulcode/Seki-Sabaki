@@ -31,7 +31,7 @@ export default class HomeView extends Component {
         onNavigate: this.handleNavigate,
       }),
       h(
-        'main',
+        'div',
         {class: 'home-content'},
         renderHomeSection(activeSection, props, this.handleNavigate),
       ),

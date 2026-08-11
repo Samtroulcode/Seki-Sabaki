@@ -45,6 +45,7 @@ export default class MainMenu extends Component {
 
   componentWillUnmount() {
     if (this._unsubscribeFocus) this._unsubscribeFocus()
+    ipcRenderer.send('build-menu', {visible: false})
 
     for (let id in this.listeners) {
       ipcRenderer.removeListener(`menu-click-${id}`, this.listeners[id])
