@@ -12,11 +12,15 @@ test.describe('Home panel navigation', () => {
       'page',
     )
     await expect(page.locator('#home')).toContainText('Your Go workspace')
+    await expect(
+      page.locator('.home-sidebar').getByRole('button', {name: 'Dashboard'}),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('#home')).toContainText('Start')
     await expect(page.locator('#home')).toContainText('Continue')
     await expect(page.locator('#home')).toContainText('Status')
     await expect(page.getByRole('button', {name: /New board/})).toHaveCount(2)
-    await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(2)
+    await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(1)
+    await expect(page.getByRole('button', {name: /Open Library/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
     await expect(page.locator('#home')).toContainText('No board open')
@@ -48,25 +52,32 @@ test.describe('Home panel navigation', () => {
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+      page.locator('.home-sidebar').getByRole('button', {name: 'OGS'}),
     ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+    ).toHaveCount(0)
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
     await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
-    ).toBeVisible()
-    await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
-    ).not.toHaveAttribute('aria-current', 'page')
+      page.locator('.home-sidebar').getByRole('button', {name: 'OGS'}),
+    ).toHaveAttribute('aria-current', 'page')
+    await page
+      .locator('.home-sidebar')
+      .getByRole('button', {name: 'Dashboard'})
+      .click()
     await page
       .locator('#home')
       .getByRole('button', {name: /Analyze/})
       .click()
     await expect(page.locator('#analysis-dashboard')).toBeVisible()
     await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'Analysis Setup'}),
+      page.locator('.home-sidebar').getByRole('button', {name: 'Analysis'}),
     ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.locator('#apptabs').getByRole('button', {name: 'Analysis Setup'}),
+    ).toHaveCount(0)
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Analysis Manager',
     )

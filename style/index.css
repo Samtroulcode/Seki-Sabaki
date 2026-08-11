@@ -170,9 +170,9 @@
 
 .home-view,
 .workspace-placeholder {
-  display: grid;
   align-content: start;
-  gap: 1.75rem;
+  align-items: start;
+  gap: 1.5rem;
   height: 100%;
   box-sizing: border-box;
   padding: 3rem;
@@ -185,6 +185,57 @@
     #181818;
   color: #d0d0d0;
   overflow: auto;
+}
+.home-view {
+  display: flex;
+}
+.workspace-placeholder {
+  display: grid;
+}
+.home-sidebar {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  flex: 0 0 11rem;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.home-sidebar-title {
+  color: white;
+  font-weight: bold;
+}
+.home-sidebar-list {
+  display: grid;
+  gap: 0.25rem;
+}
+.home-sidebar button {
+  justify-self: stretch;
+  text-align: left;
+}
+.home-sidebar button.selected {
+  background: #005fae;
+  color: white;
+}
+.home-content,
+.home-dashboard,
+.home-section-panel {
+  display: grid;
+  align-content: start;
+  gap: 1.75rem;
+  min-width: 0;
+}
+.home-content {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.home-content > .ogs-panel {
+  min-height: 32rem;
+  padding: 0;
+  background: transparent;
+}
+.home-content > #analysis-dashboard {
+  min-height: 32rem;
 }
 .home-view h1,
 .home-view h2,
@@ -291,10 +342,24 @@
   background: #222;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 980px) {
   .home-view,
   .workspace-placeholder {
+    flex-direction: column;
     padding: 1.5rem;
+  }
+
+  .home-sidebar-list {
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  }
+
+  .home-sidebar {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .home-content {
+    width: 100%;
   }
 
   .home-hero h1,

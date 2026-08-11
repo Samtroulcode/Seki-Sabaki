@@ -244,8 +244,11 @@ test.describe('OGS mock panel', () => {
     ).toBeDisabled()
     await expect(page.locator('.ogs-dashboard-section-detail')).toHaveCount(0)
     await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+      page.locator('.home-sidebar').getByRole('button', {name: 'OGS'}),
     ).toHaveAttribute('aria-current', 'page')
+    await expect(
+      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+    ).toHaveCount(0)
 
     await page.locator('.ogs-login-form input[name="username"]').fill('sekibot')
     await page.locator('.ogs-login-form input[name="password"]').fill('secret')
@@ -423,7 +426,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.gtp-console')).toHaveCount(0)
 
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
     await expect(page.locator('.ogs-online-game')).toContainText('19x19')
     await expect(page.locator('.ogs-online-game')).toContainText('opponent')
@@ -437,7 +440,7 @@ test.describe('OGS mock panel', () => {
     )
     await expect(page.locator('#goban')).toBeVisible()
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
 
     await page.evaluate(async () => {
       window.__sabaki.setState({
@@ -543,7 +546,7 @@ test.describe('OGS mock panel', () => {
     })
 
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
     await page
       .locator('.ogs-online-game')
       .getByRole('button', {name: 'Disconnect game'})

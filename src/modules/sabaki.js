@@ -102,6 +102,7 @@ class Sabaki extends EventEmitter {
       showMenuBar: null,
       zoomFactor: null,
       activeWorkspace: 'home',
+      homeSection: 'dashboard',
 
       representedFilename: null,
       gameIndex: 0,
@@ -289,6 +290,8 @@ class Sabaki extends EventEmitter {
     if (typeof change === 'function') {
       change = change(this.state)
     }
+
+    change = normalizeWorkspaceChange(change)
 
     if ('boardAttachment' in change || 'onlineGameId' in change) {
       Object.assign(
@@ -1382,7 +1385,7 @@ class Sabaki extends EventEmitter {
     )
 
     if (result?.ok) {
-      this.setState({activeWorkspace: 'analysis'})
+      this.setState({activeWorkspace: 'home', homeSection: 'analysis'})
     } else if (result?.error?.message != null) {
       await dialog.showMessageBox(result.error.message, 'warning')
     } else if (result == null) {
@@ -4356,6 +4359,19 @@ function getOgsColorPlayerLabel(color, player) {
   return player?.username == null || player.username === ''
     ? color
     : `${color} (${player.username})`
+}
+
+function normalizeWorkspaceChange(change) {
+  let homeSectionByWorkspace = {
+    online: 'ogs',
+    analysis: 'analysis',
+    'sgf-explorer': 'library',
+  }
+  let homeSection = homeSectionByWorkspace[change.activeWorkspace]
+
+  return homeSection == null
+    ? change
+    : {...change, activeWorkspace: 'home', homeSection}
 }
 
 export default new Sabaki()

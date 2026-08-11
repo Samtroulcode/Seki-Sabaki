@@ -13,8 +13,6 @@ import HomeView from './HomeView.js'
 import MainView from './MainView.js'
 import LeftSidebar from './LeftSidebar.js'
 import Sidebar from './Sidebar.js'
-import AnalysisPanel from './sidebars/AnalysisPanel.js'
-import OgsPanel from './sidebars/OgsPanel.js'
 import DrawerManager from './DrawerManager.js'
 import InputBox from './InputBox.js'
 import BusyScreen from './BusyScreen.js'
@@ -58,13 +56,8 @@ class App extends Component {
     super(props)
 
     this.state = sabaki.state
-    this.activityWorkspace = 'board'
 
     sabaki.on('change', ({change, callback}) => {
-      if (change.activeWorkspace != null && change.activeWorkspace !== 'home') {
-        this.activityWorkspace = change.activeWorkspace
-      }
-
       this.setState(change, callback)
     })
 
@@ -411,9 +404,6 @@ class App extends Component {
 
       h(AppTabs, {
         activeWorkspace: state.activeWorkspace,
-        activityWorkspace: this.activityWorkspace,
-        onlineGameId: state.onlineGameId,
-        representedFilename: state.representedFilename,
         boardTabs: state.boardTabs,
         activeBoardTabId: state.activeBoardTabId,
       }),
@@ -461,38 +451,15 @@ function renderWorkspace(state) {
     case 'home':
       return h(HomeView, state)
     case 'online':
-      return h(OgsPanel)
+      return h(HomeView, {...state, homeSection: 'ogs'})
     case 'sgf-explorer':
-      return h(WorkspacePlaceholder, {
-        id: 'sgf-explorer',
-        title: t('SGF Explorer'),
-        description: t(
-          'Folder browsing and mini goban previews will live here.',
-        ),
-      })
+      return h(HomeView, {...state, homeSection: 'library'})
     case 'analysis':
-      return h(AnalysisPanel)
+      return h(HomeView, {...state, homeSection: 'analysis'})
     case 'board':
     default:
       return h(MainView, state)
   }
-}
-
-function WorkspacePlaceholder({id, title, description}) {
-  return h(
-    'section',
-    {id, class: 'workspace-placeholder'},
-    h('h1', {}, title),
-    h('p', {}, description),
-    h(
-      'button',
-      {
-        type: 'button',
-        onClick: () => sabaki.setState({activeWorkspace: 'home'}),
-      },
-      t('Back to Home'),
-    ),
-  )
 }
 
 // Render

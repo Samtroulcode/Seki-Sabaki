@@ -25,6 +25,9 @@ multi-board or full activity-tab persistence yet.
 - Target navigation model: Home is permanent and non-closeable; tabs should
   represent open activities such as boards, SGFs, OGS games, and reports rather
   than merely replacing AppRail with feature-category tabs.
+- Current Home internal navigation foundation has Dashboard, OGS, Library,
+  Analysis, and Engines sections; OGS Overview and Analysis setup are no longer
+  modeled as app tabs.
 - Global singleton areas belong inside Home internal navigation, not in app
   tabs. This includes OGS Overview, Library overview, Analysis setup/status, and
   engine status.
