@@ -72,6 +72,12 @@ Board remains the local SGF workspace:
 Board can later host optional modules, such as Library or Game Info, but should
 not become the primary online live-game surface.
 
+Sabaki's existing Manage Games drawer remains a board-internal SGF collection
+tool, not a competing app-level tab system. It should eventually be clarified as
+“Games in this file” or “SGF Collection”: adding existing files there adds games
+to the current board document, while opening from Home/Library should open board
+activity tabs once true board tabs exist.
+
 ### Library
 
 Library is the user's Seki-linked SGF directory:
@@ -195,6 +201,8 @@ MVP order and empty states:
 - Do not advertise true multi-board behavior until closing, dirty state,
   file/save behavior, engines, OGS attachment, and analysis actions are scoped
   to tabs.
+- Clarify the existing Manage Games drawer as games inside the current board
+  file/collection, not as open app-level board tabs.
 
 ### Phase 3 — Library MVP
 

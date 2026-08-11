@@ -112,6 +112,46 @@ Responsibilities:
 Opening a new board should create a new tab instead of silently replacing the
 current board once true multi-board state exists.
 
+#### Games Inside A Board Tab
+
+Sabaki's existing **Manage Games** drawer (`Cmd/Ctrl+Shift+M`) is not an
+app-level tab system. It manages the games contained inside the current board
+document/SGF collection.
+
+This distinction is essential:
+
+```text
+App tabs
+├── Home
+├── collection.sgf        <- board tab / opened document
+└── OGS #12345            <- online-game activity
+
+Inside collection.sgf
+├── Game 1
+├── Game 2
+└── Game 3
+```
+
+Therefore:
+
+- opening an SGF from Home or the future Library should open a board activity
+  tab once true board tabs exist;
+- using **Add Existing Files…** inside Manage Games should add games to the
+  current board tab's SGF collection;
+- mini-goban previews in Manage Games are document-internal games, not app-level
+  open activities;
+- Home should summarize open activity tabs, not every game inside the current
+  SGF collection by default.
+
+Future UX copy should make this hierarchy clear. Candidate labels:
+
+- `Games in this file`;
+- `SGF Collection`;
+- `Games in this collection`.
+
+The feature should be preserved for SGF collection compatibility, but its UI
+should not compete with app-level tabs.
+
 ### Online Game Tab
 
 ```text
@@ -157,6 +197,8 @@ The report tab should not expose raw engine logs by default.
   the Analysis workspace until reports exist?
 - When opening an SGF, should Seki always create a new board tab, or reuse the
   active untitled clean board?
+- What final label should replace or clarify `Manage Games` so users understand
+  it means games inside the current board file/collection?
 - How should tab restoration work at startup: Home only, previous tabs, or a
   later user preference?
 - How much true per-tab state is needed before replacing the AppRail visually?
@@ -199,6 +241,8 @@ The report tab should not expose raw engine logs by default.
   rule.
 - Closing a dirty tab prompts save/discard/cancel.
 - Avoid confusing this with `gameTrees` inside a single SGF collection.
+- Rename or clarify Manage Games so adding existing files to the drawer is not
+  confused with opening new app-level board tabs.
 
 ### Phase E — Online Game And Report Tabs
 

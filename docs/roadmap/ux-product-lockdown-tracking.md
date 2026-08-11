@@ -25,6 +25,9 @@ multi-board or full activity-tab persistence yet.
 - Target navigation model: Home is permanent and non-closeable; tabs should
   represent open activities such as boards, SGFs, OGS games, and reports rather
   than merely replacing AppRail with feature-category tabs.
+- Manage Games remains a board-internal SGF collection tool, not an app-level
+  tab system. Its UI should be clarified so users understand those mini-gobans
+  are games inside the current board document.
 - Seki's first polished product promise is a Go game hub: play locally, surface
   online game status and continuation paths, find saved games, and
   analyze/review games from one coherent starting point.
@@ -62,6 +65,8 @@ multi-board or full activity-tab persistence yet.
   clean untitled board tab.
 - Decide startup restoration policy for tabs: Home only, previous tabs, or later
   user preference.
+- Decide the final user-facing label for Manage Games: `Games in this file`,
+  `SGF Collection`, or `Games in this collection`.
 
 ## Navigation Tabs Target
 
@@ -97,6 +102,8 @@ tab bar. Tabs should eventually represent user work objects, for example:
 
 - `gameTrees` and `gameIndex` are not app-level tabs; they are games inside the
   active SGF collection.
+- The current Manage Games drawer shows mini-gobans for games inside the active
+  board document. It should not be treated as a competing list of open app tabs.
 - A visual-only TabBar can mislead users if it appears to support true
   multi-document behavior before the state model does.
 - Closing tabs must not lose unsaved SGF work or live OGS state.
