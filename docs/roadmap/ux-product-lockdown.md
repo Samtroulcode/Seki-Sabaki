@@ -168,9 +168,12 @@ Minimum module contract:
 MVP order and empty states:
 
 1. quick actions;
-2. Library preview, with an empty state that offers import/open actions;
-3. Analysis status, with a not-configured state for KataGo/model/config;
-4. OGS status, with disconnected and no-current-game states.
+2. continue/resume, with an empty state that offers new board and open SGF
+   actions;
+3. Library preview, with an empty state that offers open SGF now and library
+   setup/import actions only after Library MVP decisions are settled;
+4. Analysis status, with a not-configured state for KataGo/model/config;
+5. OGS status, with disconnected and no-current-game states.
 
 ### Phase 2 — Library MVP
 
@@ -256,13 +259,16 @@ is stable.
 
 ## Immediate Next Tasks
 
-1. Fix the smoke test title mismatch so E2E dependencies are reliable.
-2. Inventory current Home, OGS, Analysis, and Board interactions.
-3. Draft the Home dashboard module layout.
-4. Draft the Analysis panel polish target: setup, queue, results, report.
-5. Implement the smallest read-only Library preview module.
-6. Add targeted E2E coverage for the new Home dashboard behavior.
-7. Defer the README rewrite until the UX direction is implemented enough to
+Completed setup tasks are tracked in
+[`ux-product-lockdown-tracking.md`](./ux-product-lockdown-tracking.md). The next
+active tasks are:
+
+1. Draft the Analysis panel polish target: setup, queue, results, report.
+2. Define the Home dashboard MVP layout from the tracked draft.
+3. Implement quick actions and continue/resume Home modules.
+4. Implement the smallest read-only Library preview module.
+5. Add targeted E2E coverage for the new Home dashboard behavior.
+6. Defer the README rewrite until the UX direction is implemented enough to
    document accurately.
 
 ## Non-Goals For This Branch Start
