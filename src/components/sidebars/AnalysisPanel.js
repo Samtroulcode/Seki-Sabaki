@@ -2,6 +2,7 @@ import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
 import analysisStore from '../../modules/analysisstore.js'
+import sabaki from '../../modules/sabaki.js'
 
 const t = i18n.context('AnalysisPanel')
 
@@ -62,7 +63,9 @@ export default class AnalysisPanel extends Component {
     }
 
     this.handleOpenGame = async (path) => {
-      await analysisStore.openAnalyzedGame(path)
+      if (await analysisStore.openAnalyzedGame(path)) {
+        await sabaki.openFileInNewBoardTab(path)
+      }
     }
   }
 
