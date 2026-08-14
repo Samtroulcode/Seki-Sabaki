@@ -2384,9 +2384,7 @@ button:active {
 }
 .ogs-mini-goban {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(5, 1fr);
+  display: block;
   width: 4.5rem;
   height: 4.5rem;
   overflow: hidden;
@@ -2395,16 +2393,47 @@ button:active {
   background:
     linear-gradient(#7b5826 1px, transparent 1px),
     linear-gradient(90deg, #7b5826 1px, transparent 1px), #c9963c;
-  background-size: 25% 25%;
 }
-.ogs-mini-point:nth-child(7),
-.ogs-mini-point:nth-child(19) {
-  align-self: center;
-  justify-self: center;
-  width: 0.55rem;
-  height: 0.55rem;
+.ogs-mini-placeholder {
+  position: absolute;
+  inset: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  border-radius: 4px;
+  background: rgba(40, 30, 16, 0.72);
+  color: #fff3d2;
+  font-size: 0.62rem;
+  line-height: 1.1;
+  text-align: center;
+}
+.ogs-mini-stone,
+.ogs-mini-current-vertex {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.ogs-mini-stone {
+  width: 0.32rem;
+  height: 0.32rem;
   border-radius: 50%;
-  background: #111;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+.ogs-mini-stone.black {
+  background: #050505;
+}
+.ogs-mini-stone.white {
+  background: #f5f5f5;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.35);
+}
+.ogs-mini-current-vertex {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  border: 1px solid #0082f0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
 }
 .ogs-mini-size {
   position: absolute;

@@ -176,6 +176,22 @@ describe('online store', () => {
     })
   })
 
+  it('can suppress global network errors for background OGS SGF previews', async () => {
+    let store = createStore({
+      downloadGameSgf: async () => ({
+        ok: false,
+        error: {code: 'not-found', message: 'Not found.'},
+      }),
+    })
+    store.setState({user: {id: 1, username: 'Seki'}})
+
+    let result = await store.downloadGameSgf(123, {recordError: false})
+
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(store.getState().network.status, 'offline')
+    assert.strictEqual(store.getState().network.lastError, null)
+  })
+
   it('ignores late OGS SGF downloads after account changes', async () => {
     let resolveDownload
     let downloadPromise = new Promise((resolve) => {

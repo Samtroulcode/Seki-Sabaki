@@ -264,7 +264,7 @@ export class OnlineStore {
     return result
   }
 
-  async downloadGameSgf(gameId) {
+  async downloadGameSgf(gameId, {recordError = true} = {}) {
     let sessionRequestId = this.sessionRequestId
     let userId = this.state.user?.id ?? null
 
@@ -278,7 +278,7 @@ export class OnlineStore {
         return {ok: false, stale: true}
       }
 
-      if (!result.ok) {
+      if (!result.ok && recordError) {
         this.applySyncError(result.error, {
           code: result.error?.code || 'sgf-download-failed',
           message:
@@ -295,10 +295,12 @@ export class OnlineStore {
         return {ok: false, stale: true}
       }
 
-      this.applySyncError(err, {
-        code: 'sgf-download-failed',
-        message: t('Unable to download SGF from OGS.'),
-      })
+      if (recordError) {
+        this.applySyncError(err, {
+          code: 'sgf-download-failed',
+          message: t('Unable to download SGF from OGS.'),
+        })
+      }
       return {
         ok: false,
         error: {message: t('Unable to download SGF from OGS.')},

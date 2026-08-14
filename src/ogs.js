@@ -889,7 +889,7 @@ class OgsClient {
 
     await assertOk(response, 'game-history')
 
-    return sanitizeGameHistoryResponse(await response.json())
+    return sanitizeGameHistoryResponse(await response.json(), pageSize)
   }
 
   async downloadGameSgf(input = {}) {
@@ -1437,7 +1437,10 @@ async function readLimitedTextResponse(response, maxBytes) {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-function sanitizeGameHistoryResponse(response) {
+function sanitizeGameHistoryResponse(
+  response,
+  maxResults = MAX_GAME_HISTORY_PAGE_SIZE,
+) {
   let results = Array.isArray(response?.results)
     ? response.results
     : Array.isArray(response)
@@ -1448,8 +1451,22 @@ function sanitizeGameHistoryResponse(response) {
     count: sanitizeOptionalCount(response?.count),
     next: typeof response?.next === 'string' ? response.next : null,
     previous: typeof response?.previous === 'string' ? response.previous : null,
-    results: results.map(sanitizeGameHistoryEntry).filter((x) => x != null),
+    results: sanitizeGameHistoryEntries(results, maxResults),
   }
+}
+
+function sanitizeGameHistoryEntries(results, maxResults) {
+  let sanitized = []
+
+  for (let entry of results) {
+    let game = sanitizeGameHistoryEntry(entry)
+    if (game == null) continue
+
+    sanitized.push(game)
+    if (sanitized.length >= maxResults) break
+  }
+
+  return sanitized
 }
 
 function sanitizeOptionalCount(value) {

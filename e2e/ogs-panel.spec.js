@@ -834,6 +834,9 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-history-card')).toContainText('opponent')
     await expect(page.locator('.ogs-history-card')).toContainText('B+R')
     await expect(page.locator('.ogs-mini-goban')).toContainText('9x9')
+    await expect(page.locator('.ogs-history-card .ogs-mini-stone')).toHaveCount(
+      2,
+    )
     await page.waitForFunction(
       () => window.__ogsHistoryCalls.at(-1)?.pageSize === 12,
     )
@@ -841,7 +844,7 @@ test.describe('OGS mock panel', () => {
     await page.locator('.ogs-history-card').click()
     await page.waitForFunction(
       () =>
-        window.__ogsDownloadedGames[0] === 123 &&
+        window.__ogsDownloadedGames.includes(123) &&
         window.__sabaki.state.activeWorkspace === 'board' &&
         window.__sabaki.state.boardTabs.length === 1,
     )

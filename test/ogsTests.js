@@ -317,6 +317,38 @@ describe('OGS client', () => {
     ])
   })
 
+  it('caps sanitized OGS game history to the requested page size', async () => {
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async (url, options = {}) => {
+        if (url.includes('/game_history/')) {
+          return response({
+            body: {
+              count: 3,
+              next: null,
+              previous: null,
+              results: [
+                {id: 1, name: 'One', width: 19, height: 19},
+                {id: 2, name: 'Two', width: 19, height: 19},
+                {id: 3, name: 'Three', width: 19, height: 19},
+              ],
+            },
+          })
+        }
+
+        return loginFetch(url, options)
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let history = await client.listGameHistory({pageSize: 2})
+
+    assert.deepStrictEqual(
+      history.results.map((game) => game.id),
+      [1, 2],
+    )
+  })
+
   it('downloads logged-in OGS game SGF', async () => {
     let calls = []
     let client = new OgsClient({
