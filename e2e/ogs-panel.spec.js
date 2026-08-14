@@ -380,6 +380,13 @@ test.describe('OGS mock panel', () => {
         treePosition === [...tree.getSequence(tree.root.id)].at(-1).id
       )
     })
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.activeWorkspace === 'online-game' &&
+        window.__sabaki.state.onlineGameTabs.length === 1 &&
+        window.__sabaki.state.boardTabs.length === 0,
+    )
+    await expect(page.locator('#online-game')).toBeVisible()
     await expect(page.locator('#goban')).toBeVisible()
     await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
     await expect(page.locator('.ogs-game-context-panel')).toContainText(
@@ -433,10 +440,10 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-online-game')).toContainText('good luck')
     await page
       .locator('.ogs-active-games')
-      .getByRole('button', {name: 'Open board'})
+      .getByRole('button', {name: 'Open game'})
       .click()
     await page.waitForFunction(
-      () => window.__sabaki.state.activeWorkspace === 'board',
+      () => window.__sabaki.state.activeWorkspace === 'online-game',
     )
     await expect(page.locator('#goban')).toBeVisible()
     await page.getByTitle('Home').click()
@@ -582,12 +589,39 @@ test.describe('OGS mock panel', () => {
         window.__sabaki.state.boardAttachment?.gameId === 42,
     )
 
-    await page.getByTitle('OGS game on board').click()
+    await page.getByTitle('Fixture Game').click()
 
     await expect(page.locator('.ogs-panel')).toHaveCount(0)
     await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
     await expect(page.locator('.engine-peer-list')).toHaveCount(0)
     await expect(page.locator('.gtp-console')).toHaveCount(0)
+
+    await page.evaluate(() => {
+      window.__ogsDisconnectCalls = []
+      window.__ogsDisconnectShouldFail = true
+      window.sabaki.ogs.disconnectGame = async (gameId) => {
+        window.__ogsDisconnectCalls.push(gameId)
+        return window.__ogsDisconnectShouldFail
+          ? {ok: false, error: {message: 'still connected'}}
+          : {ok: true, state: window.__ogsTestState}
+      }
+    })
+    await page.locator('.app-online-game-tab-close').click()
+    await page.waitForFunction(
+      () =>
+        window.__ogsDisconnectCalls.length === 1 &&
+        window.__sabaki.state.onlineGameTabs.length === 1,
+    )
+
+    await page.evaluate(() => {
+      window.__ogsDisconnectShouldFail = false
+    })
+    await page.locator('.app-online-game-tab-close').click()
+    await page.waitForFunction(
+      () =>
+        window.__ogsDisconnectCalls.length === 2 &&
+        window.__sabaki.state.onlineGameTabs.length === 0,
+    )
   })
 
   test('ignores stale OGS move rejection after server confirmation', async ({
@@ -666,7 +700,7 @@ test.describe('OGS mock panel', () => {
     })
   })
 
-  test('opens the board automatically when automatch finds a game', async ({
+  test('opens an online-game tab automatically when automatch finds a game', async ({
     page,
   }) => {
     await page.evaluate(() => {
@@ -725,8 +759,9 @@ test.describe('OGS mock panel', () => {
 
     await page.waitForFunction(
       () =>
-        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.activeWorkspace === 'online-game' &&
         window.__sabaki.state.onlineGameId === 42 &&
+        window.__sabaki.state.onlineGameTabs.length === 1 &&
         window.__ogsAcknowledgedAutomatchGame === 42,
     )
     await expect(page.locator('#goban')).toBeVisible()
@@ -798,10 +833,6 @@ test.describe('OGS mock panel', () => {
       }
 
       await window.__sabaki.loadOgsGame(onlineGame)
-      window.__sabaki.setState({
-        activeWorkspace: 'board',
-        showLeftSidebar: true,
-      })
       window.__sabaki.enterOgsStoneRemovalMode(onlineGame)
     })
 
@@ -1051,6 +1082,8 @@ test.describe('OGS mock panel', () => {
       }
 
       await window.__sabaki.loadOgsGame(onlineGame)
+      await window.__sabaki.showOgsGameEndInfo(onlineGame)
+      window.__sabaki.detachOgsGame(onlineGame.gameId)
       window.__sabaki.setState({showLeftSidebar: true})
     })
 

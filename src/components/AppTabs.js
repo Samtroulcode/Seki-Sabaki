@@ -4,6 +4,7 @@ import {basename} from 'path'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
+import onlineStore from '../modules/onlinestore.js'
 
 const t = i18n.context('AppTabs')
 
@@ -23,10 +24,32 @@ export default class AppTabs extends Component {
       evt.stopPropagation()
       await sabaki.closeBoardTab(id)
     }
+
+    this.handleOnlineGameTabClick = (id) => {
+      sabaki.switchOnlineGameTab(id)
+    }
+
+    this.handleOnlineGameTabCloseButtonClick = async (evt, id) => {
+      evt.stopPropagation()
+      let tab = sabaki.getOnlineGameTab(id)
+
+      if (tab?.onlineGameId != null) {
+        let result = await onlineStore.disconnectGame(tab.onlineGameId)
+        if (result?.ok === false) return
+      }
+
+      sabaki.closeOnlineGameTab(id)
+    }
   }
 
-  render({activeWorkspace, boardTabs = [], activeBoardTabId}) {
-    let homeSelected = activeWorkspace !== 'board'
+  render({
+    activeWorkspace,
+    boardTabs = [],
+    activeBoardTabId,
+    onlineGameTabs = [],
+    activeOnlineGameTabId,
+  }) {
+    let homeSelected = !['board', 'online-game'].includes(activeWorkspace)
 
     return h(
       'nav',
@@ -59,6 +82,19 @@ export default class AppTabs extends Component {
             closeable: true,
             onClick: () => this.handleBoardTabClick(tab.id),
             onClose: (evt) => this.handleBoardTabCloseButtonClick(evt, tab.id),
+          }),
+        ),
+        onlineGameTabs.map((tab) =>
+          h(OnlineGameTab, {
+            key: tab.id,
+            tab,
+            selected:
+              activeWorkspace === 'online-game' &&
+              tab.id === activeOnlineGameTabId,
+            closeable: true,
+            onClick: () => this.handleOnlineGameTabClick(tab.id),
+            onClose: (evt) =>
+              this.handleOnlineGameTabCloseButtonClick(evt, tab.id),
           }),
         ),
       ),
@@ -104,9 +140,47 @@ function BoardTab({tab, selected, closeable, onClick, onClose}) {
 }
 
 function getBoardTitle(representedFilename, onlineGameId = null) {
-  if (onlineGameId != null) return t('OGS game on board')
-
   return representedFilename == null || representedFilename === ''
     ? t('Untitled Board')
     : basename(representedFilename)
+}
+
+function OnlineGameTab({tab, selected, closeable, onClick, onClose}) {
+  let title = getOnlineGameTitle(tab)
+  let meta = t('Online game')
+  let accessibleLabel = title + ', ' + meta
+
+  return h(
+    'div',
+    {class: classNames('app-online-game-tab', {selected})},
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'app-online-game-tab-button',
+        title,
+        'aria-label': accessibleLabel,
+        'aria-current': selected ? 'page' : undefined,
+        onClick,
+      },
+      h('span', {class: 'app-activity-tab-title'}, title),
+      h('span', {class: 'app-activity-tab-meta'}, meta),
+    ),
+    closeable &&
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'app-online-game-tab-close',
+          title: t('Close tab'),
+          'aria-label': t('Close ') + accessibleLabel,
+          onClick: onClose,
+        },
+        '×',
+      ),
+  )
+}
+
+function getOnlineGameTitle(tab) {
+  return tab.title || t('OGS #') + String(tab.onlineGameId)
 }

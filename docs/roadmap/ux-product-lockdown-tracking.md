@@ -7,13 +7,12 @@ Companion roadmap: [`ux-product-lockdown.md`](./ux-product-lockdown.md)
 
 ## Current Phase
 
-Phase 2 — Navigation Tabs Foundation
+Phase 2 — Navigation Tabs Foundation complete; Phase 3 — Library MVP is next
 
 ## Active Goal
 
-Replace the visible feature rail with the first safe navigation tab shell: Home
-as a permanent anchor plus the current open activity, without claiming true
-multi-board or full activity-tab persistence yet.
+Prepare the Library MVP after completing Home, local board tabs, board-owned
+engine/analysis state, and dedicated OGS online-game activity tabs.
 
 ## Working Branch
 
@@ -76,8 +75,8 @@ multi-board or full activity-tab persistence yet.
   the MVP or only later.
 - Decide which Analysis pieces belong on Home, in the Analysis workspace, and in
   reusable Library/Board modules.
-- Decide the temporary OGS/live-game UX boundaries before the dedicated Online
-  Game workspace exists.
+- Decide how far the first dedicated Online Game workspace should go before the
+  broader OGS panel polish phase.
 - Decide the exact Home internal navigation shape, likely a sidebar, for
   Dashboard, OGS, Library, Analysis, Engines, and future global sections.
 - Decide startup restoration policy for tabs: Home only, previous tabs, or later
@@ -158,11 +157,12 @@ tab bar. Tabs should eventually represent user work objects, for example:
 - Board remains the strongest and most complete workspace: local SGF
   view/edit/review, game-tree navigation, comments, scoring, engine/GTP tools,
   graph panels, drawers, file load/save, and analysis overlays.
-- When an OGS game is attached, the board renders an online-game projection and
-  the left sidebar switches to an OGS game context panel.
-- Main UX gap: local review/edit metaphors and live online play still share the
-  same board workspace. Some online restrictions exist, but the product boundary
-  is not obvious enough for a non-Sabaki user.
+- OGS live games now open in a dedicated online-game activity tab instead of a
+  local board tab. Board remains focused on local SGF work, engines, and live
+  analysis.
+- Main UX gap: online-game tabs are intentionally minimal and still reuse the
+  SGF projection/board renderer internally; the surrounding live-play UX needs
+  later polish.
 
 ### Analysis
 
@@ -178,13 +178,14 @@ tab bar. Tabs should eventually represent user work objects, for example:
 ### OGS
 
 - OGS currently supports login/logout, account/socket status, automatch, active
-  games, current online-game summary, opening a game on the board, pass/resign,
-  stone-removal confirmation, chat, and disconnect.
+  games, current online-game summary, opening a live game in a dedicated
+  online-game tab, pass/resign, stone-removal confirmation, chat, and
+  disconnect.
 - Several dashboard sections are placeholders: Social, Community, Settings, and
   parts of Play/Games.
 - Main UX gap: OGS is useful but still feels like an integration panel rather
-  than a polished online area. Reconnect/error/session states and the temporary
-  Board-based live-game boundary need clearer UX rules.
+  than a polished online area. Reconnect/error/session states and the minimal
+  online-game workspace need clearer UX polish.
 - Direction update: OGS Overview should be a Home section, not an app-level tab.
   Opening a specific online game should create an online-game activity tab.
 
@@ -258,8 +259,8 @@ Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
 - Rename or reframe SGF Explorer as Library before it becomes a real workspace.
 - Separate “analyze this game” from low-level KataGo configuration in the main
   UX flow.
-- Keep live OGS play safe by making online-vs-local mode obvious until a
-  dedicated Online Game workspace exists.
+- Keep live OGS play safe by continuing to separate online-game tabs from local
+  board editing and analysis affordances.
 - Centralize workspace/card metadata so AppRail and Home do not drift.
 - Avoid placeholder-heavy surfaces on the main path; prefer honest empty states
   with one clear next action.
@@ -375,7 +376,7 @@ Purpose: answer “What should I learn from this game?”
 - [x] Keep File menu Open SGF replacement-oriented for the active board tab.
 - [x] Move attached live engines and live board analysis fully into board-tab
       state.
-- [ ] Add dedicated online-game tabs for OGS live play.
+- [x] Add dedicated online-game tabs for OGS live play.
 
 ### Phase 3 — Library MVP
 
@@ -404,9 +405,9 @@ Purpose: answer “What should I learn from this game?”
 
 ### Phase 6 — Dedicated Online Game Workspace
 
-- [ ] Define online game state boundaries separate from local SGF editing.
-- [ ] Identify Board rendering pieces to reuse.
-- [ ] Define disabled/isolated actions during live play.
+- [x] Define online game state boundaries separate from local SGF editing.
+- [x] Identify Board rendering pieces to reuse.
+- [x] Define disabled/isolated actions during live play.
 - [ ] Define post-game save/export flow into Library.
 
 ### Phase 7 — KataGo Model Management Optional Post-Lockdown
@@ -429,6 +430,10 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-14 — OGS live games now open in dedicated online-game tabs with a
+restricted live-play workspace instead of board tabs; board analysis and engine
+UI are not mounted in online-game tabs.
 
 2026-08-14 — Attached engines, selected engine-player state, and live board
 analysis state moved into board-tab snapshots; closing a board tab stops its

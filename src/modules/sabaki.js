@@ -33,6 +33,13 @@ import {
   isBoardTabDirty,
   updateBoardTab,
 } from './boardtabs.js'
+import {
+  createOnlineGameTab,
+  createOnlineGameTabSnapshot,
+  getOnlineGameTabProjection,
+  onlineGameTabStateKeys,
+  updateOnlineGameTab,
+} from './onlinegametabs.js'
 import OgsBoardSessionController from './ogsboardsessioncontroller.js'
 import {buildOgsGameTree} from './ogsboard.js'
 import {
@@ -114,6 +121,8 @@ class Sabaki extends EventEmitter {
       onlineGameId: null,
       boardTabs: [],
       activeBoardTabId: null,
+      onlineGameTabs: [],
+      activeOnlineGameTabId: null,
 
       // Bars
 
@@ -312,15 +321,36 @@ class Sabaki extends EventEmitter {
       change = {...change, boardTabs: this.state.boardTabs}
     }
 
+    if (
+      !this.applyingOnlineGameTab &&
+      this.shouldSyncActiveOnlineGameTab(change)
+    ) {
+      this.syncActiveOnlineGameTab()
+      change = {...change, onlineGameTabs: this.state.onlineGameTabs}
+    }
+
     this.emit('change', {change, callback})
   }
 
   shouldSyncActiveBoardTab(change) {
     if (this.state.activeBoardTabId == null) return false
+    if (this.state.activeWorkspace !== 'board') return false
     if (change.boardTabs != null || change.activeBoardTabId != null)
       return false
 
     return boardTabStateKeys.some((key) => key in change)
+  }
+
+  shouldSyncActiveOnlineGameTab(change) {
+    if (this.state.activeOnlineGameTabId == null) return false
+    let tab = this.getOnlineGameTab(this.state.activeOnlineGameTabId)
+    if (tab == null || tab.onlineGameId !== this.state.onlineGameId)
+      return false
+    if (change.onlineGameTabs != null || change.activeOnlineGameTabId != null) {
+      return false
+    }
+
+    return onlineGameTabStateKeys.some((key) => key in change)
   }
 
   createBoardTabSnapshot(data = {}) {
@@ -342,6 +372,40 @@ class Sabaki extends EventEmitter {
 
     let snapshot = this.createBoardTabSnapshot({id: activeBoardTabId, ...data})
     this.state.boardTabs = updateBoardTab(boardTabs, activeBoardTabId, snapshot)
+  }
+
+  createOnlineGameTabSnapshot(data = {}) {
+    let snapshot = createOnlineGameTabSnapshot({
+      state: this.state,
+      history: this.history || [],
+      historyPointer: this.historyPointer || 0,
+      id: this.state.activeOnlineGameTabId,
+    })
+
+    return {...snapshot, ...data}
+  }
+
+  syncActiveOnlineGameTab(data = {}) {
+    let {activeOnlineGameTabId, onlineGameTabs = []} = this.state
+    if (activeOnlineGameTabId == null) return
+
+    let snapshot = this.createOnlineGameTabSnapshot({
+      id: activeOnlineGameTabId,
+      ...data,
+    })
+    this.state.onlineGameTabs = updateOnlineGameTab(
+      onlineGameTabs,
+      activeOnlineGameTabId,
+      snapshot,
+    )
+  }
+
+  syncCurrentActivityTab(data = {}) {
+    if (this.state.activeWorkspace === 'board') {
+      this.syncActiveBoardTab(data)
+    } else if (this.state.activeWorkspace === 'online-game') {
+      this.syncActiveOnlineGameTab(data)
+    }
   }
 
   getAllAttachedEngineSyncers() {
@@ -378,13 +442,31 @@ class Sabaki extends EventEmitter {
     return this.state.boardTabs.find((tab) => tab.id === id) || null
   }
 
+  getOnlineGameTab(id) {
+    return this.state.onlineGameTabs.find((tab) => tab.id === id) || null
+  }
+
+  getOnlineGameTabByGameId(gameId) {
+    return (
+      this.state.onlineGameTabs.find((tab) => tab.onlineGameId === gameId) ||
+      null
+    )
+  }
+
   applyBoardTab(
     tab,
     {activeWorkspace = 'board', syncCurrent = true, resumeAnalysis = true} = {},
   ) {
     if (tab == null) return false
 
-    if (syncCurrent) this.syncActiveBoardTab()
+    if (syncCurrent) this.syncCurrentActivityTab()
+
+    if (
+      this.state.activeWorkspace === 'online-game' ||
+      this.state.onlineGameId != null
+    ) {
+      this.ogsBoardSession.invalidateOperations()
+    }
 
     if (tab.id !== this.state.activeBoardTabId) {
       let previousTabId = this.state.activeBoardTabId
@@ -444,7 +526,7 @@ class Sabaki extends EventEmitter {
     let tab = createBoardTab(gameTrees, {representedFilename, boardAttachment})
 
     this.setMode('play')
-    this.syncActiveBoardTab()
+    this.syncCurrentActivityTab()
     this.state.boardTabs = [...this.state.boardTabs, tab]
     this.applyBoardTab(tab)
     this.treeHash = this.generateTreeHash()
@@ -459,6 +541,117 @@ class Sabaki extends EventEmitter {
     return this.applyBoardTab(this.getBoardTab(id))
   }
 
+  applyOnlineGameTab(tab, {syncCurrent = true} = {}) {
+    if (tab == null) return false
+    let switchingOnlineGame =
+      this.state.onlineGameId != null &&
+      this.state.onlineGameId !== tab.onlineGameId
+
+    if (syncCurrent) {
+      this.syncCurrentActivityTab()
+    }
+
+    if (switchingOnlineGame) this.ogsBoardSession.invalidateOperations()
+
+    if (
+      this.state.activeBoardTabId != null &&
+      this.state.onlineGameId == null
+    ) {
+      this.syncActiveBoardTab()
+      this.applyingBoardTab = true
+      try {
+        this.stopEngineGame()
+        this.stopAnalysis()
+      } finally {
+        this.applyingBoardTab = false
+      }
+
+      this.state.boardTabs = updateBoardTab(
+        this.state.boardTabs,
+        this.state.activeBoardTabId,
+        {engineGameOngoing: null},
+      )
+    }
+
+    this.history = tab.history || []
+    this.historyPointer = tab.historyPointer || 0
+
+    this.applyingOnlineGameTab = true
+    this.setState({
+      ...getOnlineGameTabProjection(tab),
+      activeWorkspace: 'online-game',
+      activeOnlineGameTabId: tab.id,
+      onlineGameTabs: this.state.onlineGameTabs,
+      openDrawer: null,
+      attachedEngineSyncers: [],
+      analyzingEngineSyncerId: null,
+      blackEngineSyncerId: null,
+      whiteEngineSyncerId: null,
+      engineGameOngoing: null,
+      analysisTreePosition: null,
+      analysis: null,
+    })
+    this.applyingOnlineGameTab = false
+
+    this.syncActiveOnlineGameTab()
+    return true
+  }
+
+  switchOnlineGameTab(id) {
+    return this.applyOnlineGameTab(this.getOnlineGameTab(id))
+  }
+
+  closeOnlineGameTab(id) {
+    let tab = this.getOnlineGameTab(id)
+    if (tab == null) return false
+
+    let wasActive = id === this.state.activeOnlineGameTabId
+    let previousWorkspace = this.state.activeWorkspace
+    let tabs = this.state.onlineGameTabs.filter((tab) => tab.id !== id)
+    let nextTab =
+      tabs[
+        Math.max(
+          0,
+          this.state.onlineGameTabs.findIndex((tab) => tab.id === id) - 1,
+        )
+      ]
+
+    this.state.onlineGameTabs = tabs
+
+    if (wasActive && nextTab != null) {
+      this.ogsBoardSession.invalidateOperations()
+      this.applyOnlineGameTab(nextTab, {syncCurrent: false})
+    } else if (wasActive) {
+      let emptyTree = this.getEmptyGameTree()
+
+      this.ogsBoardSession.invalidateOperations()
+      this.history = []
+      this.historyPointer = 0
+      this.setState({
+        gameIndex: 0,
+        gameTrees: [emptyTree],
+        gameCurrents: [{}],
+        treePosition: emptyTree.root.id,
+        boardAttachment: createLocalDocumentBoardAttachment(),
+        onlineGameId: null,
+        boardTransformation: '',
+        onlineGameTabs: tabs,
+        activeOnlineGameTabId: null,
+        activeWorkspace:
+          previousWorkspace === 'online-game' ? 'home' : previousWorkspace,
+        mode: 'play',
+        deadStones: [],
+        blockedGuesses: [],
+        estimateOverrides: {},
+        openDrawer: null,
+      })
+    } else {
+      this.setState({onlineGameTabs: tabs})
+    }
+
+    return true
+  }
+
   async closeBoardTab(id) {
     let tab = this.getBoardTab(id)
     if (tab == null) return false
@@ -467,7 +660,7 @@ class Sabaki extends EventEmitter {
     let previousActiveTab = this.getBoardTab(this.state.activeBoardTabId)
     let previousWorkspace = this.state.activeWorkspace
 
-    this.syncActiveBoardTab()
+    this.syncCurrentActivityTab()
     tab = this.getBoardTab(id)
 
     if (!wasActive && isBoardTabDirty(tab)) {
@@ -839,7 +1032,7 @@ class Sabaki extends EventEmitter {
       this.historyPointer = this.history.length - 1
     }
 
-    this.syncActiveBoardTab()
+    this.syncCurrentActivityTab()
   }
 
   clearHistory() {
@@ -863,7 +1056,7 @@ class Sabaki extends EventEmitter {
     this.setCurrentTreePosition(gameTree, entry.treePosition, {
       clearCache: true,
     })
-    this.syncActiveBoardTab()
+    this.syncCurrentActivityTab()
   }
 
   undo() {
@@ -1202,38 +1395,154 @@ class Sabaki extends EventEmitter {
   ) {
     if (!suppressAskForSave && !(await this.askForSave())) return false
 
-    this.stopEngineGame()
-    this.stopAnalysis()
+    this.applyingBoardTab = true
+    try {
+      this.stopEngineGame()
+      this.stopAnalysis()
+    } finally {
+      this.applyingBoardTab = false
+    }
 
     let tree = buildOgsGameTree(onlineGame, {
       appName: this.appName,
       version: this.version,
     })
+    let existingTab = this.getOnlineGameTabByGameId(onlineGame?.gameId)
 
-    await this.loadGameTrees([tree], {
-      suppressAskForSave: true,
-      clearHistory,
-      boardAttachment: createOgsBoardAttachment(onlineGame?.gameId),
-    })
-    this.setState({activeWorkspace: 'board'})
+    if (existingTab != null) {
+      this.state.onlineGameTabs = updateOnlineGameTab(
+        this.state.onlineGameTabs,
+        existingTab.id,
+        {
+          title: onlineGame?.gameName || existingTab.title,
+          gameTrees: [tree],
+          gameCurrents: [{}],
+          treePosition: tree.root.id,
+          boardAttachment: createOgsBoardAttachment(onlineGame?.gameId),
+          onlineGameId: onlineGame?.gameId,
+          mode: isOgsStoneRemovalPhase(onlineGame) ? 'scoring' : 'play',
+          deadStones: isOgsStoneRemovalPhase(onlineGame)
+            ? parseOgsStoneString(
+                onlineGame.removedStones,
+                onlineGame.board?.width,
+                onlineGame.board?.height,
+              )
+            : [],
+          estimateOverrides: isOgsStoneRemovalPhase(onlineGame)
+            ? existingTab.estimateOverrides || {}
+            : {},
+        },
+      )
+      this.applyOnlineGameTab(this.getOnlineGameTab(existingTab.id))
+    } else {
+      let tab = {
+        ...createOnlineGameTab(onlineGame, [tree]),
+        mode: isOgsStoneRemovalPhase(onlineGame) ? 'scoring' : 'play',
+        deadStones: isOgsStoneRemovalPhase(onlineGame)
+          ? parseOgsStoneString(
+              onlineGame.removedStones,
+              onlineGame.board?.width,
+              onlineGame.board?.height,
+            )
+          : [],
+        estimateOverrides: {},
+      }
+
+      this.syncCurrentActivityTab()
+      this.state.onlineGameTabs = [...this.state.onlineGameTabs, tab]
+      this.applyOnlineGameTab(tab)
+    }
+
     this.ogsBoardSession.invalidateOperations()
     this.goToEnd()
+    if (isOgsStoneRemovalPhase(onlineGame)) {
+      this.enterOgsStoneRemovalMode(onlineGame)
+    }
+    if (clearHistory) this.clearHistory()
+    this.syncActiveOnlineGameTab()
+
     return true
   }
 
-  detachOgsGame(gameId = null) {
+  updateOnlineGameTabFromOnlineGame(onlineGame) {
+    let tab = this.getOnlineGameTabByGameId(onlineGame?.gameId)
     if (
-      gameId != null &&
-      isOgsBoardAttachment(this.state.boardAttachment) &&
-      !isOgsBoardAttachment(this.state.boardAttachment, gameId)
+      tab == null ||
+      onlineGame?.board == null ||
+      !Array.isArray(onlineGame.moves)
     ) {
       return false
     }
 
+    let tree = buildOgsGameTree(onlineGame, {
+      appName: this.appName,
+      version: this.version,
+    })
+    let removeStoneState = !isOgsStoneRemovalPhase(onlineGame)
+
+    this.state.onlineGameTabs = updateOnlineGameTab(
+      this.state.onlineGameTabs,
+      tab.id,
+      {
+        title: onlineGame?.gameName || tab.title,
+        gameTrees: [tree],
+        gameCurrents: [{}],
+        treePosition: getMainLineEndId(tree),
+        boardAttachment: createOgsBoardAttachment(onlineGame.gameId),
+        onlineGameId: onlineGame.gameId,
+        mode: removeStoneState ? 'play' : 'scoring',
+        deadStones: removeStoneState
+          ? []
+          : parseOgsStoneString(
+              onlineGame.removedStones,
+              onlineGame.board?.width,
+              onlineGame.board?.height,
+            ),
+        estimateOverrides: removeStoneState ? {} : tab.estimateOverrides || {},
+      },
+    )
+
+    this.setState({onlineGameTabs: this.state.onlineGameTabs})
+    return true
+  }
+
+  detachOgsGame(gameId = null) {
+    let targetGameId = gameId ?? this.state.onlineGameId
+    let targetTab = this.getOnlineGameTabByGameId(targetGameId)
+    let targetIsCurrent =
+      targetGameId != null && this.state.onlineGameId === targetGameId
+
+    if (
+      gameId != null &&
+      isOgsBoardAttachment(this.state.boardAttachment) &&
+      !isOgsBoardAttachment(this.state.boardAttachment, gameId) &&
+      targetTab == null
+    ) {
+      return false
+    }
+
+    let onlineGameTabs = this.state.onlineGameTabs.filter(
+      (tab) => tab.onlineGameId !== targetGameId,
+    )
+
     this.ogsBoardSession.invalidateOperations()
     this.setState({
-      boardAttachment: createLocalDocumentBoardAttachment(),
-      onlineGameId: null,
+      boardAttachment: targetIsCurrent
+        ? createLocalDocumentBoardAttachment()
+        : this.state.boardAttachment,
+      onlineGameId: targetIsCurrent ? null : this.state.onlineGameId,
+      onlineGameTabs,
+      activeOnlineGameTabId: targetIsCurrent
+        ? null
+        : this.state.activeOnlineGameTabId,
+      activeWorkspace:
+        targetIsCurrent && this.state.activeWorkspace === 'online-game'
+          ? 'home'
+          : this.state.activeWorkspace,
+      mode: targetIsCurrent ? 'play' : this.state.mode,
+      deadStones: targetIsCurrent ? [] : this.state.deadStones,
+      blockedGuesses: targetIsCurrent ? [] : this.state.blockedGuesses,
+      estimateOverrides: targetIsCurrent ? {} : this.state.estimateOverrides,
     })
 
     return true
@@ -1365,6 +1674,7 @@ class Sabaki extends EventEmitter {
       lineEnd = this.getOgsLineNodes(tree).slice(-1)[0]
     }
 
+    this.syncActiveOnlineGameTab()
     return true
   }
 
@@ -4419,6 +4729,17 @@ function getOgsGameEndMessage(onlineGame) {
   }
 
   return lines.join('\n\n')
+}
+
+function isOgsStoneRemovalPhase(onlineGame) {
+  return (
+    onlineGame?.phase === 'stone removal' ||
+    onlineGame?.clock?.stoneRemovalMode === true
+  )
+}
+
+function getMainLineEndId(tree) {
+  return [...tree.getSequence(tree.root.id)].slice(-1)[0]?.id || tree.root.id
 }
 
 function getOgsGameEndPlayerLabel(onlineGame, playerId) {

@@ -11,6 +11,7 @@ import MainMenu from './MainMenu.js'
 import AppTabs from './AppTabs.js'
 import HomeView from './HomeView.js'
 import MainView from './MainView.js'
+import OnlineGameView from './OnlineGameView.js'
 import LeftSidebar from './LeftSidebar.js'
 import Sidebar from './Sidebar.js'
 import DrawerManager from './DrawerManager.js'
@@ -407,6 +408,8 @@ class App extends Component {
         activeWorkspace: state.activeWorkspace,
         boardTabs: state.boardTabs,
         activeBoardTabId: state.activeBoardTabId,
+        onlineGameTabs: state.onlineGameTabs,
+        activeOnlineGameTabId: state.activeOnlineGameTabId,
       }),
 
       h(TripleSplitContainer, {
@@ -421,9 +424,11 @@ class App extends Component {
             ? state.sidebarWidth
             : 0,
 
-        beginSideContent: h(LeftSidebar, state),
+        beginSideContent:
+          state.activeWorkspace === 'board' ? h(LeftSidebar, state) : null,
         mainContent: renderWorkspace(state),
-        endSideContent: h(Sidebar, state),
+        endSideContent:
+          state.activeWorkspace === 'board' ? h(Sidebar, state) : null,
 
         onChange: this.handleMainLayoutSplitChange,
         onFinish: this.handleMainLayoutSplitFinish,
@@ -458,6 +463,9 @@ function renderWorkspace(state) {
     case 'analysis':
       return h(HomeView, {...state, homeSection: 'analysis'})
     case 'board':
+      return h(MainView, state)
+    case 'online-game':
+      return h(OnlineGameView, state)
     default:
       return h(MainView, state)
   }

@@ -132,6 +132,32 @@ describe('OGS online controller', () => {
     ])
   })
 
+  it('updates inactive online-game tabs without activating them', async () => {
+    let state = createState({
+      onlineGame: createOnlineGame({gameId: 99, moveCount: 2}),
+    })
+    let store = createStore(state)
+    let sabaki = createSabaki({
+      state: {onlineGameId: 42},
+      getOnlineGameTabByGameId: (gameId) =>
+        gameId === 99 ? {id: 'online-tab-99'} : null,
+      updateOnlineGameTabFromOnlineGame: (onlineGame) => {
+        sabaki.calls.push([
+          'updateOnlineGameTabFromOnlineGame',
+          onlineGame.gameId,
+        ])
+        return true
+      },
+    })
+    let controller = new OgsOnlineController({store, sabaki})
+
+    await controller.handleState(state)
+
+    assert.deepStrictEqual(sabaki.calls, [
+      ['updateOnlineGameTabFromOnlineGame', 99],
+    ])
+  })
+
   it('does not sync the board while an optimistic move is pending', async () => {
     let store = createStore()
     let sabaki = createSabaki({state: {onlineGameId: 42}})
@@ -216,7 +242,6 @@ describe('OGS online controller', () => {
     assert.deepStrictEqual(sabaki.calls, [
       ['applyOgsGameUpdate', 1],
       ['applyOgsGameUpdate', 2],
-      ['setState', {activeWorkspace: 'board'}],
     ])
   })
 })

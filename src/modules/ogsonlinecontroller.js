@@ -49,7 +49,8 @@ export class OgsOnlineController {
         state.onlineGame?.status === 'connected'
       ) {
         let loaded = await this.syncOnlineGameToBoard(state.onlineGame)
-        if (loaded) this.sabaki.setState({activeWorkspace: 'board'})
+        let tab = this.sabaki.getOnlineGameTabByGameId?.(gameId)
+        if (loaded && tab != null) this.sabaki.applyOnlineGameTab(tab)
         return {ok: loaded, state}
       }
 
@@ -101,6 +102,8 @@ export class OgsOnlineController {
       await this.syncOnlineGameToBoard(onlineGame, {
         enterStoneRemovalMode: true,
       })
+    } else if (this.sabaki.getOnlineGameTabByGameId?.(onlineGame?.gameId)) {
+      this.sabaki.updateOnlineGameTabFromOnlineGame?.(onlineGame)
     }
   }
 

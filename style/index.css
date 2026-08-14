@@ -80,7 +80,8 @@
   overflow-x: auto;
   overflow-y: hidden;
 }
-#apptabs .app-board-tab {
+#apptabs .app-board-tab,
+#apptabs .app-online-game-tab {
   display: flex;
   align-items: stretch;
   min-width: 8rem;
@@ -88,17 +89,20 @@
   margin: 4px 0;
   border-radius: 5px 5px 0 0;
 }
-#apptabs .app-board-tab.selected {
+#apptabs .app-board-tab.selected,
+#apptabs .app-online-game-tab.selected {
   background: #292a2d;
   box-shadow: inset 0 -3px 0 #0082f0;
 }
-#apptabs .app-board-tab-button {
+#apptabs .app-board-tab-button,
+#apptabs .app-online-game-tab-button {
   flex: 1 1 auto;
   gap: 0.5rem;
   margin: 0;
   border-radius: 5px 0 0 0;
 }
-#apptabs .app-board-tab-close {
+#apptabs .app-board-tab-close,
+#apptabs .app-online-game-tab-close {
   flex: 0 0 auto;
   width: 1.7rem;
   margin: 0;
@@ -107,8 +111,13 @@
   color: #aaa;
 }
 #apptabs .app-board-tab-close:hover,
-#apptabs .app-board-tab-close:focus {
+#apptabs .app-board-tab-close:focus,
+#apptabs .app-online-game-tab-close:hover,
+#apptabs .app-online-game-tab-close:focus {
   color: white;
+}
+#apptabs .app-online-game-tab.selected {
+  box-shadow: inset 0 -3px 0 #46a758;
 }
 #apptabs .app-activity-tab {
   gap: 0.5rem;
@@ -166,6 +175,26 @@
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+.online-game-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: #181818;
+}
+.online-game-board {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.online-game-context {
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid #292a2d;
+  overflow: auto;
 }
 
 .home-view,

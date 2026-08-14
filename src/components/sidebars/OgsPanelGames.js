@@ -46,7 +46,7 @@ export function OnlineGameForm({
                   disabled: busy || !authenticated,
                   onClick: () => onConnectGame(game.id),
                 },
-                onlineGame?.gameId === game.id ? t('Open board') : t('View'),
+                onlineGame?.gameId === game.id ? t('Open game') : t('View'),
               ),
             ),
           ),
