@@ -2321,18 +2321,19 @@ button:active {
 }
 .ogs-history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  gap: 0.9rem;
 }
 .ogs-history.compact .ogs-history-grid {
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 }
 .ogs-history-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: stretch;
+  gap: 0.8rem;
   width: 100%;
-  padding: 0.65rem;
+  padding: 0.8rem;
   border: 1px solid #292a2d;
   border-radius: 8px;
   background: #181818;
@@ -2349,6 +2350,9 @@ button:active {
   display: grid;
   gap: 0.25rem;
   min-width: 0;
+}
+.ogs-history-card-body {
+  align-self: stretch;
 }
 .ogs-history-card-body strong,
 .ogs-history-players span,
@@ -2385,14 +2389,19 @@ button:active {
 .ogs-mini-goban {
   position: relative;
   display: block;
-  width: 4.5rem;
-  height: 4.5rem;
+  justify-self: center;
+  width: min(100%, 8.5rem);
+  aspect-ratio: 1;
+  height: auto;
   overflow: hidden;
   border: 1px solid #8a6428;
   border-radius: 6px;
   background:
     linear-gradient(#7b5826 1px, transparent 1px),
     linear-gradient(90deg, #7b5826 1px, transparent 1px), #c9963c;
+}
+.ogs-history.compact .ogs-mini-goban {
+  width: min(100%, 6.5rem);
 }
 .ogs-mini-placeholder {
   position: absolute;
@@ -2414,8 +2423,8 @@ button:active {
   transform: translate(-50%, -50%);
 }
 .ogs-mini-stone {
-  width: 0.32rem;
-  height: 0.32rem;
+  width: clamp(0.28rem, 4.2%, 0.46rem);
+  height: clamp(0.28rem, 4.2%, 0.46rem);
   border-radius: 50%;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
 }
@@ -2429,8 +2438,8 @@ button:active {
     0 1px 1px rgba(0, 0, 0, 0.35);
 }
 .ogs-mini-current-vertex {
-  width: 0.48rem;
-  height: 0.48rem;
+  width: clamp(0.42rem, 6.2%, 0.68rem);
+  height: clamp(0.42rem, 6.2%, 0.68rem);
   border-radius: 50%;
   border: 1px solid #0082f0;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
