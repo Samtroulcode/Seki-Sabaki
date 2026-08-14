@@ -30,6 +30,13 @@ describe('board tabs', () => {
       createLocalDocumentBoardAttachment(),
     )
     assert.strictEqual(tab.onlineGameId, null)
+    assert.deepStrictEqual(tab.attachedEngineSyncers, [])
+    assert.strictEqual(tab.analyzingEngineSyncerId, null)
+    assert.strictEqual(tab.blackEngineSyncerId, null)
+    assert.strictEqual(tab.whiteEngineSyncerId, null)
+    assert.strictEqual(tab.engineGameOngoing, null)
+    assert.strictEqual(tab.analysisTreePosition, null)
+    assert.strictEqual(tab.analysis, null)
   })
 
   it('snapshots and projects board-owned state', () => {
@@ -43,6 +50,13 @@ describe('board tabs', () => {
       boardAttachment: createLocalDocumentBoardAttachment(),
       onlineGameId: null,
       boardTransformation: '',
+      attachedEngineSyncers: [],
+      analyzingEngineSyncerId: null,
+      blackEngineSyncerId: null,
+      whiteEngineSyncerId: null,
+      engineGameOngoing: null,
+      analysisTreePosition: null,
+      analysis: null,
     }
     let snapshot = createBoardTabSnapshot({
       state,

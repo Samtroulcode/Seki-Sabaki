@@ -373,7 +373,7 @@ Purpose: answer “What should I learn from this game?”
 - [x] Add first local board-tabs slice with active-state projection.
 - [x] Make Home New Board and Home Open SGF create local board tabs.
 - [x] Keep File menu Open SGF replacement-oriented for the active board tab.
-- [ ] Move attached live engines and live board analysis fully into board-tab
+- [x] Move attached live engines and live board analysis fully into board-tab
       state.
 - [ ] Add dedicated online-game tabs for OGS live play.
 
@@ -429,6 +429,10 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-14 — Attached engines, selected engine-player state, and live board
+analysis state moved into board-tab snapshots; closing a board tab stops its
+owned engines immediately.
 
 2026-08-11 — First local board-tabs slice added with active-state projection,
 Home-created board tabs, and targeted unit/E2E coverage.

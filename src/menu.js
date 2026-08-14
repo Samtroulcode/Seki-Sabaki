@@ -501,8 +501,12 @@ exports.get = function (props = {}) {
           accelerator: 'F4',
           enabled: onlineGameId == null,
           click: () => {
+            let lastAnalyzingEngineSyncer =
+              sabaki.state.attachedEngineSyncers.find(
+                (syncer) => syncer.id === sabaki.lastAnalyzingEngineSyncerId,
+              )
             let syncerId =
-              sabaki.lastAnalyzingEngineSyncerId ||
+              lastAnalyzingEngineSyncer?.id ||
               sabaki.state.attachedEngineSyncers
                 .filter((syncer) =>
                   syncer.commands.some((x) =>

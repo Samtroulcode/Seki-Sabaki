@@ -198,8 +198,8 @@ class App extends Component {
 
       setTimeout(async () => {
         if (await sabaki.askForSaveAllBoardTabs()) {
-          sabaki.detachEngines(
-            this.state.attachedEngineSyncers.map((syncer) => syncer.id),
+          await sabaki.detachEngines(
+            sabaki.getAllAttachedEngineSyncers().map((syncer) => syncer.id),
           )
 
           gtplogger.close()

@@ -3,6 +3,7 @@ import EventEmitter from 'events'
 import {basename, extname} from 'path'
 import {ipcRenderer} from 'electron'
 import {h} from 'preact'
+import {v4 as uuid} from 'uuid'
 
 import Board from '@sabaki/go-board'
 import deadstones from '@sabaki/deadstones'
@@ -343,19 +344,66 @@ class Sabaki extends EventEmitter {
     this.state.boardTabs = updateBoardTab(boardTabs, activeBoardTabId, snapshot)
   }
 
+  getAllAttachedEngineSyncers() {
+    let syncers = new Map()
+
+    for (let tab of this.state.boardTabs) {
+      for (let syncer of tab.attachedEngineSyncers || []) {
+        syncers.set(syncer.id, syncer)
+      }
+    }
+
+    for (let syncer of this.state.attachedEngineSyncers || []) {
+      syncers.set(syncer.id, syncer)
+    }
+
+    return [...syncers.values()]
+  }
+
+  async stopBoardTabEngines(tab) {
+    let syncers = tab?.attachedEngineSyncers || []
+    if (syncers.length === 0) return
+
+    for (let syncer of syncers) {
+      if (tab.analyzingEngineSyncerId === syncer.id) syncer.sendAbort()
+      await syncer.stop()
+
+      if (this.lastAnalyzingEngineSyncerId === syncer.id) {
+        this.lastAnalyzingEngineSyncerId = null
+      }
+    }
+  }
+
   getBoardTab(id) {
     return this.state.boardTabs.find((tab) => tab.id === id) || null
   }
 
-  applyBoardTab(tab, {activeWorkspace = 'board', syncCurrent = true} = {}) {
+  applyBoardTab(
+    tab,
+    {activeWorkspace = 'board', syncCurrent = true, resumeAnalysis = true} = {},
+  ) {
     if (tab == null) return false
 
     if (syncCurrent) this.syncActiveBoardTab()
 
     if (tab.id !== this.state.activeBoardTabId) {
-      this.stopEngineGame()
-      this.stopAnalysis()
-      if (syncCurrent) this.syncActiveBoardTab()
+      let previousTabId = this.state.activeBoardTabId
+
+      this.applyingBoardTab = true
+      try {
+        this.stopEngineGame()
+        this.stopAnalysis()
+      } finally {
+        this.applyingBoardTab = false
+      }
+
+      if (this.getBoardTab(previousTabId) != null) {
+        this.state.boardTabs = updateBoardTab(
+          this.state.boardTabs,
+          previousTabId,
+          {engineGameOngoing: null},
+        )
+      }
     }
 
     this.history = tab.history || []
@@ -372,6 +420,19 @@ class Sabaki extends EventEmitter {
       openDrawer: null,
     })
     this.applyingBoardTab = false
+
+    if (this.state.analyzingEngineSyncerId != null) {
+      this.lastAnalyzingEngineSyncerId = this.state.analyzingEngineSyncerId
+      if (resumeAnalysis && activeWorkspace === 'board') {
+        this.analyzeMove(this.state.treePosition)
+      }
+    } else if (
+      !this.state.attachedEngineSyncers.some(
+        (syncer) => syncer.id === this.lastAnalyzingEngineSyncerId,
+      )
+    ) {
+      this.lastAnalyzingEngineSyncerId = null
+    }
 
     return true
   }
@@ -410,7 +471,7 @@ class Sabaki extends EventEmitter {
     tab = this.getBoardTab(id)
 
     if (!wasActive && isBoardTabDirty(tab)) {
-      this.applyBoardTab(tab)
+      this.applyBoardTab(tab, {resumeAnalysis: false})
     }
 
     if ((wasActive || isBoardTabDirty(tab)) && !(await this.askForSave())) {
@@ -429,6 +490,13 @@ class Sabaki extends EventEmitter {
       ]
 
     this.state.boardTabs = tabs
+    this.applyingBoardTab = true
+    try {
+      await this.stopBoardTabEngines(tab)
+    } finally {
+      this.applyingBoardTab = false
+    }
+
     if (wasActive && nextTab == null) {
       let emptyTree = this.getEmptyGameTree()
 
@@ -446,6 +514,13 @@ class Sabaki extends EventEmitter {
         boardAttachment: createLocalDocumentBoardAttachment(),
         onlineGameId: null,
         boardTransformation: '',
+        attachedEngineSyncers: [],
+        analyzingEngineSyncerId: null,
+        blackEngineSyncerId: null,
+        whiteEngineSyncerId: null,
+        engineGameOngoing: null,
+        analysisTreePosition: null,
+        analysis: null,
         mode: 'play',
         deadStones: [],
         blockedGuesses: [],
@@ -490,7 +565,7 @@ class Sabaki extends EventEmitter {
       if (!isBoardTabDirty(tab)) continue
 
       if (tab.id !== this.state.activeBoardTabId) {
-        this.applyBoardTab(tab, {syncCurrent: false})
+        this.applyBoardTab(tab, {syncCurrent: false, resumeAnalysis: false})
       }
 
       if (!(await this.askForSave())) {
@@ -3096,7 +3171,7 @@ class Sabaki extends EventEmitter {
   }
 
   async detachEngines(syncerIds) {
-    let detachEngineSyncers = this.state.attachedEngineSyncers.filter(
+    let detachEngineSyncers = this.getAllAttachedEngineSyncers().filter(
       (syncer) => syncerIds.includes(syncer.id),
     )
 
@@ -3125,6 +3200,35 @@ class Sabaki extends EventEmitter {
           blackEngineSyncerId: unset(state.blackEngineSyncerId),
           whiteEngineSyncerId: unset(state.whiteEngineSyncerId),
           analyzingEngineSyncerId: unset(state.analyzingEngineSyncerId),
+          analysis:
+            state.analyzingEngineSyncerId === syncer.id ? null : state.analysis,
+          analysisTreePosition:
+            state.analyzingEngineSyncerId === syncer.id
+              ? null
+              : state.analysisTreePosition,
+        }))
+
+        this.state.boardTabs = this.state.boardTabs.map((tab) => ({
+          ...tab,
+          attachedEngineSyncers: (tab.attachedEngineSyncers || []).filter(
+            (s) => s.id !== syncer.id,
+          ),
+          engineGameOngoing:
+            tab.engineGameOngoing &&
+            [tab.blackEngineSyncerId, tab.whiteEngineSyncerId].includes(
+              syncer.id,
+            )
+              ? false
+              : tab.engineGameOngoing,
+          blackEngineSyncerId: unset(tab.blackEngineSyncerId),
+          whiteEngineSyncerId: unset(tab.whiteEngineSyncerId),
+          analyzingEngineSyncerId: unset(tab.analyzingEngineSyncerId),
+          analysis:
+            tab.analyzingEngineSyncerId === syncer.id ? null : tab.analysis,
+          analysisTreePosition:
+            tab.analyzingEngineSyncerId === syncer.id
+              ? null
+              : tab.analysisTreePosition,
         }))
       }),
     )

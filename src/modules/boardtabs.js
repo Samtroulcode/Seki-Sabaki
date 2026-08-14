@@ -14,6 +14,13 @@ export const boardTabStateKeys = [
   'boardAttachment',
   'onlineGameId',
   'boardTransformation',
+  'attachedEngineSyncers',
+  'analyzingEngineSyncerId',
+  'blackEngineSyncerId',
+  'whiteEngineSyncerId',
+  'engineGameOngoing',
+  'analysisTreePosition',
+  'analysis',
 ]
 
 export function createBoardTabSnapshot({
@@ -54,6 +61,13 @@ export function createBoardTab(
     gameCurrents: gameTrees.map((_) => ({})),
     treePosition: firstTree.root.id,
     boardTransformation: '',
+    attachedEngineSyncers: [],
+    analyzingEngineSyncerId: null,
+    blackEngineSyncerId: null,
+    whiteEngineSyncerId: null,
+    engineGameOngoing: null,
+    analysisTreePosition: null,
+    analysis: null,
     ...attachmentState,
     history: [],
     historyPointer: 0,
