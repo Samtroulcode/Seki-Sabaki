@@ -81,10 +81,8 @@ export function SectionDetail({activeSection, connected}) {
       ),
     },
     games: {
-      title: t('Games library'),
-      text: t(
-        'History, reviews, observed games, and correspondence queues will live here.',
-      ),
+      title: t('OGS history'),
+      text: t('Review your completed OGS games from the Games section.'),
     },
     social: {
       title: t('Social'),

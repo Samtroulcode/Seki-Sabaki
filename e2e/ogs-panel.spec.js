@@ -767,6 +767,87 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('#goban')).toBeVisible()
   })
 
+  test('shows OGS history cards and opens history SGF as a board tab', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__ogsHistoryCalls = []
+      window.__ogsDownloadedGames = []
+      window.__ogsTestState = {
+        user: {id: '7', username: 'sekibot', rank: '1d'},
+        socket: {status: 'authenticated', authenticated: true, error: null},
+        matchmaking: {status: 'idle'},
+        onlineGame: {status: 'idle', gameId: null},
+        activeGames: [],
+      }
+      window.sabaki.ogs = {
+        getState: async () => window.__ogsTestState,
+        listGameHistory: async (options) => {
+          window.__ogsHistoryCalls.push(options)
+          return {
+            ok: true,
+            history: {
+              results: [
+                {
+                  id: 123,
+                  name: 'History Fixture',
+                  board: {width: 9, height: 9},
+                  result: 'B+R',
+                  ended: '2026-08-01T12:00:00Z',
+                  black: {username: 'sekibot'},
+                  white: {username: 'opponent'},
+                },
+              ],
+              next: null,
+              previous: null,
+            },
+          }
+        },
+        downloadGameSgf: async (gameId) => {
+          window.__ogsDownloadedGames.push(gameId)
+          return {
+            ok: true,
+            sgf: '(;GM[1]FF[4]SZ[9]PB[sekibot]PW[opponent];B[aa];W[bb])',
+          }
+        },
+      }
+    })
+
+    await page.evaluate(() => {
+      window.__sabaki.setState({activeWorkspace: 'home', homeSection: 'ogs'})
+    })
+    await page
+      .locator('.home-sidebar')
+      .getByRole('button', {name: 'Dashboard'})
+      .click()
+    await expect(page.locator('.home-ogs-history-card')).toContainText(
+      'History Fixture',
+    )
+
+    await page.getByRole('button', {name: 'View all OGS history'}).click()
+
+    await expect(page.locator('.ogs-history')).toContainText('OGS history')
+    await expect(page.locator('.ogs-history-card')).toContainText(
+      'History Fixture',
+    )
+    await expect(page.locator('.ogs-history-card')).toContainText('sekibot')
+    await expect(page.locator('.ogs-history-card')).toContainText('opponent')
+    await expect(page.locator('.ogs-history-card')).toContainText('B+R')
+    await expect(page.locator('.ogs-mini-goban')).toContainText('9x9')
+    await page.waitForFunction(
+      () => window.__ogsHistoryCalls.at(-1)?.pageSize === 12,
+    )
+
+    await page.locator('.ogs-history-card').click()
+    await page.waitForFunction(
+      () =>
+        window.__ogsDownloadedGames[0] === 123 &&
+        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.boardTabs.length === 1,
+    )
+    await expect(page.locator('#goban')).toBeVisible()
+  })
+
   test('uses Sabaki scoring UI to accept OGS dead stones', async ({page}) => {
     await waitForRender(page)
     await page.waitForFunction(() => window.__sabaki.state.busy === 0)

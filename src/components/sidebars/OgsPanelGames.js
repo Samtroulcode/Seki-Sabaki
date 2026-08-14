@@ -8,15 +8,10 @@ const t = i18n.context('OgsPanel')
 export function OnlineGameForm({
   onlineGame,
   activeGames = [],
-  gameHistory = [],
-  gameHistoryBusy = false,
-  gameHistoryError = null,
   authenticated,
   busy,
   onConnectGame,
   onDisconnectGame,
-  onRefreshHistory,
-  onOpenHistoryGame,
 }) {
   let gameStatus = onlineGame?.status || 'idle'
   let hasGame = onlineGame?.gameId != null
@@ -107,51 +102,5 @@ export function OnlineGameForm({
         {type: 'button', onClick: onDisconnectGame},
         t('Disconnect game'),
       ),
-    h(
-      'div',
-      {class: 'ogs-game-history-header'},
-      h('h3', {}, t('Recent games')),
-      h(
-        'button',
-        {
-          type: 'button',
-          disabled: busy || gameHistoryBusy || !authenticated,
-          onClick: onRefreshHistory,
-        },
-        gameHistoryBusy ? t('Loading...') : t('Refresh'),
-      ),
-    ),
-    h('p', {}, t('Open completed OGS games as local review boards from SGF.')),
-    gameHistoryError != null && h('p', {class: 'ogs-error'}, gameHistoryError),
-    gameHistory.length === 0
-      ? h('p', {class: 'ogs-empty'}, t('No recent games loaded yet.'))
-      : h(
-          'ul',
-          {class: 'ogs-active-games ogs-game-history'},
-          gameHistory.map((game) =>
-            h(
-              'li',
-              {key: game.id},
-              h(
-                'div',
-                {class: 'ogs-active-game-summary'},
-                h('strong', {}, game.name || `#${game.id}`),
-                h('span', {}, formatBoard(game.board, t)),
-                h('span', {}, game.result || t('Result unknown')),
-                game.ended && h('span', {}, game.ended),
-                h('span', {}, formatPlayers(game.black, game.white, t)),
-              ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  disabled: busy || !authenticated,
-                  onClick: () => onOpenHistoryGame(game.id),
-                },
-                t('Open SGF'),
-              ),
-            ),
-          ),
-        ),
   )
 }

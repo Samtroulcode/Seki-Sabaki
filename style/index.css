@@ -356,6 +356,12 @@
 .home-card h3 {
   color: white;
 }
+.home-ogs-history-card {
+  grid-column: span 2;
+}
+.home-ogs-history-card > button {
+  margin-top: 0.25rem;
+}
 .home-view button,
 .workspace-placeholder button {
   justify-self: start;
@@ -394,6 +400,12 @@
   .home-hero h1,
   .workspace-placeholder h1 {
     font-size: 2rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-ogs-history-card {
+    grid-column: auto;
   }
 }
 
@@ -2293,15 +2305,121 @@ button:active {
   display: grid;
   gap: 0.6rem;
 }
-.ogs-game-history-header {
+.ogs-history {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+.ogs-history-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-top: 0.5rem;
 }
-.ogs-game-history-header h3 {
+.ogs-history-header h3 {
   margin: 0;
+}
+.ogs-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+.ogs-history.compact .ogs-history-grid {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+.ogs-history-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+  background: #181818;
+  color: #ddd;
+  text-align: left;
+}
+.ogs-history-card:not(:disabled):hover,
+.ogs-history-card:not(:disabled):focus {
+  border-color: #0082f0;
+  background: #202124;
+}
+.ogs-history-card-body,
+.ogs-history-players {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.ogs-history-card-body strong,
+.ogs-history-players span,
+.ogs-history-result,
+.ogs-history-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ogs-history-result {
+  color: white;
+  font-weight: bold;
+}
+.ogs-history-meta {
+  color: #aaa;
+  font-size: 0.85rem;
+}
+.ogs-stone {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  vertical-align: -0.05em;
+}
+.ogs-stone.black {
+  background: #050505;
+  border: 1px solid #555;
+}
+.ogs-stone.white {
+  background: #f5f5f5;
+  border: 1px solid #999;
+}
+.ogs-mini-goban {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  width: 4.5rem;
+  height: 4.5rem;
+  overflow: hidden;
+  border: 1px solid #8a6428;
+  border-radius: 6px;
+  background:
+    linear-gradient(#7b5826 1px, transparent 1px),
+    linear-gradient(90deg, #7b5826 1px, transparent 1px), #c9963c;
+  background-size: 25% 25%;
+}
+.ogs-mini-point:nth-child(7),
+.ogs-mini-point:nth-child(19) {
+  align-self: center;
+  justify-self: center;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #111;
+}
+.ogs-mini-size {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.15rem;
+  padding: 0 0.2rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-size: 0.65rem;
+}
+.ogs-history-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 .ogs-active-games {
   display: grid;

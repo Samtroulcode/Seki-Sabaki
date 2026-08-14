@@ -24,6 +24,9 @@ export function createInitialOnlineState() {
     onlineGame: null,
     activeGames: [],
     gameHistory: [],
+    gameHistoryPage: 1,
+    gameHistoryHasNext: false,
+    gameHistoryHasPrevious: false,
     gameHistoryBusy: false,
     gameHistoryError: null,
   }
@@ -180,6 +183,9 @@ export class OnlineStore {
     this.gameHistoryRequestId++
     this.setState({
       gameHistory: [],
+      gameHistoryPage: 1,
+      gameHistoryHasNext: false,
+      gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
     })
@@ -198,6 +204,9 @@ export class OnlineStore {
       onlineGame: null,
       activeGames: [],
       gameHistory: [],
+      gameHistoryPage: 1,
+      gameHistoryHasNext: false,
+      gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
     })
@@ -235,6 +244,9 @@ export class OnlineStore {
     if (result.ok) {
       this.setState({
         gameHistory: result.history?.results || [],
+        gameHistoryPage: page,
+        gameHistoryHasNext: result.history?.next != null,
+        gameHistoryHasPrevious: result.history?.previous != null || page > 1,
         gameHistoryError: null,
       })
     } else {
@@ -491,6 +503,11 @@ export class OnlineStore {
       onlineGame: state?.onlineGame || null,
       activeGames: state?.activeGames || [],
       gameHistory: userChanged ? [] : this.state.gameHistory,
+      gameHistoryPage: userChanged ? 1 : this.state.gameHistoryPage,
+      gameHistoryHasNext: userChanged ? false : this.state.gameHistoryHasNext,
+      gameHistoryHasPrevious: userChanged
+        ? false
+        : this.state.gameHistoryHasPrevious,
       gameHistoryBusy: userChanged ? false : this.state.gameHistoryBusy,
       gameHistoryError: userChanged ? null : this.state.gameHistoryError,
       connected: true,
@@ -514,6 +531,9 @@ export class OnlineStore {
       onlineGame: null,
       activeGames: state?.activeGames || [],
       gameHistory: [],
+      gameHistoryPage: 1,
+      gameHistoryHasNext: false,
+      gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
       connected: false,

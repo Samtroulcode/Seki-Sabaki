@@ -16,7 +16,11 @@ export default class HomeView extends Component {
     super(props)
 
     this.handleNavigate = (homeSection) => {
-      sabaki.setState({activeWorkspace: 'home', homeSection})
+      sabaki.setState({
+        activeWorkspace: 'home',
+        homeSection,
+        ogsHomeSection: null,
+      })
     }
   }
 
@@ -42,7 +46,7 @@ export default class HomeView extends Component {
 function renderHomeSection(activeSection, props, onNavigate) {
   switch (activeSection) {
     case 'ogs':
-      return h(OgsPanel)
+      return h(OgsPanel, {initialSection: props.ogsHomeSection})
     case 'analysis':
       return h(AnalysisPanel)
     case 'library':

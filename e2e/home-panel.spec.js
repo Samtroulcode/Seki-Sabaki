@@ -18,6 +18,10 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#home')).toContainText('Start')
     await expect(page.locator('#home')).toContainText('Continue')
     await expect(page.locator('#home')).toContainText('Status')
+    await expect(page.locator('#home')).toContainText('Recent OGS games')
+    await expect(page.locator('#home')).toContainText(
+      'Connect OGS to see your history.',
+    )
     await expect(page.getByRole('button', {name: /New board/})).toHaveCount(2)
     await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(1)
     await expect(page.getByRole('button', {name: /Open Library/})).toBeVisible()

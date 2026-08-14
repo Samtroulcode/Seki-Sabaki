@@ -15,6 +15,7 @@ import {
   QuickLinksCard,
   SectionDetail,
 } from './OgsPanelDashboard.js'
+import {OgsGameHistoryPanel} from './OgsGameHistory.js'
 import {OnlineGameForm} from './OgsPanelGames.js'
 import {AutomatchForm} from './OgsPanelMatchmaking.js'
 import {defaultMatchmakingOptions, getSocketLabel} from './ogsPanelData.js'
@@ -27,7 +28,7 @@ export default class OgsPanel extends Component {
 
     this.state = {
       ...onlineStore.getState(),
-      activeSection: 'overview',
+      activeSection: props.initialSection || 'overview',
     }
 
     this.handleUsernameInput = (evt) => {
@@ -36,6 +37,9 @@ export default class OgsPanel extends Component {
 
     this.handleSectionButtonClick = (activeSection) => {
       this.setState({activeSection})
+      if (activeSection === 'games' && this.state.connected) {
+        onlineStore.refreshGameHistory({page: 1, pageSize: 12})
+      }
     }
 
     this.handleSubmit = async (evt) => {
@@ -80,7 +84,24 @@ export default class OgsPanel extends Component {
     }
 
     this.handleRefreshHistoryButtonClick = async () => {
-      await onlineStore.refreshGameHistory()
+      await onlineStore.refreshGameHistory({
+        page: this.state.gameHistoryPage || 1,
+        pageSize: 12,
+      })
+    }
+
+    this.handlePreviousHistoryPageButtonClick = async () => {
+      await onlineStore.refreshGameHistory({
+        page: Math.max(1, (this.state.gameHistoryPage || 1) - 1),
+        pageSize: 12,
+      })
+    }
+
+    this.handleNextHistoryPageButtonClick = async () => {
+      await onlineStore.refreshGameHistory({
+        page: (this.state.gameHistoryPage || 1) + 1,
+        pageSize: 12,
+      })
     }
 
     this.handleOpenHistoryGameButtonClick = async (gameId) => {
@@ -166,6 +187,9 @@ export default class OgsPanel extends Component {
     )
     this.pollTimer = setInterval(() => this.refreshOgsStateIfDue(), 2000)
     await this.refreshOgsState()
+    if (this.state.activeSection === 'games' && this.state.connected) {
+      await onlineStore.refreshGameHistory({page: 1, pageSize: 12})
+    }
   }
 
   componentWillUnmount() {
@@ -206,6 +230,9 @@ export default class OgsPanel extends Component {
       onlineGame,
       activeGames,
       gameHistory,
+      gameHistoryPage,
+      gameHistoryHasNext,
+      gameHistoryHasPrevious,
       gameHistoryBusy,
       gameHistoryError,
       activeSection,
@@ -295,24 +322,39 @@ export default class OgsPanel extends Component {
             h(
               'div',
               {class: 'ogs-dashboard-main'},
-              h(
-                'section',
-                {class: 'ogs-dashboard-card ogs-dashboard-primary-card'},
-                h(OnlineGameForm, {
-                  onlineGame,
-                  activeGames,
-                  gameHistory,
-                  gameHistoryBusy,
-                  gameHistoryError,
-                  authenticated,
-                  busy,
-                  onConnectGame: this.handleActiveGameButtonClick,
-                  onDisconnectGame: this.handleDisconnectGameButtonClick,
-                  onRefreshHistory: this.handleRefreshHistoryButtonClick,
-                  onOpenHistoryGame: this.handleOpenHistoryGameButtonClick,
-                }),
-              ),
-              h(SectionDetail, {activeSection, connected}),
+              activeSection === 'games'
+                ? h(
+                    'section',
+                    {class: 'ogs-dashboard-card ogs-dashboard-history-card'},
+                    h(OgsGameHistoryPanel, {
+                      games: gameHistory,
+                      busy: gameHistoryBusy,
+                      error: gameHistoryError,
+                      authenticated,
+                      page: gameHistoryPage,
+                      hasNext: gameHistoryHasNext,
+                      hasPrevious: gameHistoryHasPrevious,
+                      onRefresh: this.handleRefreshHistoryButtonClick,
+                      onPreviousPage: this.handlePreviousHistoryPageButtonClick,
+                      onNextPage: this.handleNextHistoryPageButtonClick,
+                      onOpenGame: this.handleOpenHistoryGameButtonClick,
+                    }),
+                  )
+                : [
+                    h(
+                      'section',
+                      {class: 'ogs-dashboard-card ogs-dashboard-primary-card'},
+                      h(OnlineGameForm, {
+                        onlineGame,
+                        activeGames,
+                        authenticated,
+                        busy,
+                        onConnectGame: this.handleActiveGameButtonClick,
+                        onDisconnectGame: this.handleDisconnectGameButtonClick,
+                      }),
+                    ),
+                    h(SectionDetail, {activeSection, connected}),
+                  ],
             ),
 
           connected &&

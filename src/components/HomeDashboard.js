@@ -2,12 +2,19 @@ import {h, Component} from 'preact'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
+import onlineStore from '../modules/onlinestore.js'
+import {
+  getHistoryPreview,
+  OgsGameHistoryPanel,
+} from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeDashboard')
 
 export default class HomeDashboard extends Component {
   constructor(props) {
     super(props)
+
+    this.state = onlineStore.getState()
 
     this.handleNewGameButtonClick = async () => {
       await sabaki.createNewBoardTab()
@@ -16,6 +23,85 @@ export default class HomeDashboard extends Component {
     this.handleOpenFileButtonClick = async () => {
       await sabaki.openFileInNewBoardTab()
     }
+
+    this.handleOnlineStoreState = (state) => this.setState(state)
+
+    this.handleOgsButtonClick = () => {
+      this.props.onNavigate('ogs')
+    }
+
+    this.handleOgsHistoryButtonClick = () => {
+      sabaki.setState({
+        activeWorkspace: 'home',
+        homeSection: 'ogs',
+        ogsHomeSection: 'games',
+      })
+    }
+
+    this.handleOgsHistoryRefresh = async () => {
+      await onlineStore.refreshGameHistory({page: 1, pageSize: 3})
+    }
+
+    this.handleOgsHistoryGameClick = async (gameId) => {
+      let result = await onlineStore.downloadGameSgf(gameId)
+
+      if (result.stale) return
+
+      if (!result.ok) {
+        onlineStore.setState({
+          gameHistoryError:
+            result.error?.message || t('Unable to download SGF from OGS.'),
+        })
+        return
+      }
+
+      let success = await sabaki.openContentInNewBoardTab(result.sgf, 'sgf', {
+        gotoEnd: true,
+        representedFilename: null,
+      })
+
+      if (!success) {
+        onlineStore.setState({gameHistoryError: t('Unable to open OGS SGF.')})
+      }
+    }
+  }
+
+  componentDidMount() {
+    this.mounted = true
+    this.unsubscribeOnlineStore = onlineStore.subscribe(
+      this.handleOnlineStoreState,
+    )
+
+    this.refreshOgsHistoryPreviewIfNeeded()
+  }
+
+  componentDidUpdate() {
+    this.refreshOgsHistoryPreviewIfNeeded()
+  }
+
+  componentWillUnmount() {
+    this.mounted = false
+    this.unsubscribeOnlineStore?.()
+  }
+
+  async refreshOgsHistoryPreviewIfNeeded() {
+    let state = onlineStore.getState()
+    let userId = state.user?.id ?? null
+
+    if (userId == null) this.ogsHistoryPreviewUserId = null
+
+    if (
+      !this.mounted ||
+      userId == null ||
+      state.gameHistory.length > 0 ||
+      state.gameHistoryBusy ||
+      this.ogsHistoryPreviewUserId === userId
+    ) {
+      return
+    }
+
+    this.ogsHistoryPreviewUserId = userId
+    await onlineStore.refreshGameHistory({page: 1, pageSize: 3})
   }
 
   render({
@@ -27,6 +113,9 @@ export default class HomeDashboard extends Component {
     let hasOnlineGame = onlineGameId != null
     let hasBoardTabs = boardTabs.length > 0
     let attachedEngineCount = attachedEngineSyncers.length
+    let onlineState = this.state
+    let ogsAuthenticated = onlineState.socket?.status === 'authenticated'
+    let ogsHistoryPreview = getHistoryPreview(onlineState.gameHistory, 3)
 
     return h(
       'div',
@@ -153,6 +242,27 @@ export default class HomeDashboard extends Component {
             action: t('Open OGS'),
             onClick: () => onNavigate('ogs'),
           }),
+          h(
+            'article',
+            {class: 'home-card home-ogs-history-card'},
+            h(OgsGameHistoryPanel, {
+              games: ogsHistoryPreview,
+              busy: onlineState.gameHistoryBusy,
+              error: onlineState.gameHistoryError,
+              authenticated: ogsAuthenticated,
+              compact: true,
+              emptyText: t('No recent OGS games loaded yet.'),
+              onRefresh: this.handleOgsHistoryRefresh,
+              onOpenGame: this.handleOgsHistoryGameClick,
+              onOpenOgs: this.handleOgsButtonClick,
+            }),
+            ogsAuthenticated &&
+              h(
+                'button',
+                {type: 'button', onClick: this.handleOgsHistoryButtonClick},
+                t('View all OGS history'),
+              ),
+          ),
         ),
       ),
     )

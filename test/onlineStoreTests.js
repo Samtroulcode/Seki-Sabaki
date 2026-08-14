@@ -39,6 +39,9 @@ describe('online store', () => {
       onlineGame: null,
       activeGames: [],
       gameHistory: [],
+      gameHistoryPage: 1,
+      gameHistoryHasNext: false,
+      gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
     })
@@ -114,7 +117,12 @@ describe('online store', () => {
         calls.push(options)
         return {
           ok: true,
-          history: {results: [{id: 123, name: 'Friendly Match'}]},
+          history: {
+            results: [{id: 123, name: 'Friendly Match'}],
+            next: 'https://online-go.com/api/v1/players/1/game_history/?page=3',
+            previous:
+              'https://online-go.com/api/v1/players/1/game_history/?page=1',
+          },
         }
       },
     })
@@ -127,6 +135,9 @@ describe('online store', () => {
     assert.deepStrictEqual(store.getState().gameHistory, [
       {id: 123, name: 'Friendly Match'},
     ])
+    assert.strictEqual(store.getState().gameHistoryPage, 2)
+    assert.strictEqual(store.getState().gameHistoryHasNext, true)
+    assert.strictEqual(store.getState().gameHistoryHasPrevious, true)
     assert.strictEqual(store.getState().gameHistoryBusy, false)
     assert.strictEqual(store.getState().gameHistoryError, null)
   })
@@ -210,16 +221,31 @@ describe('online store', () => {
     store.setState({
       user: {id: 1, username: 'First'},
       gameHistory: [{id: 123}],
+      gameHistoryPage: 2,
+      gameHistoryHasNext: true,
+      gameHistoryHasPrevious: true,
       gameHistoryError: 'Old error',
     })
 
     store.applyPublicState(createPublicState({user: {id: 2, username: 'Next'}}))
     assert.deepStrictEqual(store.getState().gameHistory, [])
+    assert.strictEqual(store.getState().gameHistoryPage, 1)
+    assert.strictEqual(store.getState().gameHistoryHasNext, false)
+    assert.strictEqual(store.getState().gameHistoryHasPrevious, false)
     assert.strictEqual(store.getState().gameHistoryError, null)
 
-    store.setState({gameHistory: [{id: 456}], gameHistoryError: 'Old error'})
+    store.setState({
+      gameHistory: [{id: 456}],
+      gameHistoryPage: 3,
+      gameHistoryHasNext: true,
+      gameHistoryHasPrevious: true,
+      gameHistoryError: 'Old error',
+    })
     store.applyDisconnectedState({user: null})
     assert.deepStrictEqual(store.getState().gameHistory, [])
+    assert.strictEqual(store.getState().gameHistoryPage, 1)
+    assert.strictEqual(store.getState().gameHistoryHasNext, false)
+    assert.strictEqual(store.getState().gameHistoryHasPrevious, false)
     assert.strictEqual(store.getState().gameHistoryError, null)
   })
 
