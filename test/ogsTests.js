@@ -8,14 +8,26 @@ import {
   setupOgsIpcHandlers,
 } from '../src/ogs.js'
 
-function response({status = 200, body, setCookie = null}) {
+function response({
+  status = 200,
+  body,
+  text = null,
+  bodyStream = null,
+  setCookie = null,
+  headers = {},
+}) {
   return {
     ok: status >= 200 && status < 300,
     status,
+    body: bodyStream,
     headers: {
-      get: (name) => (name.toLowerCase() === 'set-cookie' ? setCookie : null),
+      get: (name) => {
+        if (name.toLowerCase() === 'set-cookie') return setCookie
+        return headers[name.toLowerCase()] ?? null
+      },
     },
     json: async () => body,
+    text: async () => text,
   }
 }
 
@@ -246,6 +258,144 @@ describe('OGS client', () => {
       updatedAt: null,
     })
     assert.strictEqual(client.getState().socket.status, 'disconnected')
+  })
+
+  it('loads logged-in player game history without exposing tokens', async () => {
+    let calls = []
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async (url, options = {}) => {
+        calls.push({url, options})
+        if (url.includes('/game_history/')) {
+          return response({
+            body: {
+              count: 1,
+              next: null,
+              previous: null,
+              results: [
+                {
+                  id: 12345,
+                  name: 'Friendly Match',
+                  result: 'B+R',
+                  ended: '2026-08-14T12:00:00Z',
+                  width: 19,
+                  height: 19,
+                  black: 7,
+                  white: 8,
+                  players: {
+                    black: {id: 7, username: 'sente', rank: '1d'},
+                    white: {id: 8, username: 'gote', rank: '2k'},
+                  },
+                },
+              ],
+            },
+          })
+        }
+
+        return loginFetch(url, options)
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let history = await client.listGameHistory({pageSize: 500, page: -1})
+
+    assert.strictEqual(
+      calls.at(-1).url,
+      'https://online-go.com/api/v1/players/7/game_history/?page=1&page_size=50',
+    )
+    assert.strictEqual(calls.at(-1).options.headers.Authorization, undefined)
+    assert.deepStrictEqual(history.results, [
+      {
+        id: 12345,
+        name: 'Friendly Match',
+        result: 'B+R',
+        ended: '2026-08-14T12:00:00Z',
+        board: {width: 19, height: 19},
+        black: {id: 7, username: 'sente', rank: '1d'},
+        white: {id: 8, username: 'gote', rank: '2k'},
+      },
+    ])
+  })
+
+  it('downloads logged-in OGS game SGF', async () => {
+    let calls = []
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async (url, options = {}) => {
+        calls.push({url, options})
+        if (url.endsWith('/api/v1/games/12345/sgf')) {
+          return response({text: '(;FF[4]GM[1]SZ[19])'})
+        }
+
+        return loginFetch(url, options)
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let sgf = await client.downloadGameSgf({gameId: 12345})
+
+    assert.strictEqual(sgf, '(;FF[4]GM[1]SZ[19])')
+    assert.strictEqual(
+      calls.at(-1).url,
+      'https://online-go.com/api/v1/games/12345/sgf',
+    )
+    assert.strictEqual(calls.at(-1).options.headers.Authorization, undefined)
+  })
+
+  it('rejects oversized OGS game SGF downloads', async () => {
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async (url, options = {}) => {
+        if (url.endsWith('/api/v1/games/12345/sgf')) {
+          return response({
+            text: '(;FF[4])',
+            headers: {'content-length': String(6 * 1024 * 1024)},
+          })
+        }
+
+        return loginFetch(url, options)
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+
+    await assert.rejects(
+      () => client.downloadGameSgf({gameId: 12345}),
+      (err) => err instanceof OgsError && err.code === 'invalid-response',
+    )
+  })
+
+  it('rejects oversized streamed OGS game SGF downloads', async () => {
+    let chunk = new Uint8Array(1024 * 1024)
+    let remainingChunks = 6
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async (url, options = {}) => {
+        if (url.endsWith('/api/v1/games/12345/sgf')) {
+          return response({
+            bodyStream: {
+              getReader: () => ({
+                read: async () => {
+                  if (remainingChunks-- <= 0) return {done: true}
+                  return {done: false, value: chunk}
+                },
+                cancel: async () => {},
+                releaseLock: () => {},
+              }),
+            },
+          })
+        }
+
+        return loginFetch(url, options)
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+
+    await assert.rejects(
+      () => client.downloadGameSgf({gameId: 12345}),
+      (err) => err instanceof OgsError && err.code === 'invalid-response',
+    )
   })
 
   it('persists OGS session tokens without exposing them publicly', async () => {

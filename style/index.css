@@ -2293,6 +2293,16 @@ button:active {
   display: grid;
   gap: 0.6rem;
 }
+.ogs-game-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.ogs-game-history-header h3 {
+  margin: 0;
+}
 .ogs-active-games {
   display: grid;
   gap: 0.5rem;

@@ -38,6 +38,9 @@ describe('online store', () => {
       matchmaking: {options: defaultMatchmakingOptions},
       onlineGame: null,
       activeGames: [],
+      gameHistory: [],
+      gameHistoryBusy: false,
+      gameHistoryError: null,
     })
   })
 
@@ -69,6 +72,7 @@ describe('online store', () => {
         moves: [{move: 'aa', moveNumber: 1}],
       },
       activeGames: [{gameId: 42}],
+      gameHistory: [{id: 123, black: {username: 'Black'}}],
     })
 
     let state = store.getState()
@@ -79,6 +83,7 @@ describe('online store', () => {
     state.onlineGame.players.black.username = 'Changed'
     state.onlineGame.moves[0].move = 'bb'
     state.activeGames[0].gameId = 43
+    state.gameHistory[0].black.username = 'Changed'
 
     assert.strictEqual(store.getState().user.username, 'Original')
     assert.deepStrictEqual(
@@ -99,6 +104,171 @@ describe('online store', () => {
     )
     assert.strictEqual(store.getState().onlineGame.moves[0].move, 'aa')
     assert.deepStrictEqual(store.getState().activeGames, [{gameId: 42}])
+    assert.strictEqual(store.getState().gameHistory[0].black.username, 'Black')
+  })
+
+  it('refreshes OGS game history through IPC', async () => {
+    let calls = []
+    let store = createStore({
+      listGameHistory: async (options) => {
+        calls.push(options)
+        return {
+          ok: true,
+          history: {results: [{id: 123, name: 'Friendly Match'}]},
+        }
+      },
+    })
+    store.setState({user: {id: 1, username: 'Seki'}})
+
+    let result = await store.refreshGameHistory({page: 2, pageSize: 5})
+
+    assert.strictEqual(result.ok, true)
+    assert.deepStrictEqual(calls, [{page: 2, pageSize: 5}])
+    assert.deepStrictEqual(store.getState().gameHistory, [
+      {id: 123, name: 'Friendly Match'},
+    ])
+    assert.strictEqual(store.getState().gameHistoryBusy, false)
+    assert.strictEqual(store.getState().gameHistoryError, null)
+  })
+
+  it('records OGS game history failures', async () => {
+    let store = createStore({
+      listGameHistory: async () => ({
+        ok: false,
+        error: {code: 'history-failed', message: 'History failed.'},
+      }),
+    })
+    store.setState({user: {id: 1, username: 'Seki'}})
+
+    let result = await store.refreshGameHistory()
+
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(store.getState().gameHistoryError, 'History failed.')
+    assert.strictEqual(store.getState().network.status, 'degraded')
+  })
+
+  it('records OGS SGF download command failures', async () => {
+    let store = createStore({
+      downloadGameSgf: async () => ({
+        ok: false,
+        error: {code: 'invalid-response', message: 'Too large.'},
+      }),
+    })
+    store.setState({user: {id: 1, username: 'Seki'}})
+
+    let result = await store.downloadGameSgf(123)
+
+    assert.strictEqual(result.ok, false)
+    assert.deepStrictEqual(store.getState().network.lastError, {
+      code: 'invalid-response',
+      message: 'Too large.',
+    })
+  })
+
+  it('ignores late OGS SGF downloads after account changes', async () => {
+    let resolveDownload
+    let downloadPromise = new Promise((resolve) => {
+      resolveDownload = resolve
+    })
+    let store = createStore({
+      downloadGameSgf: async () => await downloadPromise,
+    })
+    store.setState({user: {id: 1, username: 'First'}})
+
+    let resultPromise = store.downloadGameSgf(123)
+    store.applyPublicState(createPublicState({user: {id: 2, username: 'Next'}}))
+
+    resolveDownload({ok: true, sgf: '(;FF[4])'})
+    let result = await resultPromise
+
+    assert.deepStrictEqual(result, {ok: false, stale: true})
+  })
+
+  it('invalidates pending OGS SGF downloads when logout starts', async () => {
+    let resolveDownload
+    let downloadPromise = new Promise((resolve) => {
+      resolveDownload = resolve
+    })
+    let store = createStore({
+      downloadGameSgf: async () => await downloadPromise,
+      logout: async () => true,
+    })
+    store.setState({user: {id: 1, username: 'First'}})
+
+    let resultPromise = store.downloadGameSgf(123)
+    let logoutPromise = store.logout()
+
+    resolveDownload({ok: true, sgf: '(;FF[4])'})
+    let result = await resultPromise
+    await logoutPromise
+
+    assert.deepStrictEqual(result, {ok: false, stale: true})
+  })
+
+  it('clears OGS history on account changes and disconnect', async () => {
+    let store = createStore({})
+    store.setState({
+      user: {id: 1, username: 'First'},
+      gameHistory: [{id: 123}],
+      gameHistoryError: 'Old error',
+    })
+
+    store.applyPublicState(createPublicState({user: {id: 2, username: 'Next'}}))
+    assert.deepStrictEqual(store.getState().gameHistory, [])
+    assert.strictEqual(store.getState().gameHistoryError, null)
+
+    store.setState({gameHistory: [{id: 456}], gameHistoryError: 'Old error'})
+    store.applyDisconnectedState({user: null})
+    assert.deepStrictEqual(store.getState().gameHistory, [])
+    assert.strictEqual(store.getState().gameHistoryError, null)
+  })
+
+  it('ignores late OGS history results after account changes', async () => {
+    let resolveHistory
+    let historyPromise = new Promise((resolve) => {
+      resolveHistory = resolve
+    })
+    let store = createStore({
+      listGameHistory: async () => await historyPromise,
+    })
+    store.setState({user: {id: 1, username: 'First'}})
+
+    let refreshPromise = store.refreshGameHistory()
+    store.applyPublicState(createPublicState({user: {id: 2, username: 'Next'}}))
+
+    resolveHistory({
+      ok: true,
+      history: {results: [{id: 123, name: 'Old game'}]},
+    })
+    await refreshPromise
+
+    assert.deepStrictEqual(store.getState().gameHistory, [])
+    assert.strictEqual(store.getState().gameHistoryBusy, false)
+  })
+
+  it('invalidates pending OGS history when logout starts', async () => {
+    let resolveHistory
+    let historyPromise = new Promise((resolve) => {
+      resolveHistory = resolve
+    })
+    let store = createStore({
+      listGameHistory: async () => await historyPromise,
+      logout: async () => true,
+    })
+    store.setState({user: {id: 1, username: 'First'}})
+
+    let refreshPromise = store.refreshGameHistory()
+    let logoutPromise = store.logout()
+
+    resolveHistory({
+      ok: true,
+      history: {results: [{id: 123, name: 'Old game'}]},
+    })
+    await refreshPromise
+    await logoutPromise
+
+    assert.deepStrictEqual(store.getState().gameHistory, [])
+    assert.strictEqual(store.getState().gameHistoryBusy, false)
   })
 
   it('refreshes from public OGS state when logged in', async () => {

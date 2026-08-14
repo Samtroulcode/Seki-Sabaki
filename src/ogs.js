@@ -64,6 +64,9 @@ const {createElectronOgsCredentialStore} = require('./ogs/credentialstore.js')
 
 const DEFAULT_SERVER_URL = 'https://online-go.com'
 const USER_AGENT = 'Seki-Sabaki/0.1'
+const DEFAULT_GAME_HISTORY_PAGE_SIZE = 10
+const MAX_GAME_HISTORY_PAGE_SIZE = 50
+const MAX_OGS_SGF_BYTES = 5 * 1024 * 1024
 
 function getWebSocketUrl(serverUrl) {
   let url = new URL(serverUrl)
@@ -854,6 +857,78 @@ class OgsClient {
     return this.getState()
   }
 
+  async listGameHistory(input = {}) {
+    if (this.session == null) {
+      throw new OgsError('not-authenticated', 'Connect to OGS first.')
+    }
+
+    let userId = sanitizeGameId(this.session.user?.id)
+    let page = sanitizePositiveInteger(input.page, 1, 100000)
+    let pageSize = sanitizePositiveInteger(
+      input.pageSize,
+      DEFAULT_GAME_HISTORY_PAGE_SIZE,
+      MAX_GAME_HISTORY_PAGE_SIZE,
+    )
+
+    if (typeof this.fetch !== 'function') {
+      throw new OgsError('network', 'Fetch is not available.')
+    }
+
+    let url = new URL(
+      `${this.serverUrl}/api/v1/players/${userId}/game_history/`,
+    )
+    url.searchParams.set('page', String(page))
+    url.searchParams.set('page_size', String(pageSize))
+
+    // OGS documents this endpoint as anonymously readable where ACL permits.
+    // The stored user_jwt is for websocket auth, so don't send it as REST auth.
+    let response = await this.fetch(url.toString(), {
+      headers: {'User-Agent': USER_AGENT, Accept: 'application/json'},
+      redirect: 'error',
+    })
+
+    await assertOk(response, 'game-history')
+
+    return sanitizeGameHistoryResponse(await response.json())
+  }
+
+  async downloadGameSgf(input = {}) {
+    let gameId = sanitizeGameId(input.gameId)
+
+    if (this.session == null) {
+      throw new OgsError('not-authenticated', 'Connect to OGS first.')
+    }
+
+    if (typeof this.fetch !== 'function') {
+      throw new OgsError('network', 'Fetch is not available.')
+    }
+
+    // OGS documents game SGF downloads as anonymously readable where ACL permits.
+    // The stored user_jwt is for websocket auth, so don't send it as REST auth.
+    let response = await this.fetch(
+      `${this.serverUrl}/api/v1/games/${gameId}/sgf`,
+      {
+        headers: {'User-Agent': USER_AGENT, Accept: 'application/x-go-sgf'},
+        redirect: 'error',
+      },
+    )
+
+    await assertOk(response, 'game-sgf')
+
+    let contentLength = Number(response.headers?.get?.('content-length'))
+    if (Number.isFinite(contentLength) && contentLength > MAX_OGS_SGF_BYTES) {
+      throw new OgsError('invalid-response', 'OGS SGF file is too large.')
+    }
+
+    let sgfText = await readLimitedTextResponse(response, MAX_OGS_SGF_BYTES)
+
+    if (typeof sgfText !== 'string' || !sgfText.trim().startsWith('(')) {
+      throw new OgsError('invalid-response', 'OGS did not return an SGF file.')
+    }
+
+    return sgfText
+  }
+
   assertAuthenticatedSocket() {
     let state = this.socket.getState()
 
@@ -1318,6 +1393,105 @@ class OgsClient {
   }
 }
 
+function sanitizePositiveInteger(value, fallback, max) {
+  let result = Number(value)
+  if (!Number.isInteger(result) || result < 1) return fallback
+  return Math.min(result, max)
+}
+
+async function readLimitedTextResponse(response, maxBytes) {
+  let reader = response.body?.getReader?.()
+
+  if (reader == null) {
+    let text = await response.text()
+
+    if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+      throw new OgsError('invalid-response', 'OGS SGF file is too large.')
+    }
+
+    return text
+  }
+
+  let chunks = []
+  let totalBytes = 0
+
+  try {
+    while (true) {
+      let {done, value} = await reader.read()
+      if (done) break
+
+      let buffer = Buffer.isBuffer(value) ? value : Buffer.from(value)
+      totalBytes += buffer.byteLength
+
+      if (totalBytes > maxBytes) {
+        await reader.cancel?.()
+        throw new OgsError('invalid-response', 'OGS SGF file is too large.')
+      }
+
+      chunks.push(buffer)
+    }
+  } finally {
+    reader.releaseLock?.()
+  }
+
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+function sanitizeGameHistoryResponse(response) {
+  let results = Array.isArray(response?.results)
+    ? response.results
+    : Array.isArray(response)
+      ? response
+      : []
+
+  return {
+    count: sanitizeOptionalCount(response?.count),
+    next: typeof response?.next === 'string' ? response.next : null,
+    previous: typeof response?.previous === 'string' ? response.previous : null,
+    results: results.map(sanitizeGameHistoryEntry).filter((x) => x != null),
+  }
+}
+
+function sanitizeOptionalCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : null
+}
+
+function sanitizeGameHistoryEntry(entry) {
+  if (entry == null || typeof entry !== 'object') return null
+
+  let id = sanitizeOptionalGameId(entry.id ?? entry.game_id)
+  if (id == null) return null
+
+  return {
+    id,
+    name: sanitizeString(entry.name || entry.game_name, 120),
+    result: sanitizeString(entry.result || entry.outcome || entry.winner, 80),
+    ended: sanitizeString(entry.ended || entry.ended_at || entry.finished, 80),
+    board: sanitizeHistoryBoard(entry),
+    black: sanitizeHistoryPlayer(entry.players?.black),
+    white: sanitizeHistoryPlayer(entry.players?.white),
+  }
+}
+
+function sanitizeHistoryBoard(entry) {
+  let width = sanitizeBoardSize(entry.width ?? entry.board_width ?? entry.size)
+  let height = sanitizeBoardSize(
+    entry.height ?? entry.board_height ?? entry.size,
+  )
+
+  return width == null || height == null ? null : {width, height}
+}
+
+function sanitizeHistoryPlayer(player) {
+  if (player == null || typeof player !== 'object') return null
+
+  return {
+    id: sanitizeOptionalGameId(player.id),
+    username: sanitizeString(player.username || player.name, 80),
+    rank: sanitizeString(player.rank, 20),
+  }
+}
+
 function sanitizeActiveGame(data, serverUrl) {
   let id = sanitizeOptionalGameId(data?.id)
   let width = sanitizeBoardSize(data?.width)
@@ -1767,6 +1941,22 @@ function setupOgsIpcHandlers(
       return {ok: true, state: client.sendChat(input || {})}
     } catch (err) {
       return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:listGameHistory', async (evt, input) => {
+    try {
+      return {ok: true, history: await client.listGameHistory(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err)}
+    }
+  })
+
+  ipcMain.handle('ogs:downloadGameSgf', async (evt, input) => {
+    try {
+      return {ok: true, sgf: await client.downloadGameSgf(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err)}
     }
   })
 

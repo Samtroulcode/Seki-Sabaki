@@ -1225,6 +1225,55 @@ class Sabaki extends EventEmitter {
     return success
   }
 
+  async openContentInNewBoardTab(
+    content,
+    extension,
+    {gotoEnd = null, representedFilename = null} = {},
+  ) {
+    this.setBusy(true)
+
+    let t = i18n.context('sabaki.file')
+    let gameTrees = []
+    let success = true
+    let lastProgress = -1
+
+    try {
+      let fileFormatModule = fileformats.getModuleByExtension(extension)
+
+      gameTrees = fileFormatModule.parse(content, (evt) => {
+        if (evt.progress - lastProgress < 0.1) return
+        this.window.setProgressBar(evt.progress)
+        lastProgress = evt.progress
+      })
+
+      if (gameTrees.length == 0) throw true
+    } catch (err) {
+      await dialog.showMessageBox(t('This file is unreadable.'), 'warning')
+      success = false
+    }
+
+    if (success) {
+      this.createBoardTab(gameTrees, {representedFilename})
+      this.fileHash = this.generateFileHash()
+      this.syncActiveBoardTab({fileHash: this.fileHash})
+
+      if (gotoEnd ?? setting.get('game.goto_end_after_loading')) {
+        this.goToEnd()
+      }
+
+      if (gameTrees.length > 1) {
+        await helper.wait(setting.get('gamechooser.show_delay'))
+        this.openDrawer('gamechooser')
+      }
+    }
+
+    this.setBusy(false)
+    this.window.setProgressBar(-1)
+    this.events.emit('fileLoad')
+
+    return success
+  }
+
   async loadFile(
     filename = null,
     {suppressAskForSave = false, clearHistory = true} = {},

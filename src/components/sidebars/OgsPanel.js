@@ -79,6 +79,33 @@ export default class OgsPanel extends Component {
       }
     }
 
+    this.handleRefreshHistoryButtonClick = async () => {
+      await onlineStore.refreshGameHistory()
+    }
+
+    this.handleOpenHistoryGameButtonClick = async (gameId) => {
+      let result = await onlineStore.downloadGameSgf(gameId)
+
+      if (result.stale) return
+
+      if (!result.ok) {
+        onlineStore.setState({
+          gameHistoryError:
+            result.error?.message || t('Unable to download SGF from OGS.'),
+        })
+        return
+      }
+
+      let success = await sabaki.openContentInNewBoardTab(result.sgf, 'sgf', {
+        gotoEnd: true,
+        representedFilename: null,
+      })
+
+      if (!success) {
+        onlineStore.setState({gameHistoryError: t('Unable to open OGS SGF.')})
+      }
+    }
+
     this.handleMatchmakingOptionChange = async (evt) => {
       let {name, value} = evt.currentTarget
 
@@ -178,6 +205,9 @@ export default class OgsPanel extends Component {
       matchmaking,
       onlineGame,
       activeGames,
+      gameHistory,
+      gameHistoryBusy,
+      gameHistoryError,
       activeSection,
     },
   ) {
@@ -271,10 +301,15 @@ export default class OgsPanel extends Component {
                 h(OnlineGameForm, {
                   onlineGame,
                   activeGames,
+                  gameHistory,
+                  gameHistoryBusy,
+                  gameHistoryError,
                   authenticated,
                   busy,
                   onConnectGame: this.handleActiveGameButtonClick,
                   onDisconnectGame: this.handleDisconnectGameButtonClick,
+                  onRefreshHistory: this.handleRefreshHistoryButtonClick,
+                  onOpenHistoryGame: this.handleOpenHistoryGameButtonClick,
                 }),
               ),
               h(SectionDetail, {activeSection, connected}),

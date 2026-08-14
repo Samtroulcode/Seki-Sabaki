@@ -23,6 +23,9 @@ export function createInitialOnlineState() {
     matchmaking: {options: defaultMatchmakingOptions},
     onlineGame: null,
     activeGames: [],
+    gameHistory: [],
+    gameHistoryBusy: false,
+    gameHistoryError: null,
   }
 }
 
@@ -34,6 +37,8 @@ export class OnlineStore {
     this.listeners = new Set()
     this.unsubscribeOgsStateChange = null
     this.subscribedOgs = null
+    this.sessionRequestId = 0
+    this.gameHistoryRequestId = 0
   }
 
   getState() {
@@ -171,6 +176,14 @@ export class OnlineStore {
   }
 
   async logout() {
+    this.sessionRequestId++
+    this.gameHistoryRequestId++
+    this.setState({
+      gameHistory: [],
+      gameHistoryBusy: false,
+      gameHistoryError: null,
+    })
+
     await this.ogs().logout()
     this.setState({
       user: null,
@@ -184,7 +197,101 @@ export class OnlineStore {
       }),
       onlineGame: null,
       activeGames: [],
+      gameHistory: [],
+      gameHistoryBusy: false,
+      gameHistoryError: null,
     })
+  }
+
+  async refreshGameHistory({page = 1, pageSize = 10} = {}) {
+    let requestId = ++this.gameHistoryRequestId
+    let sessionRequestId = this.sessionRequestId
+    let userId = this.state.user?.id ?? null
+
+    this.setState({gameHistoryBusy: true, gameHistoryError: null})
+
+    let result
+
+    try {
+      result = await this.ogs().listGameHistory({page, pageSize})
+    } catch (err) {
+      result = {
+        ok: false,
+        error: serializeOnlineStoreError(err, {
+          code: 'history-failed',
+          message: t('Unable to load game history.'),
+        }),
+      }
+    }
+
+    if (
+      requestId !== this.gameHistoryRequestId ||
+      sessionRequestId !== this.sessionRequestId ||
+      userId !== this.state.user?.id
+    ) {
+      return result
+    }
+
+    if (result.ok) {
+      this.setState({
+        gameHistory: result.history?.results || [],
+        gameHistoryError: null,
+      })
+    } else {
+      this.applySyncError(result.error, {
+        code: result.error?.code || 'history-failed',
+        message: result.error?.message || t('Unable to load game history.'),
+      })
+      this.setState({
+        gameHistoryError:
+          result.error?.message || t('Unable to load game history.'),
+      })
+    }
+
+    this.setState({gameHistoryBusy: false})
+    return result
+  }
+
+  async downloadGameSgf(gameId) {
+    let sessionRequestId = this.sessionRequestId
+    let userId = this.state.user?.id ?? null
+
+    try {
+      let result = await this.ogs().downloadGameSgf(gameId)
+
+      if (
+        sessionRequestId !== this.sessionRequestId ||
+        userId !== this.state.user?.id
+      ) {
+        return {ok: false, stale: true}
+      }
+
+      if (!result.ok) {
+        this.applySyncError(result.error, {
+          code: result.error?.code || 'sgf-download-failed',
+          message:
+            result.error?.message || t('Unable to download SGF from OGS.'),
+        })
+      }
+
+      return result
+    } catch (err) {
+      if (
+        sessionRequestId !== this.sessionRequestId ||
+        userId !== this.state.user?.id
+      ) {
+        return {ok: false, stale: true}
+      }
+
+      this.applySyncError(err, {
+        code: 'sgf-download-failed',
+        message: t('Unable to download SGF from OGS.'),
+      })
+      return {
+        ok: false,
+        error: {message: t('Unable to download SGF from OGS.')},
+      }
+    }
   }
 
   async connectGame(gameId, {manageBusy = true} = {}) {
@@ -361,9 +468,19 @@ export class OnlineStore {
   }
 
   applyPublicState(state, extra = {}) {
+    let nextUser = state?.user || null
+    let previousUserId = this.state.user?.id ?? null
+    let nextUserId = nextUser?.id ?? null
+    let userChanged = previousUserId != null && nextUserId !== previousUserId
+
+    if (userChanged) {
+      this.sessionRequestId++
+      this.gameHistoryRequestId++
+    }
+
     this.setState({
       username: state?.user?.username || this.state.username,
-      user: state?.user || null,
+      user: nextUser,
       socket: state?.socket || null,
       network: this.mergeNetworkState(state?.network, {
         status: 'online',
@@ -373,12 +490,18 @@ export class OnlineStore {
       matchmaking: state?.matchmaking || this.state.matchmaking,
       onlineGame: state?.onlineGame || null,
       activeGames: state?.activeGames || [],
+      gameHistory: userChanged ? [] : this.state.gameHistory,
+      gameHistoryBusy: userChanged ? false : this.state.gameHistoryBusy,
+      gameHistoryError: userChanged ? null : this.state.gameHistoryError,
       connected: true,
       ...extra,
     })
   }
 
   applyDisconnectedState(state = null, extra = {}) {
+    this.sessionRequestId++
+    this.gameHistoryRequestId++
+
     this.setState({
       user: null,
       socket: state?.socket || null,
@@ -390,6 +513,9 @@ export class OnlineStore {
       matchmaking: state?.matchmaking || this.state.matchmaking,
       onlineGame: null,
       activeGames: state?.activeGames || [],
+      gameHistory: [],
+      gameHistoryBusy: false,
+      gameHistoryError: null,
       connected: false,
       ...extra,
     })
@@ -461,6 +587,9 @@ function cloneOnlineState(state) {
     onlineGame: cloneObject(state.onlineGame),
     activeGames: Array.isArray(state.activeGames)
       ? state.activeGames.map(cloneObject)
+      : [],
+    gameHistory: Array.isArray(state.gameHistory)
+      ? state.gameHistory.map(cloneObject)
       : [],
   }
 }
