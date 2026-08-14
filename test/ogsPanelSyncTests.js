@@ -188,7 +188,7 @@ describe('OGS panel sync controller', () => {
     )
   })
 
-  it('shows finished attached games before detaching', async () => {
+  it('shows finished attached games without detaching the online tab', async () => {
     let sabaki = createSabaki({state: {onlineGameId: 42}})
     let controller = new OgsPanelSyncController({sabaki})
 
@@ -202,7 +202,6 @@ describe('OGS panel sync controller', () => {
       ['applyOgsGameUpdate', 42],
       ['loadOgsGame', 42, {suppressAskForSave: true, clearHistory: false}],
       ['showOgsGameEndInfo', 42],
-      ['detachOgsGame', 42],
     ])
   })
 

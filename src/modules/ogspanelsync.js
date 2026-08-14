@@ -38,7 +38,8 @@ export default class OgsPanelSyncController {
 
     if (
       onlineGame.phase === 'finished' &&
-      this.sabaki.state.onlineGameId == null
+      this.sabaki.state.onlineGameId == null &&
+      !this.sabaki.getOnlineGameTabByGameId?.(onlineGame.gameId)
     ) {
       return false
     }
@@ -81,7 +82,6 @@ export default class OgsPanelSyncController {
 
     if (loaded && onlineGame.phase === 'finished') {
       await this.sabaki.showOgsGameEndInfo(onlineGame)
-      this.sabaki.detachOgsGame(onlineGame.gameId)
     } else if (loaded && enterStoneRemovalMode) {
       this.enterOgsStoneRemovalMode(onlineGame)
     }

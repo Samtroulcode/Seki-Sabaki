@@ -158,6 +158,30 @@ describe('OGS online controller', () => {
     ])
   })
 
+  it('runs finished retained online-game tabs through the finished flow', async () => {
+    let state = createState({
+      onlineGame: createOnlineGame({
+        gameId: 99,
+        phase: 'finished',
+        moveCount: 2,
+      }),
+    })
+    let store = createStore(state)
+    let sabaki = createSabaki({
+      state: {onlineGameId: null},
+      getOnlineGameTabByGameId: (gameId) =>
+        gameId === 99 ? {id: 'online-tab-99'} : null,
+    })
+    let controller = new OgsOnlineController({store, sabaki})
+
+    await controller.handleState(state)
+
+    assert.deepStrictEqual(sabaki.calls, [
+      ['loadOgsGame', 99, {suppressAskForSave: false, clearHistory: true}],
+      ['showOgsGameEndInfo', 99],
+    ])
+  })
+
   it('does not sync the board while an optimistic move is pending', async () => {
     let store = createStore()
     let sabaki = createSabaki({state: {onlineGameId: 42}})

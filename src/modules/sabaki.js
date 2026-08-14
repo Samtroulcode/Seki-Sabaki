@@ -1578,23 +1578,19 @@ class Sabaki extends EventEmitter {
 
     this.ogsGameEndNoticeKey = key
     this.ogsGameEndNoticeGameId = onlineGame.gameId
-    let sgfContent = this.getCurrentGameSGF()
     this.ogsGameEndNoticePromise = dialog
       .showMessageBox(
         getOgsGameEndMessage(onlineGame),
         'info',
         [
           i18n.context('sabaki.ogs')('OK'),
-          i18n.context('sabaki.ogs')('Analyze Game'),
+          i18n.context('sabaki.ogs')('Open Review Board'),
         ],
         0,
       )
       .then(async (answer) => {
         if (answer === 1) {
-          await this.startCurrentGameSgfAnalysis({
-            allowOnlineGame: true,
-            sgfContent,
-          })
+          await this.openOgsGameReviewBoard(onlineGame)
         }
       })
       .finally(() => {
@@ -1604,6 +1600,26 @@ class Sabaki extends EventEmitter {
         }
       })
     await this.ogsGameEndNoticePromise
+
+    return true
+  }
+
+  async openOgsGameReviewBoard(onlineGame) {
+    if (onlineGame?.board == null || !Array.isArray(onlineGame.moves)) {
+      return false
+    }
+
+    let tree = buildOgsGameTree(onlineGame, {
+      appName: this.appName,
+      version: this.version,
+    })
+    let tab = this.createBoardTab([tree])
+
+    this.applyBoardTab(tab)
+    this.goToEnd()
+    this.treeHash = this.generateTreeHash()
+    this.fileHash = null
+    this.syncActiveBoardTab({treeHash: this.treeHash, fileHash: this.fileHash})
 
     return true
   }

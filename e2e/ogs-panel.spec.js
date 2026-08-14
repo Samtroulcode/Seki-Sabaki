@@ -1040,7 +1040,7 @@ test.describe('OGS mock panel', () => {
     ).toHaveText('Captures: 1')
   })
 
-  test('explains finished OGS games before detaching the board', async ({
+  test('explains finished OGS games and can open a review board', async ({
     page,
   }) => {
     await waitForRender(page)
@@ -1078,12 +1078,11 @@ test.describe('OGS mock panel', () => {
       }
       window.sabaki.dialog.showMessageBox = async (options) => {
         window.__ogsGameEndDialog = options
-        return {response: 0}
+        return {response: 1}
       }
 
       await window.__sabaki.loadOgsGame(onlineGame)
       await window.__sabaki.showOgsGameEndInfo(onlineGame)
-      window.__sabaki.detachOgsGame(onlineGame.gameId)
       window.__sabaki.setState({showLeftSidebar: true})
     })
 
@@ -1096,7 +1095,13 @@ test.describe('OGS mock panel', () => {
     await expect
       .poll(() => page.evaluate(() => window.__ogsGameEndDialog.message))
       .toContain('Reason: White (opponent) resigned.')
-    await page.waitForFunction(() => window.__sabaki.state.onlineGameId == null)
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.onlineGameId == null &&
+        window.__sabaki.state.boardTabs.length === 1 &&
+        window.__sabaki.state.onlineGameTabs.length === 1,
+    )
 
     await page.evaluate(async () => {
       window.__ogsGameEndDialog = null

@@ -431,6 +431,10 @@ Purpose: answer “What should I learn from this game?”
 
 ## Last Updated
 
+2026-08-14 — Finished OGS games keep their online-game tab open; the result
+dialog now offers opening a separate local review board instead of starting
+local analysis directly.
+
 2026-08-14 — OGS live games now open in dedicated online-game tabs with a
 restricted live-play workspace instead of board tabs; board analysis and engine
 UI are not mounted in online-game tabs.

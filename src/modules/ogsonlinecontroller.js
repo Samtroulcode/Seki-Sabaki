@@ -102,6 +102,11 @@ export class OgsOnlineController {
       await this.syncOnlineGameToBoard(onlineGame, {
         enterStoneRemovalMode: true,
       })
+    } else if (
+      onlineGame?.phase === 'finished' &&
+      this.sabaki.getOnlineGameTabByGameId?.(onlineGame?.gameId)
+    ) {
+      await this.syncOnlineGameToBoard(onlineGame)
     } else if (this.sabaki.getOnlineGameTabByGameId?.(onlineGame?.gameId)) {
       this.sabaki.updateOnlineGameTabFromOnlineGame?.(onlineGame)
     }
