@@ -145,12 +145,12 @@ tab bar. Tabs should eventually represent user work objects, for example:
 ### Home
 
 - Current Home is a navigation page with cards for Board, OGS, SGF Explorer, and
-  Analysis Manager, plus New Game and Open SGF actions.
-- It shows minimal status: local board/online game id, no online game/current
-  online game id, attached engine count, and SGF Explorer as coming soon.
-- Main UX gap: it does not yet behave like the product hub described in the
-  roadmap. It does not show recent games, library state, analysis jobs/results,
-  OGS account state, or clear empty states.
+  Analysis Manager, plus New Game and Open SGF actions. It also previews recent
+  OGS games and exposes the OGS history entry point.
+- It shows local board/online game continuation state, attached engine count,
+  OGS account status, recent OGS games, and matchmaking status.
+- Main UX gap: Library state and analysis jobs/results are not yet surfaced as
+  complete product modules, and some empty/error states still need polish.
 
 ### Board
 
@@ -177,15 +177,21 @@ tab bar. Tabs should eventually represent user work objects, for example:
 
 ### OGS
 
-- OGS currently supports login/logout, account/socket status, automatch, active
-  games, current online-game summary, opening a live game in a dedicated
-  online-game tab, pass/resign, stone-removal confirmation, chat, and
-  disconnect.
+- OGS currently supports login/logout, account/socket status, automatch, recent
+  game history, opening a live game in a dedicated online-game tab, pass/resign,
+  stone-removal confirmation, chat, and disconnect.
+- The former `Active games` card was removed from the panel: it duplicated the
+  history presentation and was removed from the dashboard. The underlying OGS
+  active-game state remains available to live-game synchronization and turn
+  resolution.
 - Several dashboard sections are placeholders: Social, Community, Settings, and
   parts of Play/Games.
 - Main UX gap: OGS is useful but still feels like an integration panel rather
   than a polished online area. Reconnect/error/session states and the minimal
   online-game workspace need clearer UX polish.
+- Matchmaking status is now shown by a global in-app toaster, including when the
+  user switches workspace or opens another tab. A newly opened online-game tab
+  receives focus automatically.
 - Direction update: OGS Overview should be a Home section, not an app-level tab.
   Opening a specific online game should create an online-game activity tab.
 
@@ -398,7 +404,12 @@ Purpose: answer “What should I learn from this game?”
 
 ### Phase 5 — OGS Panel Polish
 
-- [ ] Inventory current OGS panel states and user actions.
+- [x] Inventory current OGS panel states and user actions.
+- [x] Add recent OGS history cards with review and analysis actions.
+- [x] Remove the misleading `Active games` presentation while retaining the
+      backend state needed by live-game synchronization.
+- [x] Make matchmaking status global across workspaces and tabs.
+- [x] Focus the dedicated online-game tab when a match opens.
 - [ ] Redesign account/connection/current-game states.
 - [ ] Clarify reconnect/error states.
 - [ ] Add deterministic fake-transport tests for visible state changes.
@@ -430,6 +441,11 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-15 — OGS panel checkpoint: recent history is available on Home, the
+misleading `Active games` card was removed, matchmaking status is global across
+workspaces, and newly opened online-game tabs receive focus. Phase 2 remains
+complete; Library MVP is still the next major roadmap phase.
 
 2026-08-14 — Finished OGS games keep their online-game tab open; the result
 dialog now offers opening a separate local review board instead of starting
