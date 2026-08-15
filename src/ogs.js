@@ -1503,7 +1503,10 @@ function sanitizeGameHistoryEntry(entry) {
   return {
     id,
     name: sanitizeString(entry.name || entry.game_name, 120),
-    result: sanitizeString(entry.result || entry.outcome || entry.winner, 80),
+    result: sanitizeString(entry.result || entry.outcome, 80),
+    winner: sanitizeOptionalGameId(
+      entry.winner_id ?? entry.winner?.id ?? entry.winner,
+    ),
     ended: sanitizeString(entry.ended || entry.ended_at || entry.finished, 80),
     board: sanitizeHistoryBoard(entry),
     black: sanitizeHistoryPlayer(entry.players?.black),

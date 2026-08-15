@@ -309,6 +309,7 @@ describe('OGS client', () => {
         id: 12345,
         name: 'Friendly Match',
         result: 'B+R',
+        winner: null,
         ended: '2026-08-14T12:00:00Z',
         board: {width: 19, height: 19},
         black: {id: 7, username: 'sente', rank: '1d'},

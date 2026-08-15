@@ -233,6 +233,7 @@ test.describe('OGS mock panel', () => {
                   name: 'History Fixture',
                   board: {width: 9, height: 9},
                   result: 'B+R',
+                  winner: 7,
                   ended: '2026-08-01T12:00:00Z',
                   black: {username: 'sekibot'},
                   white: {username: 'opponent'},

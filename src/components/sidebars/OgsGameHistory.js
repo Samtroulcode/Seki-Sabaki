@@ -163,14 +163,10 @@ function OgsGameHistoryCard({
       h(
         'span',
         {class: 'ogs-history-result'},
-        resultStone(game.result),
+        resultStone(game),
         game.result || t('Result unknown'),
-        resultWinner(game.result) != null &&
-          h(
-            'span',
-            {class: 'ogs-history-winner'},
-            ` · ${resultWinner(game.result)}`,
-          ),
+        winnerLabel(game) != null &&
+          h('span', {class: 'ogs-history-winner'}, ` · ${winnerLabel(game)}`),
       ),
       h(
         'span',
@@ -210,31 +206,43 @@ function OgsGameHistoryCard({
   )
 }
 
-function resultStone(result) {
-  let color = typeof result === 'string' ? result.trim()[0] : null
+function resultStone(game) {
+  let color = getWinnerColor(game)
   if (color !== 'B' && color !== 'W') return null
 
   return h('i', {class: `ogs-stone ${color === 'B' ? 'black' : 'white'}`})
 }
 
-function resultWinner(result) {
-  let color = typeof result === 'string' ? result.trim()[0] : null
+function winnerLabel(game) {
+  let color = getWinnerColor(game)
   if (color === 'B') return t('Black')
   if (color === 'W') return t('White')
   return null
 }
 
 function getGameOutcome(game, currentUserId) {
-  let winner = resultWinner(game.result)
+  let winner = winnerLabel(game)
   if (winner == null) return {status: '', winner: null}
 
-  let winnerId = winner === t('Black') ? game.black?.id : game.white?.id
+  let winnerId = game.winner
   let status = ''
   if (currentUserId != null && winnerId != null) {
     status = Number(winnerId) === Number(currentUserId) ? 'won' : 'lost'
   }
 
   return {status, winner}
+}
+
+function getWinnerColor(game) {
+  let result = typeof game.result === 'string' ? game.result.trim()[0] : null
+  if (result === 'B' || result === 'W') return result
+
+  if (game.winner != null) {
+    if (Number(game.winner) === Number(game.black?.id)) return 'B'
+    if (Number(game.winner) === Number(game.white?.id)) return 'W'
+  }
+
+  return null
 }
 
 class LazyMiniGoban extends Component {
