@@ -489,6 +489,12 @@
 .home-online-presets {
   width: 100%;
 }
+.home-online-modes {
+  margin-bottom: 0.35rem;
+}
+.home-online-presets {
+  margin-top: 0.15rem;
+}
 .home-online-settings button,
 .home-online-sizes button {
   min-width: 0;
@@ -498,15 +504,16 @@
   white-space: nowrap;
 }
 .home-online-sizes button {
-  justify-self: center;
+  justify-self: center !important;
   width: 4.5rem;
 }
 .home-online-modes button {
-  justify-self: center;
+  justify-self: center !important;
   width: 6rem;
 }
 .home-online-presets button {
-  justify-self: stretch;
+  justify-self: center !important;
+  width: 6rem;
 }
 .home-online-settings button.selected,
 .home-online-sizes button.selected {
