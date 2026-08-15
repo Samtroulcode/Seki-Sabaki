@@ -103,107 +103,116 @@ export function OgsGameHistoryPanel({
   )
 }
 
-function OgsGameHistoryCard({
-  game,
-  currentUserId,
-  onOpenGame,
-  onAnalyzeOgs,
-  onAnalyzeSeki,
-}) {
-  let outcome = getGameOutcome(game, currentUserId)
+class OgsGameHistoryCard extends Component {
+  constructor(props) {
+    super(props)
+    this.state = {preview: null}
+    this.handlePreview = (preview) => this.setState({preview})
+  }
 
-  return h(
-    'article',
-    {
-      type: 'button',
-      class: `ogs-history-card ${outcome.status}`,
-      role: 'button',
-      tabIndex: 0,
-      onClick: () => onOpenGame?.(game.id),
-      onKeyDown: (evt) => {
-        if (evt.key === 'Enter' || evt.key === ' ') {
-          evt.preventDefault()
-          onOpenGame?.(game.id)
-        }
+  render() {
+    let {game, currentUserId, onOpenGame, onAnalyzeOgs, onAnalyzeSeki} =
+      this.props
+    let displayGame = {...game, winnerColor: this.state.preview?.winnerColor}
+    let outcome = getGameOutcome(displayGame, currentUserId)
+
+    return h(
+      'article',
+      {
+        type: 'button',
+        class: `ogs-history-card ${outcome.status}`,
+        role: 'button',
+        tabIndex: 0,
+        onClick: () => onOpenGame?.(game.id),
+        onKeyDown: (evt) => {
+          if (evt.key === 'Enter' || evt.key === ' ') {
+            evt.preventDefault()
+            onOpenGame?.(game.id)
+          }
+        },
       },
-    },
-    outcome.winner != null &&
-      h(
-        'span',
-        {class: 'ogs-history-outcome'},
-        outcome.status === 'won' ? '✓' : outcome.status === 'lost' ? '×' : '',
-        ' ',
-        outcome.winner,
-      ),
-    h(LazyMiniGoban, {game}),
-    h(
-      'span',
-      {class: 'ogs-history-card-body'},
-      h('strong', {}, game.name || `#${game.id}`),
-      h(
-        'span',
-        {class: 'ogs-history-players'},
+      outcome.winner != null &&
         h(
           'span',
-          {},
-          h('i', {class: 'ogs-stone black'}),
-          t('Black'),
-          ': ',
-          game.black?.username || t('Black'),
+          {class: 'ogs-history-outcome'},
+          outcome.status === 'won' ? '✓' : outcome.status === 'lost' ? '×' : '',
+          ' ',
+          outcome.winner,
+        ),
+      h(LazyMiniGoban, {game, onPreview: this.handlePreview}),
+      h(
+        'span',
+        {class: 'ogs-history-card-body'},
+        h('strong', {}, game.name || `#${game.id}`),
+        h(
+          'span',
+          {class: 'ogs-history-players'},
+          h(
+            'span',
+            {},
+            h('i', {class: 'ogs-stone black'}),
+            t('Black'),
+            ': ',
+            game.black?.username || t('Black'),
+          ),
+          h(
+            'span',
+            {},
+            h('i', {class: 'ogs-stone white'}),
+            t('White'),
+            ': ',
+            game.white?.username || t('White'),
+          ),
         ),
         h(
           'span',
-          {},
-          h('i', {class: 'ogs-stone white'}),
-          t('White'),
-          ': ',
-          game.white?.username || t('White'),
-        ),
-      ),
-      h(
-        'span',
-        {class: 'ogs-history-result'},
-        resultStone(game),
-        game.result || t('Result unknown'),
-        winnerLabel(game) != null &&
-          h('span', {class: 'ogs-history-winner'}, ` · ${winnerLabel(game)}`),
-      ),
-      h(
-        'span',
-        {class: 'ogs-history-meta'},
-        formatBoard(game.board, t),
-        game.ended ? ` · ${game.ended.slice(0, 10)}` : '',
-      ),
-      h(
-        'span',
-        {class: 'ogs-history-actions'},
-        h(
-          'button',
-          {
-            type: 'button',
-            onClick: (evt) => {
-              evt.stopPropagation()
-              onAnalyzeOgs?.(game.id)
-            },
-            onKeyDown: (evt) => evt.stopPropagation(),
-          },
-          t('Analyze OGS'),
+          {class: 'ogs-history-result'},
+          resultStone(displayGame),
+          game.result || t('Result unknown'),
+          winnerLabel(displayGame) != null &&
+            h(
+              'span',
+              {class: 'ogs-history-winner'},
+              ` · ${winnerLabel(displayGame)}`,
+            ),
         ),
         h(
-          'button',
-          {
-            type: 'button',
-            onClick: (evt) => {
-              evt.stopPropagation()
-              onAnalyzeSeki?.(game.id)
+          'span',
+          {class: 'ogs-history-meta'},
+          formatBoard(game.board, t),
+          game.ended ? ` · ${game.ended.slice(0, 10)}` : '',
+        ),
+        h(
+          'span',
+          {class: 'ogs-history-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: (evt) => {
+                evt.stopPropagation()
+                onAnalyzeOgs?.(game.id)
+              },
+              onKeyDown: (evt) => evt.stopPropagation(),
             },
-            onKeyDown: (evt) => evt.stopPropagation(),
-          },
-          t('Analyze Seki'),
+            t('Analyze OGS'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: (evt) => {
+                evt.stopPropagation()
+                onAnalyzeSeki?.(game.id)
+              },
+              onKeyDown: (evt) => evt.stopPropagation(),
+            },
+            t('Analyze Seki'),
+          ),
         ),
       ),
-    ),
-  )
+    )
+  }
 }
 
 function resultStone(game) {
@@ -224,7 +233,9 @@ function getGameOutcome(game, currentUserId) {
   let winner = winnerLabel(game)
   if (winner == null) return {status: '', winner: null}
 
-  let winnerId = game.winner
+  let winnerId =
+    game.winner ??
+    (getWinnerColor(game) === 'B' ? game.black?.id : game.white?.id)
   let status = ''
   if (currentUserId != null && winnerId != null) {
     status = Number(winnerId) === Number(currentUserId) ? 'won' : 'lost'
@@ -236,6 +247,10 @@ function getGameOutcome(game, currentUserId) {
 function getWinnerColor(game) {
   let result = typeof game.result === 'string' ? game.result.trim()[0] : null
   if (result === 'B' || result === 'W') return result
+
+  if (game.winnerColor === 'B' || game.winnerColor === 'W') {
+    return game.winnerColor
+  }
 
   if (game.winner != null) {
     if (Number(game.winner) === Number(game.black?.id)) return 'B'
@@ -253,6 +268,7 @@ class LazyMiniGoban extends Component {
   }
 
   componentDidMount() {
+    if (this.state.preview != null) this.props.onPreview?.(this.state.preview)
     this.loadPreview()
   }
 
@@ -284,6 +300,8 @@ class LazyMiniGoban extends Component {
         if (!this.disposed && this.props.game?.id === gameId) {
           this.setState(getCachedPreviewState(cacheKey, preview))
         }
+      } else {
+        this.props.onPreview?.(cached.preview)
       }
 
       return
@@ -294,6 +312,7 @@ class LazyMiniGoban extends Component {
     this.setState({status: 'loading', preview: null})
 
     let preview = await promise
+    this.props.onPreview?.(preview)
     if (!this.disposed && this.props.game?.id === gameId) {
       this.setState(getCachedPreviewState(cacheKey, preview))
     }

@@ -17,12 +17,16 @@ export function parseSgfPreview(content) {
     let mainNodes = [...tree.listMainNodes()]
     let node = mainNodes.at(-1) || tree.root
     let board = gametree.getBoard(tree, node.id)
+    let result = gametree.getRootProperty(tree, 'RE', null)
 
     return {
       width: board.width,
       height: board.height,
       signMap: board.signMap.map((row) => [...row]),
       currentVertex: board.currentVertex,
+      result,
+      winnerColor:
+        typeof result === 'string' && /^[BW]/.test(result) ? result[0] : null,
     }
   } catch (err) {
     return null
