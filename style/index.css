@@ -671,6 +671,16 @@
 .library-browser-toolbar button {
   flex: 0 0 auto;
 }
+.library-change-folder-action {
+  display: grid;
+  justify-items: end;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.library-change-folder-action .library-setup-warning {
+  max-width: 24rem;
+  margin: 0;
+}
 .library-current-path {
   overflow: hidden;
   text-overflow: ellipsis;

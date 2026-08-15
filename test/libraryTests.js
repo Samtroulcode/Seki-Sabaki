@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'fs'
+import {existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'fs'
 import {join} from 'path'
 import {tmpdir} from 'os'
 
@@ -54,8 +54,10 @@ describe('library root', () => {
     assert.deepStrictEqual(await api.chooseRoot(null), {
       ok: true,
       root: directory,
+      tsumegoRoot: join(directory, 'Tsumego'),
     })
     assert.strictEqual(values['library.root'], directory)
+    assert.strictEqual(existsSync(join(directory, 'Tsumego')), true)
     assert.deepStrictEqual(api.getConfig(), {configured: true, root: directory})
   })
 

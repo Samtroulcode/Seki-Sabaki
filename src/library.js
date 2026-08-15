@@ -88,6 +88,27 @@ function isSgfFile(filename) {
   return extension === '.sgf' || extension === '.rsgf'
 }
 
+function ensureTsumegoDirectory(root) {
+  let tsumegoPath = path.join(root, 'Tsumego')
+  try {
+    let existing = fs.existsSync(tsumegoPath)
+    if (existing) {
+      let stats = fs.lstatSync(tsumegoPath)
+      if (stats.isSymbolicLink() || !stats.isDirectory()) {
+        return {ok: false, code: 'tsumego-not-directory'}
+      }
+    } else {
+      fs.mkdirSync(tsumegoPath)
+    }
+    let validation = validateRoot(tsumegoPath)
+    return validation.ok
+      ? {ok: true, path: validation.root}
+      : {ok: false, code: 'tsumego-not-writable'}
+  } catch (err) {
+    return {ok: false, code: 'tsumego-not-writable'}
+  }
+}
+
 function isContained(root, filePath) {
   let relative = path.relative(root, filePath)
   return !relative.startsWith('..') && !path.isAbsolute(relative)
@@ -251,8 +272,11 @@ exports.create = function (setting, dialog) {
     let validation = validateRoot(selected)
     if (!validation.ok) return validation
 
+    let tsumego = ensureTsumegoDirectory(validation.root)
+    if (!tsumego.ok) return tsumego
+
     setting.set('library.root', validation.root)
-    return {ok: true, root: validation.root}
+    return {ok: true, root: validation.root, tsumegoRoot: tsumego.path}
   }
 
   return {getConfig, chooseRoot, list, open}

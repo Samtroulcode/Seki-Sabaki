@@ -23,6 +23,7 @@ export default class LibraryPanel extends Component {
       truncated: false,
       busy: true,
       error: null,
+      changingRoot: false,
     }
   }
 
@@ -88,19 +89,22 @@ export default class LibraryPanel extends Component {
           currentPath: '',
           truncated: false,
           busy: true,
+          changingRoot: false,
         })
         await this.refresh('')
       } else if (!result.cancelled) {
         this.setState({
           busy: false,
+          changingRoot: false,
           error: t('This folder cannot be used as a Library.'),
         })
       } else {
-        this.setState({busy: false})
+        this.setState({busy: false, changingRoot: false})
       }
     } catch (err) {
       this.setState({
         busy: false,
+        changingRoot: false,
         error: t('Unable to choose a Library folder.'),
       })
     }
@@ -149,7 +153,8 @@ export default class LibraryPanel extends Component {
   }
 
   render() {
-    let {config, entries, currentPath, truncated, busy, error} = this.state
+    let {config, entries, currentPath, truncated, busy, error, changingRoot} =
+      this.state
     let configured = config?.configured === true
 
     return h(
@@ -207,13 +212,28 @@ export default class LibraryPanel extends Component {
                   h('p', {class: 'library-root-path'}, config.root),
                 ),
                 h(
-                  'button',
-                  {
-                    type: 'button',
-                    disabled: busy,
-                    onClick: () => this.handleChooseRoot(),
-                  },
-                  t('Change folder'),
+                  'div',
+                  {class: 'library-change-folder-action'},
+                  changingRoot &&
+                    h(
+                      'p',
+                      {class: 'library-setup-warning'},
+                      t(
+                        'Changing the Library folder will create its Tsumego folder if needed.',
+                      ),
+                    ),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      disabled: busy,
+                      onClick: () =>
+                        this.setState({changingRoot: true}, () =>
+                          this.handleChooseRoot(),
+                        ),
+                    },
+                    t('Change folder'),
+                  ),
                 ),
               ),
               h(
@@ -251,13 +271,6 @@ export default class LibraryPanel extends Component {
                         ),
                       ),
                     ),
-              h(
-                'p',
-                {class: 'library-setup-warning'},
-                t(
-                  'A Tsumego folder may be created here later when you first save a tsumego.',
-                ),
-              ),
             ),
     )
   }
