@@ -1,10 +1,8 @@
 import {h, Component} from 'preact'
-import Board from '@sabaki/go-board'
-
 import i18n from '../i18n.js'
 import onlineStore from '../modules/onlinestore.js'
 import {defaultMatchmakingOptions} from './sidebars/ogsPanelData.js'
-import MiniGoban from './MiniGoban.js'
+import HomeBoardPreview from './HomeBoardPreview.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -112,39 +110,36 @@ export default class HomeOnlinePanel extends Component {
       h(
         'div',
         {class: 'home-online-content'},
+        h('span', {class: 'home-online-label'}, t('Board size')),
+        h(
+          'div',
+          {
+            class: 'home-online-sizes',
+            role: 'group',
+            'aria-label': t('Board size'),
+          },
+          boardSizes.map((size) =>
+            h(
+              'button',
+              {
+                key: size,
+                type: 'button',
+                class: boardSize === size ? 'selected' : '',
+                'aria-pressed': boardSize === size,
+                onClick: () => this.handleBoardSizeChange(size),
+              },
+              `${size}x${size}`,
+            ),
+          ),
+        ),
         h(
           'div',
           {class: 'home-online-preview', 'aria-hidden': 'true'},
-          h(MiniGoban, {
-            board: Board.fromDimensions(boardSize, boardSize),
-            maxSize: 230,
-          }),
+          h(HomeBoardPreview, {width: boardSize}),
         ),
         h(
           'div',
           {class: 'home-online-settings'},
-          h('span', {class: 'home-online-label'}, t('Board size')),
-          h(
-            'div',
-            {
-              class: 'home-online-sizes',
-              role: 'group',
-              'aria-label': t('Board size'),
-            },
-            boardSizes.map((size) =>
-              h(
-                'button',
-                {
-                  key: size,
-                  type: 'button',
-                  class: boardSize === size ? 'selected' : '',
-                  'aria-pressed': boardSize === size,
-                  onClick: () => this.handleBoardSizeChange(size),
-                },
-                `${size}x${size}`,
-              ),
-            ),
-          ),
           h('span', {class: 'home-online-label'}, t('Clock')),
           h(
             'div',

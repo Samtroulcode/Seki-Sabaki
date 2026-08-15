@@ -319,14 +319,10 @@
   border-radius: 8px;
 }
 .home-create-board {
-  --home-board-columns: 18;
-  --home-board-rows: 18;
   display: grid;
   gap: 1rem;
   justify-items: center;
-  background:
-    radial-gradient(circle at 50% 20%, rgba(0, 130, 240, 0.18), transparent 55%),
-    rgba(17, 17, 17, 0.72);
+  background: #111;
 }
 .home-create-board > h2,
 .home-online-heading h2 {
@@ -340,22 +336,25 @@
   justify-items: center;
   width: min(100%, 23rem);
   padding: 1rem;
-  background: #c2cb9c url('../img/ui/tatami.png') center;
-  border: 1px solid #8b936d;
-  border-radius: 6px;
-  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.28);
+  padding: 0;
+  background: #000;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .home-board-preview svg {
   display: block;
   width: min(100%, 19rem);
   height: auto;
-  background-color: #c2cb9c;
-  background-image:
-    linear-gradient(to right, transparent 48%, #514326 49%, #514326 51%, transparent 52%),
-    linear-gradient(to bottom, transparent 48%, #514326 49%, #514326 51%, transparent 52%);
-  background-size: calc(100% / var(--home-board-columns)) calc(100% / var(--home-board-rows));
-  background-position: center;
-  color: #433018;
+  background-color: #c78b47;
+  border: 1px solid #1e160e;
+  color: #1e160e;
+  stroke: currentColor;
+  stroke-width: 0.08;
+}
+.home-board-preview svg circle {
+  fill: currentColor;
+  stroke: none;
 }
 .home-create-board-button {
   display: grid;
@@ -434,19 +433,32 @@
   display: grid;
   gap: 1rem;
 }
+.home-online-content > .home-online-label,
+.home-online-content > .home-online-sizes {
+  justify-self: center;
+  width: min(100%, 23rem);
+}
 .home-online-preview {
   justify-self: center;
   width: min(100%, 13rem);
-  padding: 0.7rem;
-  background: #c2cb9c url('../img/ui/tatami.png') center;
-  border: 1px solid #8b936d;
-  border-radius: 5px;
+  padding: 0;
+  background: #000;
+  border: 0;
+  border-radius: 0;
 }
 .home-online-preview svg {
   display: block;
   width: 100%;
   height: auto;
-  background: #c2cb9c;
+  background-color: #c78b47;
+  border: 1px solid #1e160e;
+  color: #1e160e;
+  stroke: currentColor;
+  stroke-width: 0.08;
+}
+.home-online-preview svg circle {
+  fill: currentColor;
+  stroke: none;
 }
 .home-online-settings {
   display: grid;
@@ -469,14 +481,16 @@
 .home-online-presets {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.home-online-settings button {
+.home-online-settings button,
+.home-online-sizes button {
   min-width: 0;
   padding: 0.45rem 0.25rem;
   border: 1px solid #45484d;
   font-size: 0.8rem;
   white-space: nowrap;
 }
-.home-online-settings button.selected {
+.home-online-settings button.selected,
+.home-online-sizes button.selected {
   background: #006fca;
   border-color: #2a9bf0;
   color: white;

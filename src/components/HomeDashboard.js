@@ -1,10 +1,8 @@
 import {h, Component} from 'preact'
-import Board from '@sabaki/go-board'
-
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
 import onlineStore from '../modules/onlinestore.js'
-import MiniGoban from './MiniGoban.js'
+import HomeBoardPreview from './HomeBoardPreview.js'
 import HomeOnlinePanel from './HomeOnlinePanel.js'
 import {
   getHistoryPreview,
@@ -162,13 +160,7 @@ export default class HomeDashboard extends Component {
             {class: 'home-primary-grid'},
             h(
               'section',
-              {
-                class: 'home-create-board',
-                style: {
-                  '--home-board-columns': previewDimensions[0] - 1,
-                  '--home-board-rows': previewDimensions[1] - 1,
-                },
-              },
+              {class: 'home-create-board'},
               h('h2', {}, t('New board')),
               h(
                 'div',
@@ -176,12 +168,9 @@ export default class HomeDashboard extends Component {
                 h(
                   'div',
                   {class: 'home-board-preview-goban', 'aria-hidden': 'true'},
-                  h(MiniGoban, {
-                    board: Board.fromDimensions(
-                      previewDimensions[0],
-                      previewDimensions[1],
-                    ),
-                    maxSize: 360,
+                  h(HomeBoardPreview, {
+                    width: previewDimensions[0],
+                    height: previewDimensions[1],
                   }),
                 ),
                 h(
