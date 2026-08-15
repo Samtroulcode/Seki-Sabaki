@@ -463,10 +463,14 @@
 .home-online-settings {
   display: grid;
   gap: 0.55rem;
+  justify-self: center;
+  justify-items: center;
+  width: min(100%, 23rem);
 }
 .home-online-label {
   color: #aaa;
   font-size: 0.8rem;
+  text-align: center;
 }
 .home-online-sizes,
 .home-online-modes,
@@ -480,6 +484,10 @@
 }
 .home-online-presets {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.home-online-modes,
+.home-online-presets {
+  width: 100%;
 }
 .home-online-settings button,
 .home-online-sizes button {
@@ -498,6 +506,7 @@
 .home-online-start {
   margin-top: 0.35rem;
   padding: 0.7rem !important;
+  width: 100%;
   background: #006fca !important;
   border-color: #2a9bf0 !important;
   color: white !important;
