@@ -28,6 +28,12 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('.home-online-panel')).toContainText(
       'Play online',
     )
+    await expect(
+      page.locator('.home-board-preview .ogs-mini-goban'),
+    ).toBeVisible()
+    await expect(
+      page.locator('.home-online-preview .ogs-mini-goban'),
+    ).toBeVisible()
     await page
       .locator('.home-online-sizes')
       .getByRole('button', {name: '9x9'})

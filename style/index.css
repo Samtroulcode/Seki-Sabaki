@@ -342,6 +342,9 @@
   border-radius: 0;
   box-shadow: none;
 }
+.home-board-preview-goban {
+  width: min(100%, 19rem);
+}
 .home-board-preview .ogs-mini-goban {
   width: min(100%, 19rem);
 }
