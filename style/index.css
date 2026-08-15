@@ -696,7 +696,11 @@
 }
 .library-entry-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 13rem));
+  align-content: start;
+  align-items: start;
+  justify-content: start;
+  grid-auto-rows: max-content;
   gap: 0.75rem;
   min-height: 0;
   flex: 1 1 auto;
@@ -710,6 +714,8 @@
   justify-items: center;
   gap: 0.45rem;
   min-width: 0;
+  width: 100%;
+  align-self: start;
   padding: 0.7rem;
   overflow: hidden;
   background: #181818;
@@ -724,13 +730,13 @@
   border-color: #0082f0;
 }
 .library-entry .ogs-mini-goban {
-  width: 8rem;
+  width: 6rem;
 }
 .library-folder-icon {
   display: block;
-  width: 8rem;
-  height: 8rem;
-  padding: 2rem;
+  width: 6rem;
+  height: 6rem;
+  padding: 1.5rem;
   box-sizing: border-box;
   color: #d6a84f;
   filter: invert(77%) sepia(52%) saturate(551%) hue-rotate(359deg)
