@@ -14,7 +14,7 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#home')).toContainText('Your Go workspace')
     await expect(page.locator('.home-sidebar')).toHaveCount(0)
     await expect(page.locator('#home')).toContainText('Board size')
-    await expect(page.locator('#home')).toContainText('Explore')
+    await expect(page.locator('#home')).toContainText('Play online')
     await expect(page.locator('#home')).not.toContainText('Status')
     await expect(page.locator('#home')).toContainText('Recent OGS games')
     await expect(page.locator('#home')).toContainText(
@@ -25,6 +25,22 @@ test.describe('Home panel navigation', () => {
     await expect(page.getByRole('button', {name: /Library/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
+    await expect(page.locator('.home-online-panel')).toContainText(
+      'Play online',
+    )
+    await page
+      .locator('.home-online-sizes')
+      .getByRole('button', {name: '9x9'})
+      .click()
+    await page
+      .locator('.home-online-modes')
+      .getByRole('button', {name: 'Fischer'})
+      .click()
+    await expect(
+      page
+        .locator('.home-online-presets')
+        .getByRole('button', {name: '2m + 7s'}),
+    ).toBeVisible()
     await expect(
       page.locator('.home-board-sizes').getByRole('button', {name: '19x19'}),
     ).toHaveAttribute('aria-pressed', 'true')

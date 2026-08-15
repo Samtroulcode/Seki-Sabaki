@@ -262,9 +262,54 @@
 }
 .home-primary-grid {
   display: grid;
-  grid-template-columns: minmax(24rem, 1.15fr) minmax(20rem, 0.85fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   align-items: stretch;
+}
+.home-layout {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.home-main-content {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+.home-navbar {
+  position: sticky;
+  top: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  background: rgba(17, 17, 17, 0.72);
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+}
+.home-nav-button {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.7rem 0.3rem !important;
+  color: #c8c8c8 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  font-size: 0.75rem;
+  text-align: center;
+}
+.home-nav-button img {
+  width: 1.2rem;
+  height: 1.2rem;
+  opacity: 0.82;
+  filter: invert(1);
+}
+.home-nav-button:hover,
+.home-nav-button:focus {
+  color: white !important;
+  background: #292a2d !important;
+  border-color: #45484d !important;
 }
 .home-create-board,
 .home-navigation-actions {
@@ -282,6 +327,12 @@
   background:
     radial-gradient(circle at 50% 20%, rgba(0, 130, 240, 0.18), transparent 55%),
     rgba(17, 17, 17, 0.72);
+}
+.home-create-board > h2,
+.home-online-heading h2 {
+  width: 100%;
+  color: white;
+  font-size: 1.15rem;
 }
 .home-board-preview {
   display: grid;
@@ -362,6 +413,103 @@
 }
 .home-recent-games .home-ogs-history-card {
   min-height: 0;
+}
+.home-online-panel {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: rgba(17, 17, 17, 0.72);
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+}
+.home-online-heading {
+  display: grid;
+  gap: 0.25rem;
+}
+.home-online-heading p {
+  color: #aaa;
+}
+.home-online-content {
+  display: grid;
+  gap: 1rem;
+}
+.home-online-preview {
+  justify-self: center;
+  width: min(100%, 13rem);
+  padding: 0.7rem;
+  background: #c2cb9c url('../img/ui/tatami.png') center;
+  border: 1px solid #8b936d;
+  border-radius: 5px;
+}
+.home-online-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #c2cb9c;
+}
+.home-online-settings {
+  display: grid;
+  gap: 0.55rem;
+}
+.home-online-label {
+  color: #aaa;
+  font-size: 0.8rem;
+}
+.home-online-sizes,
+.home-online-modes,
+.home-online-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.home-online-modes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.home-online-presets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.home-online-settings button {
+  min-width: 0;
+  padding: 0.45rem 0.25rem;
+  border: 1px solid #45484d;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.home-online-settings button.selected {
+  background: #006fca;
+  border-color: #2a9bf0;
+  color: white;
+}
+.home-online-start {
+  margin-top: 0.35rem;
+  padding: 0.7rem !important;
+  background: #006fca !important;
+  border-color: #2a9bf0 !important;
+  color: white !important;
+  font-size: 1rem !important;
+}
+.home-online-start:disabled {
+  opacity: 0.5;
+}
+.home-matchmaking-toast {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 100;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #202b34;
+  border: 1px solid #2a9bf0;
+  border-radius: 6px;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.4);
+  color: white;
+}
+.home-matchmaking-toast button {
+  color: white;
+  background: #006fca;
 }
 .home-section {
   display: grid;
@@ -465,6 +613,15 @@
 
   .home-primary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .home-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .home-navbar {
+    position: static;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

@@ -356,7 +356,7 @@ test.describe('OGS mock panel', () => {
         window.__ogsTestState.matchmaking.options.boardSizes.length === 1 &&
         window.__ogsTestState.matchmaking.options.boardSizes[0] === 9 &&
         window.__ogsTestState.matchmaking.options.speeds[0] === 'rapid' &&
-        window.__ogsTestState.matchmaking.options.timeSystem === 'byoyomi' &&
+        window.__ogsTestState.matchmaking.options.timeSystem === 'fischer' &&
         window.__ogsTestState.matchmaking.options.handicap.value ===
           'disabled' &&
         window.__ogsTestState.matchmaking.options.lowerRankDiff === 2 &&
@@ -444,10 +444,7 @@ test.describe('OGS mock panel', () => {
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    await expect(page.locator('#home')).toContainText(
-      'Online game on the board',
-    )
-    await expect(page.locator('#home')).toContainText('Viewing game #42')
+    await expect(page.locator('#home')).toContainText('Continue game #42')
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
