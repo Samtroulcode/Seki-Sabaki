@@ -19,6 +19,7 @@ import * as gametree from './gametree.js'
 import * as gobantransformer from './gobantransformer.js'
 import * as gtplogger from './gtplogger.js'
 import * as helper from './helper.js'
+import {addRecentFile} from './recentfiles.js'
 import {
   createBoardAttachmentState,
   createLocalDocumentBoardAttachment,
@@ -1208,6 +1209,7 @@ class Sabaki extends EventEmitter {
 
     if (success) {
       this.createBoardTab(gameTrees, {representedFilename: filename})
+      await addRecentFile(filename)
       this.fileHash = this.generateFileHash()
       this.syncActiveBoardTab({fileHash: this.fileHash})
 
@@ -1324,6 +1326,7 @@ class Sabaki extends EventEmitter {
     }
 
     if (success) {
+      await addRecentFile(filename)
       if (this.state.activeBoardTabId == null) {
         this.createBoardTab(gameTrees, {representedFilename: filename})
         this.fileHash = this.generateFileHash()

@@ -142,6 +142,12 @@ window.sabaki = {
     showSaveDialog: (opts) => ipcRenderer.invoke('dialog:showSaveDialog', opts),
   },
 
+  recentFiles: {
+    list: () => ipcRenderer.invoke('recentFiles:list'),
+    add: (filePath) => ipcRenderer.invoke('recentFiles:add', filePath),
+    open: (id) => ipcRenderer.invoke('recentFiles:open', id),
+  },
+
   // Menu
   menu: {
     popup: (template, x, y) => ipcRenderer.invoke('menu:popup', template, x, y),

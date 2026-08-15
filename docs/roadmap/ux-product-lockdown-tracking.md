@@ -222,17 +222,18 @@ Purpose: answer “Where was I?”
 
 Minimum empty state: “No active game yet” with New Board and Open SGF actions.
 
-### 3. Library Preview Module
+### 3. Recently Opened Games Module
 
-Purpose: make the future Library visible without pretending it is complete.
+Purpose: answer “What local games did I work on recently?” without duplicating
+the full Library explorer on the Home dashboard.
 
-- MVP before Library implementation: explain that the library is not configured
-  yet and offer Open SGF as the safe action.
-- Once Library MVP starts: show selected root/folder state and a small read-only
-  list of recent or discovered SGFs.
+- Show a small bounded list of recently opened local SGFs.
+- Open a selected SGF in a new Board tab.
+- Keep the full Library explorer in the Home Library section, reached through a
+  clear `Open Library` action.
 
-Minimum empty state: “No library folder selected yet.” Avoid silently moving or
-copying user files.
+Minimum empty state: “No recently opened games.” Avoid scanning or silently
+copying files from a Library root on the Home dashboard.
 
 ### 4. Analysis Status Module
 
@@ -362,9 +363,10 @@ Purpose: answer “What should I learn from this game?”
 - [x] Define Home dashboard MVP layout.
 - [x] Add quick actions module/card.
 - [x] Add continue/resume module/card.
-- [x] Add read-only Library preview module/card.
+- [x] Keep Library as a Home section entry point until the Library MVP exists.
 - [x] Add Analysis status module/card.
 - [x] Add OGS status module/card.
+- [x] Add a bounded recently opened local SGF module to Home.
 - [x] Add targeted Home dashboard E2E coverage.
 
 ### Phase 2 — Navigation Tabs Foundation

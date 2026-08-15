@@ -6,6 +6,7 @@ import sabaki from '../modules/sabaki.js'
 import onlineStore from '../modules/onlinestore.js'
 import HomeBoardPreview from './HomeBoardPreview.js'
 import HomeOnlinePanel from './HomeOnlinePanel.js'
+import RecentlyOpenedGames from './RecentlyOpenedGames.js'
 import {
   getHistoryPreview,
   OgsGameHistoryPanel,
@@ -280,36 +281,41 @@ export default class HomeDashboard extends Component {
                 : t('Resume current board'),
             ),
           h(
-            'section',
-            {class: 'home-section home-recent-games'},
+            'div',
+            {class: 'home-recent-games-grid'},
+            h(RecentlyOpenedGames),
             h(
-              'div',
-              {class: 'home-section-heading'},
-              h('h2', {}, t('Recent OGS games')),
-              h('p', {}, t('Your latest games, ready to review.')),
-            ),
-            h(
-              'article',
-              {class: 'home-card home-ogs-history-card'},
-              h(OgsGameHistoryPanel, {
-                games: ogsHistoryPreview,
-                busy: onlineState.gameHistoryBusy,
-                error: onlineState.gameHistoryError,
-                authenticated: ogsAuthenticated,
-                compact: true,
-                emptyText: t('No recent OGS games loaded yet.'),
-                onRefresh: this.handleOgsHistoryRefresh,
-                onOpenGame: this.handleOgsHistoryGameClick,
-                onAnalyzeOgs: this.handleAnalyzeOgs,
-                onAnalyzeSeki: this.handleAnalyzeSeki,
-                onOpenOgs: this.handleOgsButtonClick,
-              }),
-              ogsAuthenticated &&
-                h(
-                  'button',
-                  {type: 'button', onClick: this.handleOgsHistoryButtonClick},
-                  t('View all OGS history'),
-                ),
+              'section',
+              {class: 'home-section home-recent-games'},
+              h(
+                'div',
+                {class: 'home-section-heading'},
+                h('h2', {}, t('Recent OGS games')),
+                h('p', {}, t('Your latest games, ready to review.')),
+              ),
+              h(
+                'article',
+                {class: 'home-card home-ogs-history-card'},
+                h(OgsGameHistoryPanel, {
+                  games: ogsHistoryPreview,
+                  busy: onlineState.gameHistoryBusy,
+                  error: onlineState.gameHistoryError,
+                  authenticated: ogsAuthenticated,
+                  compact: true,
+                  emptyText: t('No recent OGS games loaded yet.'),
+                  onRefresh: this.handleOgsHistoryRefresh,
+                  onOpenGame: this.handleOgsHistoryGameClick,
+                  onAnalyzeOgs: this.handleAnalyzeOgs,
+                  onAnalyzeSeki: this.handleAnalyzeSeki,
+                  onOpenOgs: this.handleOgsButtonClick,
+                }),
+                ogsAuthenticated &&
+                  h(
+                    'button',
+                    {type: 'button', onClick: this.handleOgsHistoryButtonClick},
+                    t('View all OGS history'),
+                  ),
+              ),
             ),
           ),
         ),

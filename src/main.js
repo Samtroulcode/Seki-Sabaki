@@ -19,6 +19,7 @@ const {OgsAiReviewClient} = require('./ogs/ai-review-client.js')
 const {setupOgsReviewIpcHandlers} = require('./ogs/review-ipc.js')
 const {setupSgfAnalysisIpcHandlers} = require('./sgfanalysis')
 const {openExternalUrl} = require('./shell')
+const recentFiles = require('./recentfiles')
 
 let windows = []
 let openfile = null
@@ -30,6 +31,18 @@ let runningWayland =
   process.platform === 'linux' &&
   !!process.env.WAYLAND_DISPLAY &&
   explicitOzonePlatform !== 'x11'
+
+const expectedAppUrl = pathToFileURL(resolve(__dirname, '../index.html'))
+
+function isTrustedRendererEvent(event) {
+  let window = BrowserWindow.fromWebContents(event.sender)
+  let url = event.senderFrame?.url || event.sender.getURL?.() || ''
+  return (
+    window?.webContents === event.sender &&
+    event.senderFrame?.parent === null &&
+    url === expectedAppUrl.href
+  )
+}
 
 // Electron 43 can hang during first paint on Wayland when Vulkan is selected.
 // Prefer XWayland when it is available; explicit Electron CLI flags remain
@@ -377,6 +390,20 @@ function setupIpcHandlers() {
     setting.loadThemes()
     return setting.getThemes()
   })
+
+  let recentFilesApi = recentFiles.create(setting)
+  ipcMain.handle('recentFiles:list', (e) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return recentFilesApi.list()
+  })
+  ipcMain.handle('recentFiles:add', (e, filePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return recentFilesApi.add(filePath)
+  })
+  ipcMain.handle('recentFiles:open', (e, id) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return recentFilesApi.open(id)
+  })
   ipcMain.on('setting:getPathsSync', (e) => {
     try {
       e.returnValue = {
@@ -397,7 +424,6 @@ function setupIpcHandlers() {
   })
 
   let ogsAiReviewClient = null
-  let expectedAppUrl = pathToFileURL(resolve(__dirname, '../index.html'))
   let ogsClient = setupOgsIpcHandlers(ipcMain, undefined, {
     sendStateChange: (state) => {
       if (state.user == null) ogsAiReviewClient?.dispose()

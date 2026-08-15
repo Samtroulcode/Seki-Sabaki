@@ -1,4 +1,5 @@
 const {expect} = require('@playwright/test')
+const path = require('path')
 const {test} = require('./fixtures/electron-app')
 
 test.describe('Home panel navigation', () => {
@@ -22,7 +23,9 @@ test.describe('Home panel navigation', () => {
     )
     await expect(page.getByRole('button', {name: /New board/})).toHaveCount(1)
     await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(1)
-    await expect(page.getByRole('button', {name: /Library/})).toBeVisible()
+    await expect(
+      page.getByRole('button', {name: 'Library', exact: true}),
+    ).toBeVisible()
     await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
     await expect(page.locator('.home-online-panel')).toContainText(
@@ -152,5 +155,31 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Apply settings before starting analysis.',
     )
+  })
+
+  test('shows and reopens recently opened SGF games', async ({page}) => {
+    let filename = path.join(process.cwd(), 'test/sgf/pro_game.sgf')
+
+    await page.evaluate(
+      async (filePath) => window.__sabaki.openFileInNewBoardTab(filePath),
+      filename,
+    )
+    await expect(page.locator('#goban')).toBeVisible()
+
+    await page.getByTitle('Home').click()
+    await expect(page.locator('.home-recent-local-games')).toContainText(
+      'pro_game.sgf',
+    )
+    await expect(
+      page.locator('.home-recent-local-game .ogs-mini-goban'),
+    ).toBeVisible()
+
+    await page.locator('.home-recent-local-game').first().click()
+    await expect(page.locator('#goban')).toBeVisible()
+    await expect(
+      page.locator(
+        '.app-board-tab-button[title="pro_game.sgf"][aria-current="page"]',
+      ),
+    ).toHaveAttribute('aria-current', 'page')
   })
 })
