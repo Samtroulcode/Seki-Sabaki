@@ -1069,10 +1069,9 @@ class Sabaki extends EventEmitter {
 
   // File Management
 
-  getEmptyGameTree() {
+  getEmptyGameTree(boardSize = null) {
     let handicap = setting.get('game.default_handicap')
-    let size = setting
-      .get('game.default_board_size')
+    let size = (boardSize ?? setting.get('game.default_board_size'))
       .toString()
       .split(':')
       .map((x) => +x)
@@ -1143,7 +1142,11 @@ class Sabaki extends EventEmitter {
     if (playSound) sound.playNewGame()
   }
 
-  async createNewBoardTab({playSound = false, showInfo = false} = {}) {
+  async createNewBoardTab({
+    boardSize = null,
+    playSound = false,
+    showInfo = false,
+  } = {}) {
     let [blackName, whiteName] = [
       this.state.blackEngineSyncerId,
       this.state.whiteEngineSyncerId,
@@ -1153,7 +1156,7 @@ class Sabaki extends EventEmitter {
       )
       .map((syncer) => (syncer == null ? null : syncer.engine.name))
 
-    let emptyTree = gametree.setGameInfo(this.getEmptyGameTree(), {
+    let emptyTree = gametree.setGameInfo(this.getEmptyGameTree(boardSize), {
       blackName,
       whiteName,
     })

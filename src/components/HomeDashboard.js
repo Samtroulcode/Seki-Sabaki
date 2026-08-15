@@ -1,8 +1,10 @@
 import {h, Component} from 'preact'
+import Board from '@sabaki/go-board'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
 import onlineStore from '../modules/onlinestore.js'
+import MiniGoban from './MiniGoban.js'
 import {
   getHistoryPreview,
   OgsGameHistoryPanel,
@@ -14,10 +16,33 @@ export default class HomeDashboard extends Component {
   constructor(props) {
     super(props)
 
-    this.state = onlineStore.getState()
+    let configuredSizeInfo = String(sabaki.getEmptyGameTree().root.data.SZ?.[0])
+    let configuredDimensions = configuredSizeInfo.split(':').map(Number)
+    if (configuredDimensions.length === 1) {
+      configuredDimensions = [configuredDimensions[0], configuredDimensions[0]]
+    }
+    if (configuredDimensions.some((size) => !Number.isFinite(size))) {
+      configuredDimensions = [19, 19]
+    }
+
+    this.state = {
+      ...onlineStore.getState(),
+      configuredBoardDimensions: configuredDimensions,
+      selectedBoardSize:
+        configuredDimensions[0] === configuredDimensions[1] &&
+        [9, 13, 19].includes(configuredDimensions[0])
+          ? configuredDimensions[0]
+          : null,
+    }
 
     this.handleNewGameButtonClick = async () => {
-      await sabaki.createNewBoardTab()
+      await sabaki.createNewBoardTab({
+        boardSize: this.state.selectedBoardSize,
+      })
+    }
+
+    this.handleBoardSizeChange = (selectedBoardSize) => {
+      this.setState({selectedBoardSize})
     }
 
     this.handleOpenFileButtonClick = async () => {
@@ -31,10 +56,7 @@ export default class HomeDashboard extends Component {
     }
 
     this.handleOgsHistoryButtonClick = () => {
-      sabaki.setState({
-        activeWorkspace: 'home',
-        homeSection: 'ogs',
-      })
+      sabaki.setState({activeWorkspace: 'home', homeSection: 'ogs'})
     }
 
     this.handleOgsHistoryRefresh = async () => {
@@ -70,7 +92,6 @@ export default class HomeDashboard extends Component {
     this.unsubscribeOnlineStore = onlineStore.subscribe(
       this.handleOnlineStoreState,
     )
-
     this.refreshOgsHistoryPreviewIfNeeded()
   }
 
@@ -103,18 +124,16 @@ export default class HomeDashboard extends Component {
     await onlineStore.refreshGameHistory({page: 1, pageSize: 3})
   }
 
-  render({
-    onlineGameId,
-    attachedEngineSyncers = [],
-    boardTabs = [],
-    onNavigate,
-  }) {
+  render({onlineGameId, boardTabs = [], onNavigate}) {
     let hasOnlineGame = onlineGameId != null
     let hasBoardTabs = boardTabs.length > 0
-    let attachedEngineCount = attachedEngineSyncers.length
     let onlineState = this.state
     let ogsAuthenticated = onlineState.socket?.status === 'authenticated'
     let ogsHistoryPreview = getHistoryPreview(onlineState.gameHistory, 3)
+    let selectedBoardSize = this.state.selectedBoardSize
+    let previewDimensions = selectedBoardSize
+      ? [selectedBoardSize, selectedBoardSize]
+      : this.state.configuredBoardDimensions
 
     return h(
       'div',
@@ -124,170 +143,150 @@ export default class HomeDashboard extends Component {
         {class: 'home-hero'},
         h('p', {class: 'home-kicker'}, t('Seki Sabaki')),
         h('h1', {}, t('Your Go workspace')),
+        h('p', {}, t('Choose a board and start playing.')),
+      ),
+      h(
+        'div',
+        {class: 'home-primary-grid'},
         h(
-          'p',
-          {},
-          t(
-            'Play, review, analyze, and continue your games from one calm starting point.',
+          'section',
+          {
+            class: 'home-create-board',
+            style: {
+              '--home-board-columns': previewDimensions[0] - 1,
+              '--home-board-rows': previewDimensions[1] - 1,
+            },
+          },
+          h(
+            'div',
+            {class: 'home-board-preview'},
+            h(
+              'div',
+              {class: 'home-board-preview-goban', 'aria-hidden': 'true'},
+              h(MiniGoban, {
+                board: Board.fromDimensions(
+                  previewDimensions[0],
+                  previewDimensions[1],
+                ),
+                maxSize: 360,
+              }),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'home-create-board-button',
+                onClick: this.handleNewGameButtonClick,
+              },
+              h('strong', {}, t('New board')),
+              h('span', {}, t('Start a fresh game')),
+            ),
+          ),
+          h(
+            'div',
+            {
+              class: 'home-board-sizes',
+              role: 'group',
+              'aria-label': t('Board size'),
+            },
+            h('span', {}, t('Board size')),
+            [9, 13, 19].map((size) =>
+              h(
+                'button',
+                {
+                  key: size,
+                  type: 'button',
+                  class: selectedBoardSize === size ? 'selected' : '',
+                  'aria-pressed': selectedBoardSize === size,
+                  onClick: () => this.handleBoardSizeChange(size),
+                },
+                `${size}x${size}`,
+              ),
+            ),
           ),
         ),
-      ),
-      h(
-        'section',
-        {class: 'home-section home-quick-actions'},
-        h('div', {class: 'home-section-heading'}, h('h2', {}, t('Start'))),
         h(
-          'div',
-          {class: 'home-action-grid'},
-          h(ActionButton, {
-            title: t('New board'),
-            description: t('Start a fresh local game or review board.'),
-            primary: true,
-            onClick: this.handleNewGameButtonClick,
-          }),
-          h(ActionButton, {
-            title: t('Open SGF'),
-            description: t('Load a game file from your computer.'),
-            onClick: this.handleOpenFileButtonClick,
-          }),
-          h(ActionButton, {
-            title: t('Analyze'),
-            description: t('Set up KataGo analysis and view analyzed games.'),
-            onClick: () => onNavigate('analysis'),
-          }),
-          h(ActionButton, {
-            title: t('Online play'),
-            description: t('Open OGS connection, games, and matchmaking.'),
-            onClick: () => onNavigate('ogs'),
-          }),
+          'section',
+          {class: 'home-navigation-actions'},
+          h('div', {class: 'home-section-heading'}, h('h2', {}, t('Explore'))),
+          h(
+            'div',
+            {class: 'home-action-grid'},
+            h(ActionButton, {
+              title: t('Open SGF'),
+              description: t('Load a game file from your computer.'),
+              onClick: this.handleOpenFileButtonClick,
+            }),
+            h(ActionButton, {
+              title: t('Analyze'),
+              description: t('Set up KataGo analysis and view analyzed games.'),
+              onClick: () => onNavigate('analysis'),
+            }),
+            h(ActionButton, {
+              title: t('Online play'),
+              description: t('Open OGS connection, games, and matchmaking.'),
+              onClick: () => onNavigate('ogs'),
+            }),
+            h(ActionButton, {
+              title: t('Library'),
+              description: t('Browse your local game collection.'),
+              onClick: () => onNavigate('library'),
+            }),
+          ),
+          (hasOnlineGame || hasBoardTabs) &&
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'home-continue-link',
+                onClick: () => sabaki.setState({activeWorkspace: 'board'}),
+              },
+              hasOnlineGame
+                ? t('Continue game #') + String(onlineGameId)
+                : t('Resume current board'),
+            ),
         ),
       ),
       h(
         'section',
-        {class: 'home-section home-continue'},
-        h('div', {class: 'home-section-heading'}, h('h2', {}, t('Continue'))),
-        h(HomePanel, {
-          title: hasOnlineGame
-            ? t('Online game on the board')
-            : hasBoardTabs
-              ? t('Local board ready')
-              : t('No board open'),
-          description: hasOnlineGame
-            ? t('Continue game #') +
-              String(onlineGameId) +
-              t(' from the board workspace.')
-            : hasBoardTabs
-              ? t('Return to the current board without changing your position.')
-              : t('Create a board or open an SGF when you are ready.'),
-          meta: hasOnlineGame
-            ? t('Online mode')
-            : hasBoardTabs
-              ? t('Local review mode')
-              : t('Clean start'),
-          action: hasOnlineGame
-            ? t('Continue game')
-            : hasBoardTabs
-              ? t('Resume board')
-              : t('New board'),
-          onClick: () =>
-            hasBoardTabs
-              ? sabaki.setState({activeWorkspace: 'board'})
-              : this.handleNewGameButtonClick(),
-        }),
-      ),
-      h(
-        'section',
-        {class: 'home-section'},
+        {class: 'home-section home-recent-games'},
         h(
           'div',
           {class: 'home-section-heading'},
-          h('h2', {}, t('Status')),
-          h('p', {}, t('Honest entry points for the larger Seki workspace.')),
+          h('h2', {}, t('Recent OGS games')),
+          h('p', {}, t('Your latest games, ready to review.')),
         ),
         h(
-          'div',
-          {class: 'home-card-grid'},
-          h(HomePanel, {
-            title: t('Library'),
-            description: t(
-              'A dedicated game library is coming. For now, open SGF files directly.',
+          'article',
+          {class: 'home-card home-ogs-history-card'},
+          h(OgsGameHistoryPanel, {
+            games: ogsHistoryPreview,
+            busy: onlineState.gameHistoryBusy,
+            error: onlineState.gameHistoryError,
+            authenticated: ogsAuthenticated,
+            compact: true,
+            emptyText: t('No recent OGS games loaded yet.'),
+            onRefresh: this.handleOgsHistoryRefresh,
+            onOpenGame: this.handleOgsHistoryGameClick,
+            onOpenOgs: this.handleOgsButtonClick,
+          }),
+          ogsAuthenticated &&
+            h(
+              'button',
+              {type: 'button', onClick: this.handleOgsHistoryButtonClick},
+              t('View all OGS history'),
             ),
-            meta: t('No library folder selected'),
-            action: t('Open Library'),
-            onClick: () => onNavigate('library'),
-          }),
-          h(HomePanel, {
-            title: t('Analysis'),
-            description: t(
-              'Prepare analysis jobs and browse generated review files.',
-            ),
-            meta:
-              attachedEngineCount === 0
-                ? t('No live engines attached')
-                : String(attachedEngineCount) +
-                  ' ' +
-                  t('live engine(s) attached'),
-            action: t('Open analysis'),
-            onClick: () => onNavigate('analysis'),
-          }),
-          h(HomePanel, {
-            title: t('OGS'),
-            description: hasOnlineGame
-              ? t('An online game is attached to the board.')
-              : t('Connect to OGS, find games, or start matchmaking.'),
-            meta: hasOnlineGame
-              ? t('Viewing game #') + String(onlineGameId)
-              : t('No online game on the board'),
-            action: t('Open OGS'),
-            onClick: () => onNavigate('ogs'),
-          }),
-          h(
-            'article',
-            {class: 'home-card home-ogs-history-card'},
-            h(OgsGameHistoryPanel, {
-              games: ogsHistoryPreview,
-              busy: onlineState.gameHistoryBusy,
-              error: onlineState.gameHistoryError,
-              authenticated: ogsAuthenticated,
-              compact: true,
-              emptyText: t('No recent OGS games loaded yet.'),
-              onRefresh: this.handleOgsHistoryRefresh,
-              onOpenGame: this.handleOgsHistoryGameClick,
-              onOpenOgs: this.handleOgsButtonClick,
-            }),
-            ogsAuthenticated &&
-              h(
-                'button',
-                {type: 'button', onClick: this.handleOgsHistoryButtonClick},
-                t('View all OGS history'),
-              ),
-          ),
         ),
       ),
     )
   }
 }
 
-function ActionButton({title, description, primary, onClick}) {
+function ActionButton({title, description, onClick}) {
   return h(
     'button',
-    {
-      type: 'button',
-      class: primary ? 'home-action primary' : 'home-action',
-      onClick,
-    },
+    {type: 'button', class: 'home-action', onClick},
     h('strong', {}, title),
     h('span', {}, description),
-  )
-}
-
-function HomePanel({title, description, meta, action, onClick}) {
-  return h(
-    'article',
-    {class: 'home-card'},
-    h('h3', {}, title),
-    h('p', {}, description),
-    h('p', {class: 'home-card-meta'}, meta),
-    h('button', {type: 'button', onClick}, action),
   )
 }

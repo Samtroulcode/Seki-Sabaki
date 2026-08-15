@@ -13,34 +13,38 @@ test.describe('Home panel navigation', () => {
     )
     await expect(page.locator('#home')).toContainText('Your Go workspace')
     await expect(page.locator('.home-sidebar')).toHaveCount(0)
-    await expect(page.locator('#home')).toContainText('Start')
-    await expect(page.locator('#home')).toContainText('Continue')
-    await expect(page.locator('#home')).toContainText('Status')
+    await expect(page.locator('#home')).toContainText('Board size')
+    await expect(page.locator('#home')).toContainText('Explore')
+    await expect(page.locator('#home')).not.toContainText('Status')
     await expect(page.locator('#home')).toContainText('Recent OGS games')
     await expect(page.locator('#home')).toContainText(
       'Connect OGS to see your history.',
     )
-    await expect(page.getByRole('button', {name: /New board/})).toHaveCount(2)
+    await expect(page.getByRole('button', {name: /New board/})).toHaveCount(1)
     await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(1)
-    await expect(page.getByRole('button', {name: /Open Library/})).toBeVisible()
+    await expect(page.getByRole('button', {name: /Library/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
-    await expect(page.locator('#home')).toContainText('No board open')
-    await expect(page.locator('#home')).toContainText(
-      'No library folder selected',
-    )
-    await expect(page.locator('#home')).toContainText(
-      'No live engines attached',
-    )
-    await expect(page.locator('#home')).toContainText(
-      'No online game on the board',
-    )
+    await expect(
+      page.locator('.home-board-sizes').getByRole('button', {name: '19x19'}),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await page
+      .locator('.home-board-sizes')
+      .getByRole('button', {name: '13x13'})
+      .click()
+    await expect(
+      page.locator('.home-board-sizes').getByRole('button', {name: '13x13'}),
+    ).toHaveAttribute('aria-pressed', 'true')
 
     await page
-      .getByRole('button', {name: /^New board$/})
-      .first()
+      .locator('.home-board-sizes')
+      .getByRole('button', {name: '9x9'})
       .click()
+    await page.getByRole('button', {name: /^New board/}).click()
     await expect(page.locator('#goban')).toBeVisible()
+    await page.waitForFunction(
+      () => window.__sabaki.state.gameTrees[0].root.data.SZ?.[0] === '9',
+    )
     await expect(page.getByTitle('Untitled Board')).toHaveAttribute(
       'aria-current',
       'page',
@@ -62,8 +66,8 @@ test.describe('Home panel navigation', () => {
 
     await page
       .locator('#home')
-      .getByRole('button', {name: /Open analysis/})
-      .click({force: true})
+      .getByRole('button', {name: /Analyze/})
+      .click()
     await expect(page.locator('#analysis-dashboard')).toBeVisible()
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Analysis Manager',
