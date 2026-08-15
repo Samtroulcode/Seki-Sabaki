@@ -371,11 +371,11 @@ test.describe('OGS mock panel', () => {
     await expect(
       page.getByRole('button', {name: 'Find opponent'}),
     ).toBeVisible()
-    await expect(page.locator('.ogs-online-game')).toBeVisible()
-    await expect(page.locator('.ogs-online-game')).toContainText('Active games')
-    await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
-    await expect(page.locator('.ogs-online-game')).toContainText('sekibot')
-    await page.locator('.ogs-active-games button').click()
+    await expect(page.locator('.ogs-dashboard-games-card')).toHaveCount(0)
+    await page.evaluate(async () => {
+      let result = await window.sabaki.ogs.connectGame(42)
+      await window.__sabaki.loadOgsGame(result.state.onlineGame)
+    })
     await page.waitForFunction(() => {
       let {gameTrees, gameIndex, treePosition} = window.__sabaki.state
       let tree = gameTrees[gameIndex]
@@ -448,14 +448,8 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('#home')).toContainText('Continue game #42')
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
-    await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
-    await expect(page.locator('.ogs-online-game')).toContainText('19x19')
-    await expect(page.locator('.ogs-online-game')).toContainText('opponent')
-    await expect(page.locator('.ogs-online-game')).toContainText('good luck')
-    await page
-      .locator('.ogs-active-games')
-      .getByRole('button', {name: 'Open game'})
-      .click()
+    await expect(page.locator('.ogs-dashboard-games-card')).toHaveCount(0)
+    await page.getByTitle('Fixture Game').click()
     await page.waitForFunction(
       () => window.__sabaki.state.activeWorkspace === 'online-game',
     )
@@ -572,8 +566,9 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('#home')).toBeVisible()
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByTitle('Fixture Game').click()
     await page
-      .locator('.ogs-online-game')
+      .locator('.ogs-game-context-panel')
       .getByRole('button', {name: 'Disconnect game'})
       .click()
     await page.waitForFunction(
@@ -599,7 +594,10 @@ test.describe('OGS mock panel', () => {
       )
     })
 
-    await page.locator('.ogs-active-games button').click()
+    await page.evaluate(async () => {
+      let result = await window.sabaki.ogs.connectGame(42)
+      await window.__sabaki.loadOgsGame(result.state.onlineGame)
+    })
     await page.waitForFunction(
       () =>
         window.__sabaki.state.onlineGameId === 42 &&

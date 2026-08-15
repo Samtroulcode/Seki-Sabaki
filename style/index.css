@@ -2421,13 +2421,11 @@ button:active {
   gap: 0.8rem;
 }
 .ogs-login-form label,
-.ogs-game-connect-form label,
 .ogs-matchmaking label {
   display: grid;
   gap: 0.3rem;
 }
 .ogs-login-form input,
-.ogs-game-connect-form input,
 .ogs-matchmaking input,
 .ogs-matchmaking select {
   width: 100%;
@@ -2612,15 +2610,6 @@ button:active {
 }
 .ogs-matchmaking-action:disabled {
   background: #292a2d;
-}
-.ogs-online-game {
-  display: grid;
-  gap: 0.6rem;
-  min-width: 0;
-}
-.ogs-game-connect-form {
-  display: grid;
-  gap: 0.6rem;
 }
 .ogs-history {
   display: grid;
@@ -2835,43 +2824,6 @@ button:active {
   align-items: center;
   gap: 0.75rem;
 }
-.ogs-active-games {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ogs-active-games li,
-.ogs-active-game-summary {
-  display: grid;
-  gap: 0.25rem;
-}
-.ogs-active-games li {
-  padding: 0.5rem;
-  border: 1px solid #292a2d;
-  border-radius: 8px;
-  background: #181818;
-}
-.ogs-game-status {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.35rem 0.8rem;
-  margin: 0;
-}
-.ogs-game-status dt {
-  color: #aaa;
-}
-.ogs-game-status dd {
-  margin: 0;
-}
-.ogs-game-chat {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0;
-  padding-left: 1.2rem;
-}
-
 .analysis-panel {
   display: grid;
   grid-template-rows: auto auto 1fr;

@@ -9,7 +9,6 @@ import {getOgsOnlineController} from '../../modules/ogsonlinecontroller.js'
 import {AccountStatus, LoginForm} from './OgsPanelAccount.js'
 import {OgsGameHistoryPanel} from './OgsGameHistory.js'
 import {AutomatchForm} from './OgsPanelMatchmaking.js'
-import {OnlineGameForm} from './OgsPanelGames.js'
 import {defaultMatchmakingOptions, getSocketLabel} from './ogsPanelData.js'
 
 const t = i18n.context('OgsPanel')
@@ -45,26 +44,6 @@ export default class OgsPanel extends Component {
       sabaki.detachOgsGame()
       await onlineStore.logout()
       getOgsOnlineController().resetSession()
-    }
-
-    this.handleActiveGameButtonClick = async (gameId) => {
-      try {
-        await getOgsOnlineController().openGame(gameId, this.state)
-      } catch (err) {
-        onlineStore.setState({error: t('Unable to connect to game.')})
-      }
-    }
-
-    this.handleDisconnectGameButtonClick = async () => {
-      let gameId = this.state.onlineGame?.gameId
-      if (gameId == null) return
-
-      let result = await onlineStore.disconnectGame(gameId)
-
-      if (result.ok) {
-        sabaki.detachOgsGame(gameId)
-        getOgsOnlineController().resetSyncKey()
-      }
     }
 
     this.handleRefreshHistoryButtonClick = async () => {
@@ -216,8 +195,6 @@ export default class OgsPanel extends Component {
       connected,
       socket,
       matchmaking,
-      onlineGame,
-      activeGames,
       gameHistory,
       gameHistoryPage,
       gameHistoryHasNext,
@@ -228,7 +205,6 @@ export default class OgsPanel extends Component {
   ) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
     let authenticated = socket?.status === 'authenticated'
-    let connectedGame = onlineGame?.status === 'connected' ? onlineGame : null
 
     return h(
       'section',
@@ -301,18 +277,6 @@ export default class OgsPanel extends Component {
                     onChange: this.handleMatchmakingOptionChange,
                     onStartAutomatch: this.handleStartAutomatchButtonClick,
                     onCancelAutomatch: this.handleCancelAutomatchButtonClick,
-                  }),
-                ),
-                h(
-                  'section',
-                  {class: 'ogs-dashboard-card ogs-dashboard-games-card'},
-                  h(OnlineGameForm, {
-                    onlineGame,
-                    activeGames,
-                    authenticated,
-                    busy,
-                    onConnectGame: this.handleActiveGameButtonClick,
-                    onDisconnectGame: this.handleDisconnectGameButtonClick,
                   }),
                 ),
                 h(
