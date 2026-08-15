@@ -34,7 +34,6 @@ export default class HomeDashboard extends Component {
       sabaki.setState({
         activeWorkspace: 'home',
         homeSection: 'ogs',
-        ogsHomeSection: 'games',
       })
     }
 

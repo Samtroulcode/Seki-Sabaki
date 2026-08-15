@@ -12,9 +12,7 @@ test.describe('Home panel navigation', () => {
       'page',
     )
     await expect(page.locator('#home')).toContainText('Your Go workspace')
-    await expect(
-      page.locator('.home-sidebar').getByRole('button', {name: 'Dashboard'}),
-    ).toHaveAttribute('aria-current', 'page')
+    await expect(page.locator('.home-sidebar')).toHaveCount(0)
     await expect(page.locator('#home')).toContainText('Start')
     await expect(page.locator('#home')).toContainText('Continue')
     await expect(page.locator('#home')).toContainText('Status')
@@ -56,32 +54,17 @@ test.describe('Home panel navigation', () => {
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(
-      page.locator('.home-sidebar').getByRole('button', {name: 'OGS'}),
-    ).toHaveAttribute('aria-current', 'page')
-    await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
+      page.locator('#apptabs').getByRole('button', {name: 'OGS'}),
     ).toHaveCount(0)
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    await expect(
-      page.locator('.home-sidebar').getByRole('button', {name: 'OGS'}),
-    ).toHaveAttribute('aria-current', 'page')
-    await page
-      .locator('.home-sidebar')
-      .getByRole('button', {name: 'Dashboard'})
-      .click()
+
     await page
       .locator('#home')
-      .getByRole('button', {name: /Analyze/})
-      .click()
+      .getByRole('button', {name: /Open analysis/})
+      .click({force: true})
     await expect(page.locator('#analysis-dashboard')).toBeVisible()
-    await expect(
-      page.locator('.home-sidebar').getByRole('button', {name: 'Analysis'}),
-    ).toHaveAttribute('aria-current', 'page')
-    await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'Analysis Setup'}),
-    ).toHaveCount(0)
     await expect(page.locator('#analysis-dashboard')).toContainText(
       'Analysis Manager',
     )

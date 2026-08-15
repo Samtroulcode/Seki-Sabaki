@@ -187,7 +187,7 @@ class App extends Component {
       if (helper.isTextLikeElement(document.activeElement)) return
 
       evt.preventDefault()
-      sabaki.setState({activeWorkspace: 'home'})
+      sabaki.setState({activeWorkspace: 'home', homeSection: 'dashboard'})
     })
 
     // Handle window closing

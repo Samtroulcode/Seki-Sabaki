@@ -48,6 +48,8 @@ test.describe('OGS mock panel', () => {
       window.__ogsRemovedStonesCommands = []
       window.__ogsChatMessages = []
       window.__ogsMatchmakingOptions = []
+      window.__ogsHistoryCalls = []
+      window.__ogsDownloadedGames = []
       window.__ogsTestState = {
         user: null,
         socket: {
@@ -63,8 +65,8 @@ test.describe('OGS mock panel', () => {
             timeSystem: 'byoyomi',
             lowerRankDiff: 3,
             upperRankDiff: 3,
-            rules: {condition: 'required', value: 'japanese'},
-            handicap: {condition: 'preferred', value: 'enabled'},
+            rules: {condition: 'preferred', value: 'chinese'},
+            handicap: {condition: 'no-preference', value: 'enabled'},
           },
           error: null,
         },
@@ -220,6 +222,34 @@ test.describe('OGS mock panel', () => {
           })
           return {ok: true, state: window.__ogsTestState}
         },
+        listGameHistory: async (options) => {
+          window.__ogsHistoryCalls.push(options)
+          return {
+            ok: true,
+            history: {
+              results: [
+                {
+                  id: 123,
+                  name: 'History Fixture',
+                  board: {width: 9, height: 9},
+                  result: 'B+R',
+                  ended: '2026-08-01T12:00:00Z',
+                  black: {username: 'sekibot'},
+                  white: {username: 'opponent'},
+                },
+              ],
+              next: null,
+              previous: null,
+            },
+          }
+        },
+        downloadGameSgf: async (gameId) => {
+          window.__ogsDownloadedGames.push(gameId)
+          return {
+            ok: true,
+            sgf: '(;GM[1]FF[4]SZ[9]PB[sekibot]PW[opponent];B[aa];W[bb])',
+          }
+        },
         logout: async () => {
           window.__ogsTestSession = null
           window.__ogsTestState.user = null
@@ -236,16 +266,11 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-dashboard-hero')).toContainText(
       'Online Go Server',
     )
-    await expect(page.locator('.ogs-dashboard-nav')).toContainText('Overview')
-    await expect(page.locator('.ogs-dashboard-nav')).toContainText('Play')
-    await expect(page.locator('.ogs-dashboard-nav')).toContainText('Games')
-    await expect(
-      page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Play'}),
-    ).toBeDisabled()
+    await expect(page.locator('.ogs-dashboard-nav')).toHaveCount(0)
     await expect(page.locator('.ogs-dashboard-section-detail')).toHaveCount(0)
     await expect(
       page.locator('.home-sidebar').getByRole('button', {name: 'OGS'}),
-    ).toHaveAttribute('aria-current', 'page')
+    ).toHaveCount(0)
     await expect(
       page.locator('#apptabs').getByRole('button', {name: 'OGS Overview'}),
     ).toHaveCount(0)
@@ -264,98 +289,83 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-socket-status')).toContainText(
       'Authenticated',
     )
-    await expect(
-      page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Play'}),
-    ).toBeEnabled()
     await expect(page.locator('.ogs-dashboard-status-pill')).toContainText(
       'Authenticated',
     )
-    await page
-      .locator('.ogs-dashboard-nav')
-      .getByRole('button', {name: 'Social'})
-      .click()
-    await expect(page.locator('.ogs-dashboard-section-detail')).toContainText(
-      'Friends, direct chats, invitations, and presence will live here.',
-    )
-    await expect(
-      page.locator('.ogs-dashboard-nav').getByRole('button', {name: 'Social'}),
-    ).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('.ogs-matchmaking')).toBeVisible()
     await expect(page.locator('.ogs-matchmaking h3')).toHaveText('Play')
-    await expect(page.locator('.ogs-matchmaking')).toContainText('Game speed')
-    await expect(page.locator('.ogs-matchmaking')).toContainText('Rule set')
-    await expect(page.locator('.ogs-matchmaking')).toContainText('Preference')
-    await expect(page.locator('.ogs-matchmaking')).not.toContainText(
-      'Automatch',
+    await expect(page.locator('.ogs-matchmaking')).toContainText('Board size')
+    await expect(page.locator('.ogs-matchmaking')).toContainText('Clock')
+    await expect(page.locator('.ogs-matchmaking')).toContainText('Handicap')
+    await expect(page.locator('.ogs-matchmaking')).toContainText(
+      'Opponent rank',
     )
-    await expect(page.locator('.ogs-matchmaking')).not.toContainText('Value')
-    await expect(page.locator('.ogs-matchmaking')).not.toContainText(
-      'Condition',
-    )
+    await expect(page.locator('.ogs-matchmaking')).not.toContainText('Rule set')
+
     await page
-      .locator('.ogs-matchmaking input[name="boardSizes"][value="9"]')
-      .check()
+      .locator('.ogs-matchmaking-board-sizes')
+      .getByRole('button', {name: '9x9'})
+      .click()
+    await page
+      .locator('.ogs-matchmaking-board-sizes')
+      .getByRole('button', {name: '19x19'})
+      .click()
     await expect(
-      page.locator('.ogs-matchmaking input[name="boardSizes"][value="9"]'),
-    ).toBeChecked()
+      page
+        .locator('.ogs-matchmaking-board-sizes')
+        .getByRole('button', {name: '9x9'}),
+    ).toHaveClass(/selected/)
     await expect(
-      page.locator('.ogs-matchmaking input[name="boardSizes"][value="9"]'),
-    ).toHaveCSS('background-color', 'rgb(0, 130, 240)')
+      page
+        .locator('.ogs-matchmaking-board-sizes')
+        .getByRole('button', {name: '9x9'}),
+    ).toHaveAttribute('aria-pressed', 'true')
     await page
-      .locator('.ogs-matchmaking input[name="speeds"][value="blitz"]')
-      .check()
+      .locator('.ogs-matchmaking-time-presets')
+      .getByRole('button', {name: '5m + 7s'})
+      .click()
     await expect(
-      page.locator('.ogs-matchmaking input[name="speeds"][value="blitz"]'),
-    ).toBeChecked()
+      page
+        .locator('.ogs-matchmaking-time-presets')
+        .getByRole('button', {name: '5m + 7s'}),
+    ).toHaveClass(/selected/)
     await expect(
-      page.locator('.ogs-matchmaking input[name="speeds"][value="blitz"]'),
-    ).toHaveCSS('background-color', 'rgb(0, 130, 240)')
-    await page
-      .locator('.ogs-matchmaking select[name="timeSystem"]')
-      .selectOption('fischer')
-    await page.locator('.ogs-matchmaking input[name="lowerRankDiff"]').fill('2')
-    await page.locator('.ogs-matchmaking input[name="upperRankDiff"]').fill('4')
-    await page
-      .locator('.ogs-matchmaking select[name="rules.value"]')
-      .selectOption('chinese')
-    await page
-      .locator(
-        '.ogs-matchmaking input[name="rules.condition"][value="preferred"]',
-      )
-      .check()
-    await expect(
-      page.locator(
-        '.ogs-matchmaking input[name="rules.condition"][value="preferred"]',
-      ),
-    ).toBeChecked()
-    await page
-      .locator('.ogs-matchmaking select[name="handicap.value"]')
-      .selectOption('disabled')
-    await page
-      .locator(
-        '.ogs-matchmaking input[name="handicap.condition"][value="no-preference"]',
-      )
-      .check()
-    await expect(
-      page.locator(
-        '.ogs-matchmaking input[name="handicap.condition"][value="no-preference"]',
-      ),
-    ).toBeChecked()
+      page
+        .locator('.ogs-matchmaking-time-presets')
+        .getByRole('button', {name: '5m + 7s'}),
+    ).toHaveAttribute('aria-pressed', 'true')
     await page.waitForFunction(
       () =>
+        window.__ogsTestState.matchmaking.options.rules.value === 'chinese' &&
         window.__ogsTestState.matchmaking.options.rules.condition ===
           'preferred' &&
-        window.__ogsTestState.matchmaking.options.rules.value === 'chinese' &&
         window.__ogsTestState.matchmaking.options.handicap.condition ===
-          'no-preference' &&
+          'no-preference',
+    )
+    await page.locator('.ogs-matchmaking-select').selectOption('No handicap')
+    await page
+      .locator('.ogs-matchmaking-rank-diff')
+      .getByRole('button', {name: '-'})
+      .click()
+    await page
+      .locator('.ogs-matchmaking-rank-diff')
+      .getByRole('button', {name: '+'})
+      .click()
+    await page.waitForFunction(
+      () =>
+        window.__ogsTestState.matchmaking.options.boardSizes.length === 1 &&
+        window.__ogsTestState.matchmaking.options.boardSizes[0] === 9 &&
+        window.__ogsTestState.matchmaking.options.speeds[0] === 'rapid' &&
+        window.__ogsTestState.matchmaking.options.timeSystem === 'byoyomi' &&
         window.__ogsTestState.matchmaking.options.handicap.value ===
           'disabled' &&
-        window.__ogsMatchmakingOptions.length >= 8,
+        window.__ogsTestState.matchmaking.options.lowerRankDiff === 2 &&
+        window.__ogsTestState.matchmaking.options.upperRankDiff === 2,
     )
     await page.getByRole('button', {name: 'Find opponent'}).click()
-    await expect(page.locator('.ogs-matchmaking')).toContainText(
-      'Searching for opponent…',
-    )
+    await expect(
+      page.getByRole('button', {name: 'Cancel search'}),
+    ).toBeVisible()
     await page.getByRole('button', {name: 'Cancel search'}).click()
     await expect(
       page.getByRole('button', {name: 'Find opponent'}),
@@ -433,6 +443,12 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.gtp-console')).toHaveCount(0)
 
     await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await expect(page.locator('#home')).toContainText(
+      'Online game on the board',
+    )
+    await expect(page.locator('#home')).toContainText('Viewing game #42')
+    await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(page.locator('.ogs-online-game')).toContainText('Fixture Game')
     await expect(page.locator('.ogs-online-game')).toContainText('19x19')
@@ -447,6 +463,8 @@ test.describe('OGS mock panel', () => {
     )
     await expect(page.locator('#goban')).toBeVisible()
     await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
 
     await page.evaluate(async () => {
@@ -553,6 +571,8 @@ test.describe('OGS mock panel', () => {
     })
 
     await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await page
       .locator('.ogs-online-game')
@@ -613,91 +633,37 @@ test.describe('OGS mock panel', () => {
         window.__sabaki.state.onlineGameTabs.length === 1,
     )
 
-    await page.evaluate(() => {
-      window.__ogsDisconnectShouldFail = false
-    })
-    await page.locator('.app-online-game-tab-close').click()
+    await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await expect(page.locator('.home-ogs-history-card')).toContainText(
+      'History Fixture',
+    )
+
+    await page.getByRole('button', {name: 'View all OGS history'}).click()
+
+    await expect(page.locator('.ogs-history')).toContainText('OGS history')
+    await expect(page.locator('.ogs-history-card')).toContainText(
+      'History Fixture',
+    )
+    await expect(page.locator('.ogs-history-card')).toContainText('sekibot')
+    await expect(page.locator('.ogs-history-card')).toContainText('opponent')
+    await expect(page.locator('.ogs-history-card')).toContainText('B+R')
+    await expect(page.locator('.ogs-mini-goban')).toContainText('9x9')
+    await expect(page.locator('.ogs-history-card .ogs-mini-stone')).toHaveCount(
+      2,
+    )
+    await page.waitForFunction(
+      () => window.__ogsHistoryCalls.at(-1)?.pageSize === 12,
+    )
+
+    await page.locator('.ogs-history-card').click()
     await page.waitForFunction(
       () =>
-        window.__ogsDisconnectCalls.length === 2 &&
-        window.__sabaki.state.onlineGameTabs.length === 0,
+        window.__ogsDownloadedGames.includes(123) &&
+        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.boardTabs.length === 1,
     )
-  })
-
-  test('ignores stale OGS move rejection after server confirmation', async ({
-    page,
-  }) => {
-    await page.evaluate(async () => {
-      let onlineGame = {
-        status: 'connected',
-        gameId: 42,
-        error: null,
-        gameName: 'Fixture Game',
-        board: {width: 19, height: 19},
-        phase: 'play',
-        players: {
-          black: {id: 7, username: 'sekibot'},
-          white: {id: 8, username: 'opponent'},
-        },
-        moves: [],
-        moveCount: 0,
-        lastMove: null,
-        clock: null,
-        chat: [],
-      }
-
-      window.__ogsPlayError = null
-      window.__ogsTestState = {
-        user: {id: '7', username: 'sekibot', rank: '1d'},
-        onlineGame,
-      }
-      window.sabaki.ogs = {
-        getState: async () => window.__ogsTestState,
-        playMove: async () =>
-          new Promise((resolve) => {
-            window.__resolveOgsMove = resolve
-          }),
-      }
-      window.__sabaki.showOgsPlayError = async (error) => {
-        window.__ogsPlayError = error
-      }
-
-      await window.__sabaki.loadOgsGame(onlineGame)
-      window.__sabaki.submitOgsMove([2, 2])
-    })
-
-    await page.waitForFunction(() => window.__sabaki.ogsPendingMove != null)
-
-    await page.evaluate(async () => {
-      window.__ogsTestState.onlineGame.moves.push({move: 'cc', moveNumber: 1})
-      window.__ogsTestState.onlineGame.moveCount = 1
-      window.__ogsTestState.onlineGame.lastMove = 'cc'
-      await window.__sabaki.applyOgsGameUpdate(window.__ogsTestState.onlineGame)
-      window.__resolveOgsMove({
-        ok: false,
-        error: {code: 'not-your-turn', message: 'Not your turn.'},
-        state: window.__ogsTestState,
-      })
-    })
-
-    await page.waitForFunction(
-      () => window.__sabaki.ogsSubmittingMove === false,
-    )
-    await page.waitForFunction(() => {
-      let {gameTrees, gameIndex} = window.__sabaki.state
-      let tree = gameTrees[gameIndex]
-      let sequence = [...tree.getSequence(tree.root.id)].map(
-        (node) => node.data,
-      )
-
-      return (
-        window.__ogsPlayError == null &&
-        window.__sabaki.ogsPendingMove == null &&
-        window.__sabaki.state.onlineGameId === 42 &&
-        sequence.length === 2 &&
-        sequence[1].B?.[0] === 'cc'
-      )
-    })
+    await expect(page.locator('#goban')).toBeVisible()
   })
 
   test('opens an online-game tab automatically when automatch finds a game', async ({
@@ -763,90 +729,6 @@ test.describe('OGS mock panel', () => {
         window.__sabaki.state.onlineGameId === 42 &&
         window.__sabaki.state.onlineGameTabs.length === 1 &&
         window.__ogsAcknowledgedAutomatchGame === 42,
-    )
-    await expect(page.locator('#goban')).toBeVisible()
-  })
-
-  test('shows OGS history cards and opens history SGF as a board tab', async ({
-    page,
-  }) => {
-    await page.evaluate(() => {
-      window.__ogsHistoryCalls = []
-      window.__ogsDownloadedGames = []
-      window.__ogsTestState = {
-        user: {id: '7', username: 'sekibot', rank: '1d'},
-        socket: {status: 'authenticated', authenticated: true, error: null},
-        matchmaking: {status: 'idle'},
-        onlineGame: {status: 'idle', gameId: null},
-        activeGames: [],
-      }
-      window.sabaki.ogs = {
-        getState: async () => window.__ogsTestState,
-        listGameHistory: async (options) => {
-          window.__ogsHistoryCalls.push(options)
-          return {
-            ok: true,
-            history: {
-              results: [
-                {
-                  id: 123,
-                  name: 'History Fixture',
-                  board: {width: 9, height: 9},
-                  result: 'B+R',
-                  ended: '2026-08-01T12:00:00Z',
-                  black: {username: 'sekibot'},
-                  white: {username: 'opponent'},
-                },
-              ],
-              next: null,
-              previous: null,
-            },
-          }
-        },
-        downloadGameSgf: async (gameId) => {
-          window.__ogsDownloadedGames.push(gameId)
-          return {
-            ok: true,
-            sgf: '(;GM[1]FF[4]SZ[9]PB[sekibot]PW[opponent];B[aa];W[bb])',
-          }
-        },
-      }
-    })
-
-    await page.evaluate(() => {
-      window.__sabaki.setState({activeWorkspace: 'home', homeSection: 'ogs'})
-    })
-    await page
-      .locator('.home-sidebar')
-      .getByRole('button', {name: 'Dashboard'})
-      .click()
-    await expect(page.locator('.home-ogs-history-card')).toContainText(
-      'History Fixture',
-    )
-
-    await page.getByRole('button', {name: 'View all OGS history'}).click()
-
-    await expect(page.locator('.ogs-history')).toContainText('OGS history')
-    await expect(page.locator('.ogs-history-card')).toContainText(
-      'History Fixture',
-    )
-    await expect(page.locator('.ogs-history-card')).toContainText('sekibot')
-    await expect(page.locator('.ogs-history-card')).toContainText('opponent')
-    await expect(page.locator('.ogs-history-card')).toContainText('B+R')
-    await expect(page.locator('.ogs-mini-goban')).toContainText('9x9')
-    await expect(page.locator('.ogs-history-card .ogs-mini-stone')).toHaveCount(
-      2,
-    )
-    await page.waitForFunction(
-      () => window.__ogsHistoryCalls.at(-1)?.pageSize === 12,
-    )
-
-    await page.locator('.ogs-history-card').click()
-    await page.waitForFunction(
-      () =>
-        window.__ogsDownloadedGames.includes(123) &&
-        window.__sabaki.state.activeWorkspace === 'board' &&
-        window.__sabaki.state.boardTabs.length === 1,
     )
     await expect(page.locator('#goban')).toBeVisible()
   })

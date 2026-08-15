@@ -2,7 +2,6 @@ import {h, Component} from 'preact'
 
 import AnalysisPanel from './sidebars/AnalysisPanel.js'
 import HomeDashboard from './HomeDashboard.js'
-import HomeNavigation from './HomeNavigation.js'
 import HomePlaceholder from './HomePlaceholder.js'
 import OgsPanel from './sidebars/OgsPanel.js'
 
@@ -19,7 +18,6 @@ export default class HomeView extends Component {
       sabaki.setState({
         activeWorkspace: 'home',
         homeSection,
-        ogsHomeSection: null,
       })
     }
   }
@@ -30,10 +28,6 @@ export default class HomeView extends Component {
     return h(
       'section',
       {id: 'home', class: 'home-view'},
-      h(HomeNavigation, {
-        activeSection,
-        onNavigate: this.handleNavigate,
-      }),
       h(
         'div',
         {class: 'home-content'},
@@ -46,7 +40,7 @@ export default class HomeView extends Component {
 function renderHomeSection(activeSection, props, onNavigate) {
   switch (activeSection) {
     case 'ogs':
-      return h(OgsPanel, {initialSection: props.ogsHomeSection})
+      return h(OgsPanel)
     case 'analysis':
       return h(AnalysisPanel)
     case 'library':

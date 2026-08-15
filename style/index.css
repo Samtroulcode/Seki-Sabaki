@@ -215,36 +215,9 @@
   color: #d0d0d0;
   overflow: auto;
 }
-.home-view {
-  display: flex;
-}
+.home-view,
 .workspace-placeholder {
   display: grid;
-}
-.home-sidebar {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  flex: 0 0 11rem;
-  align-content: start;
-  gap: 0.75rem;
-  min-width: 0;
-}
-.home-sidebar-title {
-  color: white;
-  font-weight: bold;
-}
-.home-sidebar-list {
-  display: grid;
-  gap: 0.25rem;
-}
-.home-sidebar button {
-  justify-self: stretch;
-  text-align: left;
-}
-.home-sidebar button.selected {
-  background: #005fae;
-  color: white;
 }
 .home-content,
 .home-dashboard,
@@ -255,8 +228,7 @@
   min-width: 0;
 }
 .home-content {
-  flex: 1 1 auto;
-  overflow: hidden;
+  min-width: 0;
 }
 .home-content > .ogs-panel {
   min-height: 32rem;
@@ -380,21 +352,7 @@
 @media (max-width: 980px) {
   .home-view,
   .workspace-placeholder {
-    flex-direction: column;
     padding: 1.5rem;
-  }
-
-  .home-sidebar-list {
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  }
-
-  .home-sidebar {
-    flex-basis: auto;
-    width: 100%;
-  }
-
-  .home-content {
-    width: 100%;
   }
 
   .home-hero h1,
@@ -2111,38 +2069,12 @@ button:active {
   border-color: rgba(140, 220, 218, 0.45);
   color: #8cdcda;
 }
-.ogs-dashboard-nav {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-}
-.ogs-dashboard-nav button {
-  border: 1px solid #3a3b40;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-.ogs-dashboard-nav button.selected,
-.ogs-dashboard-nav button.selected:hover,
-.ogs-dashboard-nav button.selected:focus,
-.ogs-dashboard-nav button.selected:active {
-  border-color: #0082f0;
-  background: #0082f0;
-  color: white;
-}
-.ogs-dashboard-nav button:disabled {
-  opacity: 0.45;
-}
 .ogs-dashboard-content {
   min-height: 0;
 }
 .ogs-dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(320px, 1fr) minmax(
-      280px,
-      380px
-    );
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
   gap: 1rem;
   align-items: start;
 }
@@ -2295,6 +2227,101 @@ button:active {
 }
 .ogs-matchmaking {
   min-width: 0;
+}
+.ogs-matchmaking-group {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ogs-matchmaking-group legend {
+  padding: 0;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+.ogs-matchmaking-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+.ogs-matchmaking-board-sizes,
+.ogs-matchmaking-time-presets {
+  display: grid;
+  gap: 0.5rem;
+}
+.ogs-matchmaking-board-sizes {
+  grid-template-columns: repeat(3, 1fr);
+}
+.ogs-matchmaking-time-presets {
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+}
+.ogs-matchmaking-chip,
+.ogs-matchmaking-preset {
+  display: grid;
+  gap: 0.15rem;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #3a3b40;
+  border-radius: 6px;
+  background: #181818;
+  color: #ddd;
+  text-align: center;
+  line-height: 1.2;
+}
+.ogs-matchmaking-chip.selected,
+.ogs-matchmaking-preset.selected {
+  border-color: #0082f0;
+  background: rgba(0, 130, 240, 0.18);
+  color: white;
+}
+.ogs-matchmaking-chip:disabled,
+.ogs-matchmaking-preset:disabled {
+  opacity: 0.45;
+}
+.ogs-matchmaking-preset-label {
+  font-weight: bold;
+}
+.ogs-matchmaking-preset-hint {
+  color: #aaa;
+  font-size: 0.8rem;
+}
+.ogs-matchmaking-select {
+  min-height: 2.2rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #3a3b40;
+  border-radius: 4px;
+  background: #181818;
+  color: #eee;
+}
+.ogs-matchmaking-rank-diff {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ogs-matchmaking-rank-diff button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 4px;
+  font-size: 1.1rem;
+}
+.ogs-matchmaking-action {
+  justify-self: stretch;
+  min-height: 2.6rem;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  background: #005fae;
+  color: white;
+  font-weight: bold;
+}
+.ogs-matchmaking-action.cancel {
+  background: #8b3a3a;
+}
+.ogs-matchmaking-action:disabled {
+  background: #292a2d;
 }
 .ogs-online-game {
   display: grid;
@@ -2703,10 +2730,10 @@ button:active {
 
 @media (max-width: 1180px) {
   .ogs-dashboard-grid {
-    grid-template-columns: minmax(220px, 300px) minmax(320px, 1fr);
+    grid-template-columns: 1fr;
   }
-  .ogs-dashboard-secondary {
-    grid-column: 1 / -1;
+  .ogs-dashboard-column {
+    order: -1;
   }
   .analysis-dashboard-grid {
     grid-template-columns: minmax(300px, 420px) minmax(320px, 1fr);

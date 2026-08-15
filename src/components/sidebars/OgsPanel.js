@@ -4,20 +4,10 @@ import i18n from '../../i18n.js'
 import sabaki from '../../modules/sabaki.js'
 import onlineStore from '../../modules/onlinestore.js'
 import {getOgsOnlineController} from '../../modules/ogsonlinecontroller.js'
-import {
-  updateMultiMatchmakingOption,
-  updateNestedMatchmakingOption,
-  updateScalarMatchmakingOption,
-} from '../../modules/ogsmatchmakingoptions.js'
 import {AccountStatus, LoginForm} from './OgsPanelAccount.js'
-import {
-  OgsDashboardNav,
-  QuickLinksCard,
-  SectionDetail,
-} from './OgsPanelDashboard.js'
 import {OgsGameHistoryPanel} from './OgsGameHistory.js'
-import {OnlineGameForm} from './OgsPanelGames.js'
 import {AutomatchForm} from './OgsPanelMatchmaking.js'
+import {OnlineGameForm} from './OgsPanelGames.js'
 import {defaultMatchmakingOptions, getSocketLabel} from './ogsPanelData.js'
 
 const t = i18n.context('OgsPanel')
@@ -28,18 +18,10 @@ export default class OgsPanel extends Component {
 
     this.state = {
       ...onlineStore.getState(),
-      activeSection: props.initialSection || 'overview',
     }
 
     this.handleUsernameInput = (evt) => {
       onlineStore.setUsername(evt.currentTarget.value)
-    }
-
-    this.handleSectionButtonClick = (activeSection) => {
-      this.setState({activeSection})
-      if (activeSection === 'games' && this.state.connected) {
-        onlineStore.refreshGameHistory({page: 1, pageSize: 12})
-      }
     }
 
     this.handleSubmit = async (evt) => {
@@ -127,41 +109,8 @@ export default class OgsPanel extends Component {
       }
     }
 
-    this.handleMatchmakingOptionChange = async (evt) => {
-      let {name, value} = evt.currentTarget
-
-      await this.updateMatchmakingOptions(
-        updateScalarMatchmakingOption(
-          this.state.matchmaking.options,
-          name,
-          value,
-        ),
-      )
-    }
-
-    this.handleConditionOptionChange = async (evt) => {
-      let {name, value} = evt.currentTarget
-
-      await this.updateMatchmakingOptions(
-        updateNestedMatchmakingOption(
-          this.state.matchmaking.options,
-          name,
-          value,
-        ),
-      )
-    }
-
-    this.handleMultiOptionChange = async (evt) => {
-      let {name, value, checked} = evt.currentTarget
-
-      await this.updateMatchmakingOptions(
-        updateMultiMatchmakingOption(
-          this.state.matchmaking.options,
-          name,
-          value,
-          checked,
-        ),
-      )
+    this.handleMatchmakingOptionChange = async (options) => {
+      await onlineStore.setMatchmakingOptions(options)
     }
 
     this.handleStartAutomatchButtonClick = async () => {
@@ -177,17 +126,14 @@ export default class OgsPanel extends Component {
     this.lastFallbackRefreshAt = 0
   }
 
-  async updateMatchmakingOptions(options) {
-    await onlineStore.setMatchmakingOptions(options)
-  }
-
   async componentDidMount() {
     this.unsubscribeOnlineStore = onlineStore.subscribe(
       this.handleOnlineStoreState,
     )
     this.pollTimer = setInterval(() => this.refreshOgsStateIfDue(), 2000)
     await this.refreshOgsState()
-    if (this.state.activeSection === 'games' && this.state.connected) {
+
+    if (this.state.connected) {
       await onlineStore.refreshGameHistory({page: 1, pageSize: 12})
     }
   }
@@ -235,7 +181,6 @@ export default class OgsPanel extends Component {
       gameHistoryHasPrevious,
       gameHistoryBusy,
       gameHistoryError,
-      activeSection,
     },
   ) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
@@ -258,7 +203,7 @@ export default class OgsPanel extends Component {
             {},
             h('p', {class: 'ogs-dashboard-kicker'}, t('Online workspace')),
             h('h2', {}, t('Online Go Server')),
-            h('p', {}, t('Play, follow games, and manage your OGS account.')),
+            h('p', {}, t('Play, review history, and manage your account.')),
           ),
         ),
         h(
@@ -280,34 +225,72 @@ export default class OgsPanel extends Component {
         ),
       ),
 
-      h(OgsDashboardNav, {
-        activeSection,
-        disabled: !connected,
-        onSectionClick: this.handleSectionButtonClick,
-      }),
-
       h(
         'div',
         {class: 'ogs-dashboard-content'},
-        h(
-          'div',
-          {
-            class: `ogs-dashboard-grid ${!connected ? 'logged-out' : ''}`,
-          },
-          !connected
-            ? h(
-                'section',
-                {class: 'ogs-dashboard-card ogs-dashboard-login-card'},
-                h(LoginForm, {
-                  username,
-                  busy,
-                  error,
-                  passwordRef: (el) => (this.passwordInputElement = el),
-                  onUsernameInput: this.handleUsernameInput,
-                  onSubmit: this.handleSubmit,
-                }),
-              )
-            : h(
+        !connected
+          ? h(
+              'section',
+              {class: 'ogs-dashboard-card ogs-dashboard-login-card'},
+              h(LoginForm, {
+                username,
+                busy,
+                error,
+                passwordRef: (el) => (this.passwordInputElement = el),
+                onUsernameInput: this.handleUsernameInput,
+                onSubmit: this.handleSubmit,
+              }),
+            )
+          : h(
+              'div',
+              {class: 'ogs-dashboard-grid'},
+              h(
+                'div',
+                {class: 'ogs-dashboard-main'},
+                h(
+                  'section',
+                  {class: 'ogs-dashboard-card ogs-dashboard-primary-card'},
+                  h(AutomatchForm, {
+                    options: matchmakingOptions,
+                    status: matchmaking?.status,
+                    authenticated,
+                    busy,
+                    onChange: this.handleMatchmakingOptionChange,
+                    onStartAutomatch: this.handleStartAutomatchButtonClick,
+                    onCancelAutomatch: this.handleCancelAutomatchButtonClick,
+                  }),
+                ),
+                h(
+                  'section',
+                  {class: 'ogs-dashboard-card ogs-dashboard-games-card'},
+                  h(OnlineGameForm, {
+                    onlineGame,
+                    activeGames,
+                    authenticated,
+                    busy,
+                    onConnectGame: this.handleActiveGameButtonClick,
+                    onDisconnectGame: this.handleDisconnectGameButtonClick,
+                  }),
+                ),
+                h(
+                  'section',
+                  {class: 'ogs-dashboard-card ogs-dashboard-history-card'},
+                  h(OgsGameHistoryPanel, {
+                    games: gameHistory,
+                    busy: gameHistoryBusy,
+                    error: gameHistoryError,
+                    authenticated,
+                    page: gameHistoryPage,
+                    hasNext: gameHistoryHasNext,
+                    hasPrevious: gameHistoryHasPrevious,
+                    onRefresh: this.handleRefreshHistoryButtonClick,
+                    onPreviousPage: this.handlePreviousHistoryPageButtonClick,
+                    onNextPage: this.handleNextHistoryPageButtonClick,
+                    onOpenGame: this.handleOpenHistoryGameButtonClick,
+                  }),
+                ),
+              ),
+              h(
                 'aside',
                 {class: 'ogs-dashboard-column ogs-dashboard-account'},
                 h(
@@ -315,69 +298,8 @@ export default class OgsPanel extends Component {
                   {class: 'ogs-dashboard-card'},
                   h(AccountStatus, {user, username, socket}),
                 ),
-                h(QuickLinksCard, {connected, connectedGame}),
-              ),
-
-          connected &&
-            h(
-              'div',
-              {class: 'ogs-dashboard-main'},
-              activeSection === 'games'
-                ? h(
-                    'section',
-                    {class: 'ogs-dashboard-card ogs-dashboard-history-card'},
-                    h(OgsGameHistoryPanel, {
-                      games: gameHistory,
-                      busy: gameHistoryBusy,
-                      error: gameHistoryError,
-                      authenticated,
-                      page: gameHistoryPage,
-                      hasNext: gameHistoryHasNext,
-                      hasPrevious: gameHistoryHasPrevious,
-                      onRefresh: this.handleRefreshHistoryButtonClick,
-                      onPreviousPage: this.handlePreviousHistoryPageButtonClick,
-                      onNextPage: this.handleNextHistoryPageButtonClick,
-                      onOpenGame: this.handleOpenHistoryGameButtonClick,
-                    }),
-                  )
-                : [
-                    h(
-                      'section',
-                      {class: 'ogs-dashboard-card ogs-dashboard-primary-card'},
-                      h(OnlineGameForm, {
-                        onlineGame,
-                        activeGames,
-                        authenticated,
-                        busy,
-                        onConnectGame: this.handleActiveGameButtonClick,
-                        onDisconnectGame: this.handleDisconnectGameButtonClick,
-                      }),
-                    ),
-                    h(SectionDetail, {activeSection, connected}),
-                  ],
-            ),
-
-          connected &&
-            h(
-              'aside',
-              {class: 'ogs-dashboard-column ogs-dashboard-secondary'},
-              h(
-                'section',
-                {class: 'ogs-dashboard-card'},
-                h(AutomatchForm, {
-                  options: matchmakingOptions,
-                  status: matchmaking?.status,
-                  authenticated,
-                  busy,
-                  onOptionChange: this.handleMatchmakingOptionChange,
-                  onConditionChange: this.handleConditionOptionChange,
-                  onMultiChange: this.handleMultiOptionChange,
-                  onStartAutomatch: this.handleStartAutomatchButtonClick,
-                  onCancelAutomatch: this.handleCancelAutomatchButtonClick,
-                }),
               ),
             ),
-        ),
       ),
     )
   }

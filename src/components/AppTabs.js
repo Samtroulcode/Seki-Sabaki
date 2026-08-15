@@ -13,7 +13,7 @@ export default class AppTabs extends Component {
     super(props)
 
     this.handleHomeTabClick = () => {
-      sabaki.setState({activeWorkspace: 'home'})
+      sabaki.setState({activeWorkspace: 'home', homeSection: 'dashboard'})
     }
 
     this.handleBoardTabClick = (id) => {

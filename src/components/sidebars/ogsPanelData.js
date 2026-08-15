@@ -7,6 +7,76 @@ export const conditions = ['required', 'preferred', 'no-preference']
 export const rules = ['japanese', 'chinese', 'aga', 'korean', 'ing', 'nz']
 export const handicapValues = ['enabled', 'disabled']
 
+export const timePresets = [
+  {
+    id: 'blitz-byoyomi',
+    label: '30s + 5s',
+    hint: '~1 min',
+    speed: 'blitz',
+    system: 'byoyomi',
+  },
+  {
+    id: 'blitz-fischer',
+    label: '30s + 5x10s',
+    hint: '~2 min',
+    speed: 'blitz',
+    system: 'fischer',
+  },
+  {
+    id: 'rapid-byoyomi',
+    label: '5m + 7s',
+    hint: '~15 min',
+    speed: 'rapid',
+    system: 'byoyomi',
+  },
+  {
+    id: 'rapid-fischer',
+    label: '5m + 5x30s',
+    hint: '~25 min',
+    speed: 'rapid',
+    system: 'fischer',
+  },
+  {
+    id: 'live-byoyomi',
+    label: '10m + 10s',
+    hint: '~40 min',
+    speed: 'live',
+    system: 'byoyomi',
+  },
+  {
+    id: 'live-fischer',
+    label: '20m + 5x30s',
+    hint: '~1 h',
+    speed: 'live',
+    system: 'fischer',
+  },
+  {
+    id: 'correspondence-fischer',
+    label: '3d + 1d',
+    hint: 'Correspondence',
+    speed: 'correspondence',
+    system: 'fischer',
+  },
+]
+
+export const simpleHandicapOptions = [
+  {
+    id: 'none',
+    label: 'No handicap',
+    value: {condition: 'required', value: 'disabled'},
+  },
+  {
+    id: 'standard',
+    label: 'Standard',
+    value: {condition: 'preferred', value: 'enabled'},
+  },
+  {
+    id: 'handicap',
+    label: 'Handicap',
+    value: {condition: 'required', value: 'enabled'},
+  },
+]
+
 export {defaultMatchmakingOptions}
 
 export function createOgsPanelLabels(t) {
