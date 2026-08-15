@@ -2642,8 +2642,7 @@ button:active {
   gap: 0.9rem;
 }
 .ogs-history.compact .ogs-history-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 22rem));
-  justify-content: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
 }
 .ogs-history-card {
   position: relative;
@@ -2653,6 +2652,7 @@ button:active {
   justify-items: stretch;
   gap: 0.8rem;
   width: 100%;
+  box-sizing: border-box;
   padding: 0.8rem;
   border: 1px solid #292a2d;
   border-radius: 8px;
