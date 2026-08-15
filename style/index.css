@@ -497,6 +497,17 @@
   font-size: 0.8rem;
   white-space: nowrap;
 }
+.home-online-sizes button {
+  justify-self: center;
+  width: 4.5rem;
+}
+.home-online-modes button {
+  justify-self: center;
+  width: 6rem;
+}
+.home-online-presets button {
+  justify-self: stretch;
+}
 .home-online-settings button.selected,
 .home-online-sizes button.selected {
   background: #006fca;
