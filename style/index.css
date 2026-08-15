@@ -2646,7 +2646,8 @@ button:active {
 }
 .ogs-history-card {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-self: start;
   justify-items: stretch;
   gap: 0.8rem;
   width: 100%;
@@ -2656,6 +2657,9 @@ button:active {
   background: #181818;
   color: #ddd;
   text-align: left;
+}
+.ogs-history.compact .ogs-history-card {
+  height: fit-content;
 }
 .ogs-history-card:not(:disabled):hover,
 .ogs-history-card:not(:disabled):focus {
