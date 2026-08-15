@@ -151,6 +151,8 @@ window.sabaki = {
   library: {
     getConfig: () => ipcRenderer.invoke('library:getConfig'),
     chooseRoot: () => ipcRenderer.invoke('library:chooseRoot'),
+    list: (relativePath) => ipcRenderer.invoke('library:list', relativePath),
+    open: (relativePath) => ipcRenderer.invoke('library:open', relativePath),
   },
 
   // Menu

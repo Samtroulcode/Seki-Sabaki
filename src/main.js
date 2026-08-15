@@ -425,6 +425,14 @@ function setupIpcHandlers() {
     }
     return result
   })
+  ipcMain.handle('library:list', (e, relativePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.list(relativePath)
+  })
+  ipcMain.handle('library:open', (e, relativePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.open(relativePath)
+  })
   ipcMain.on('setting:getPathsSync', (e) => {
     try {
       e.returnValue = {

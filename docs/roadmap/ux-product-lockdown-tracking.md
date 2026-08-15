@@ -386,11 +386,11 @@ Purpose: answer “What should I learn from this game?”
 ### Phase 3 — Library MVP
 
 - [x] Define a user-selected Library root with explicit setup warning.
-- [ ] Add library listing logic.
+- [x] Add bounded Library listing logic for folders and SGF/RSGF files.
 - [ ] Add folder and SGF metadata display.
 - [ ] Add import/copy behavior without silently moving user files.
 - [ ] Add duplicate handling.
-- [ ] Add open-from-library behavior.
+- [x] Add open-from-library behavior into Board tabs.
 - [ ] Cover empty, missing, invalid, and externally edited file states.
 
 ### Phase 4 — Analysis Polish and Reports
@@ -444,6 +444,9 @@ Purpose: answer “What should I learn from this game?”
 2026-08-15 — Navigation model revised: Home is the only permanent tab; OGS,
 Library, and Analysis now open as ordinary closeable workspace tabs. Library
 setup and optional OGS connection states are being built within that model.
+
+2026-08-15 — Library browser slice added: configured roots now show bounded
+folder/SGF entries, support folder navigation, and open SGFs in Board tabs.
 
 2026-08-15 — OGS panel checkpoint: recent history is available on Home, the
 misleading `Active games` card was removed, matchmaking status is global across

@@ -1,4 +1,6 @@
 const {expect} = require('@playwright/test')
+const {mkdirSync, mkdtempSync, rmSync, writeFileSync} = require('fs')
+const {tmpdir} = require('os')
 const path = require('path')
 const {test} = require('./fixtures/electron-app')
 
@@ -181,5 +183,58 @@ test.describe('Home panel navigation', () => {
         '.app-board-tab-button[title="pro_game.sgf"][aria-current="page"]',
       ),
     ).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('browses a configured Library folder', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-library-e2e-'))
+    let games = path.join(root, 'Games')
+    mkdirSync(games)
+    writeFileSync(path.join(games, 'fixture.sgf'), '(;GM[1]SZ[9];B[aa])')
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Library', exact: true}).click()
+      await expect(page.locator('.library-entry-directory')).toContainText(
+        'Games',
+      )
+      await page.locator('.library-entry-directory').click()
+      await expect(page.locator('.library-entry-file')).toContainText(
+        'fixture.sgf',
+      )
+      await page.getByRole('button', {name: 'Up one folder'}).click()
+      await expect(page.locator('.library-entry-directory')).toContainText(
+        'Games',
+      )
+      await page.evaluate(() => {
+        window.__libraryList = window.sabaki.library.list
+        window.sabaki.library.list = async () => ({
+          ok: false,
+          code: 'read-failed',
+          entries: [],
+        })
+      })
+      await page.locator('.library-entry-directory').click()
+      await expect(page.locator('.ogs-error')).toContainText(
+        'Unable to read this Library folder.',
+      )
+      await page.evaluate(() => {
+        window.sabaki.library.list = window.__libraryList
+      })
+      await page.getByRole('button', {name: 'Up one folder'}).click()
+      await page.locator('.library-entry-directory').click()
+      await page.locator('.library-entry-file').click()
+      await expect(page.locator('#goban')).toBeVisible()
+      await expect(
+        page.locator(
+          '.app-board-tab-button[title="fixture.sgf"][aria-current="page"]',
+        ),
+      ).toHaveCount(1)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
   })
 })

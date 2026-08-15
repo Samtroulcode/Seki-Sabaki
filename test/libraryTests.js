@@ -58,4 +58,31 @@ describe('library root', () => {
     assert.strictEqual(values['library.root'], directory)
     assert.deepStrictEqual(api.getConfig(), {configured: true, root: directory})
   })
+
+  it('lists folders and SGF files and opens files inside the root', () => {
+    let games = join(directory, 'Games')
+    let content = '(;GM[1]SZ[9])'
+    mkdirSync(games)
+    writeFileSync(join(games, 'game.sgf'), content)
+    writeFileSync(join(directory, 'notes.txt'), 'ignore')
+    let values = {'library.root': directory}
+    let setting = {
+      get: (key) => values[key],
+      set: (key, value) => (values[key] = value),
+    }
+    let api = create(setting, {showOpenDialog: async () => ({filePaths: []})})
+
+    let rootEntries = api.list('')
+    assert.strictEqual(rootEntries.ok, true)
+    assert.deepStrictEqual(
+      rootEntries.entries.map((entry) => entry.name),
+      ['Games'],
+    )
+
+    let gameEntries = api.list('Games')
+    assert.deepStrictEqual(gameEntries.entries[0].name, 'game.sgf')
+    assert.strictEqual(gameEntries.entries[0].type, 'file')
+    assert.strictEqual(api.open('Games/game.sgf').content, content)
+    assert.strictEqual(api.open('../outside.sgf').ok, false)
+  })
 })

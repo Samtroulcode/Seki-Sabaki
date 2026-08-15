@@ -1,28 +1,79 @@
 import {h, Component} from 'preact'
 
 import i18n from '../i18n.js'
-import {chooseLibraryRoot, getLibraryConfig} from '../modules/library.js'
+import sabaki from '../modules/sabaki.js'
+import {parseSgfPreview} from '../modules/sgfpreview.js'
+import {
+  chooseLibraryRoot,
+  getLibraryConfig,
+  listLibraryEntries,
+  openLibraryFile,
+} from '../modules/library.js'
+import {MiniGoban} from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeView')
 
 export default class LibraryPanel extends Component {
   constructor(props) {
     super(props)
-    this.state = {config: null, busy: true, error: null}
+    this.state = {
+      config: null,
+      entries: [],
+      currentPath: '',
+      truncated: false,
+      busy: true,
+      error: null,
+    }
   }
 
   componentDidMount() {
     this.refresh()
   }
 
-  async refresh() {
+  async refresh(relativePath = this.state.currentPath) {
     try {
-      this.setState({config: await getLibraryConfig(), busy: false})
-    } catch (err) {
+      let config = await getLibraryConfig()
+      if (relativePath !== this.state.currentPath) return
+      if (!config.configured) {
+        this.setState({
+          config,
+          entries: [],
+          truncated: false,
+          busy: false,
+          error: null,
+        })
+        return
+      }
+
+      let result = await listLibraryEntries(relativePath)
+      if (relativePath !== this.state.currentPath) return
+      if (!result.ok) {
+        this.setState({
+          config,
+          entries: [],
+          truncated: false,
+          busy: false,
+          error: t('Unable to read this Library folder.'),
+        })
+        return
+      }
       this.setState({
-        config: {configured: false},
+        config,
+        entries: result.entries || [],
+        truncated: result.truncated === true,
         busy: false,
-        error: t('Unable to load Library settings.'),
+        error: null,
+      })
+    } catch (err) {
+      let configured = this.state.config?.configured === true
+      this.setState({
+        config: configured ? this.state.config : {configured: false},
+        entries: [],
+        truncated: false,
+        busy: false,
+        error: configured
+          ? t('Unable to read this Library folder.')
+          : t('Unable to load Library settings.'),
       })
     }
   }
@@ -34,8 +85,11 @@ export default class LibraryPanel extends Component {
       if (result.ok) {
         this.setState({
           config: {configured: true, root: result.root},
-          busy: false,
+          currentPath: '',
+          truncated: false,
+          busy: true,
         })
+        await this.refresh('')
       } else if (!result.cancelled) {
         this.setState({
           busy: false,
@@ -52,8 +106,50 @@ export default class LibraryPanel extends Component {
     }
   }
 
+  async handleEntryClick(entry) {
+    try {
+      if (entry.type === 'directory') {
+        this.setState({currentPath: entry.relativePath, busy: true})
+        await this.refresh(entry.relativePath)
+        return
+      }
+
+      this.setState({error: null})
+      let result = await openLibraryFile(entry.relativePath)
+      if (!result?.ok) {
+        this.setState({error: t('Unable to open this SGF file.')})
+        return
+      }
+
+      await sabaki.openContentInNewBoardTab(result.content, 'sgf', {
+        gotoEnd: true,
+        representedFilename: result.path,
+      })
+    } catch (err) {
+      this.setState({
+        busy: false,
+        error: t('Unable to open this Library item.'),
+      })
+    }
+  }
+
+  async handleParentClick() {
+    try {
+      let parts = this.state.currentPath.split(/[\\/]/).filter(Boolean)
+      parts.pop()
+      let parentPath = parts.join('/')
+      this.setState({currentPath: parentPath, busy: true})
+      await this.refresh(parentPath)
+    } catch (err) {
+      this.setState({
+        busy: false,
+        error: t('Unable to open this Library folder.'),
+      })
+    }
+  }
+
   render() {
-    let {config, busy, error} = this.state
+    let {config, entries, currentPath, truncated, busy, error} = this.state
     let configured = config?.configured === true
 
     return h(
@@ -97,9 +193,61 @@ export default class LibraryPanel extends Component {
             )
           : h(
               'article',
-              {class: 'library-configured-card'},
-              h('h2', {}, t('Library folder')),
-              h('p', {class: 'library-root-path'}, config.root),
+              {class: 'library-browser-card'},
+              h(
+                'div',
+                {class: 'library-browser-toolbar'},
+                h(
+                  'div',
+                  {},
+                  h('h2', {}, t('Library folder')),
+                  h('p', {class: 'library-root-path'}, config.root),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    disabled: busy,
+                    onClick: () => this.handleChooseRoot(),
+                  },
+                  t('Change folder'),
+                ),
+              ),
+              h(
+                'p',
+                {class: 'library-current-path'},
+                currentPath === '' ? t('Library root') : currentPath,
+              ),
+              truncated &&
+                h(
+                  'p',
+                  {class: 'library-list-warning'},
+                  t('Only the first 256 entries are shown.'),
+                ),
+              currentPath !== '' &&
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'library-parent-button',
+                    disabled: busy,
+                    onClick: () => this.handleParentClick(),
+                  },
+                  t('Up one folder'),
+                ),
+              busy
+                ? h('p', {class: 'library-panel-status'}, t('Loading…'))
+                : entries.length === 0
+                  ? h('p', {class: 'library-empty'}, t('This folder is empty.'))
+                  : h(
+                      'div',
+                      {class: 'library-entry-grid'},
+                      entries.map((entry) =>
+                        renderLibraryEntry(entry, (value) =>
+                          this.handleEntryClick(value),
+                        ),
+                      ),
+                    ),
               h(
                 'p',
                 {class: 'library-setup-warning'},
@@ -107,16 +255,30 @@ export default class LibraryPanel extends Component {
                   'A Tsumego folder may be created here later when you first save a tsumego.',
                 ),
               ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  disabled: busy,
-                  onClick: () => this.handleChooseRoot(),
-                },
-                t('Change folder'),
-              ),
             ),
     )
   }
+}
+
+function renderLibraryEntry(entry, onClick) {
+  let preview =
+    entry.type === 'file' ? parseSgfPreview(entry.previewContent) : null
+
+  return h(
+    'button',
+    {
+      key: entry.relativePath,
+      type: 'button',
+      class: `library-entry library-entry-${entry.type}`,
+      onClick: () => onClick(entry),
+    },
+    entry.type === 'directory'
+      ? h('span', {class: 'library-folder-icon'}, '▰')
+      : h(MiniGoban, {
+          board: preview,
+          preview,
+          status: preview == null ? 'error' : 'idle',
+        }),
+    h('span', {class: 'library-entry-name'}, entry.name),
+  )
 }

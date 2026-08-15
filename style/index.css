@@ -579,6 +579,129 @@
 .home-online-start:disabled {
   opacity: 0.5;
 }
+.library-panel {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+  min-height: 100%;
+  padding: 2rem;
+  background: #181818;
+  color: #d0d0d0;
+  box-sizing: border-box;
+}
+.library-panel h1,
+.library-panel h2,
+.library-panel p {
+  margin: 0;
+}
+.library-panel h1 {
+  color: white;
+  font-size: 1.8rem;
+}
+.library-panel-intro,
+.library-root-path,
+.library-current-path,
+.library-panel-status,
+.library-empty {
+  color: #aaa;
+}
+.library-setup-card,
+.library-browser-card {
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  max-width: 62rem;
+  padding: 1.25rem;
+  background: #111;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+}
+.library-setup-card h2,
+.library-browser-card h2 {
+  color: white;
+  font-size: 1.15rem;
+}
+.library-setup-warning {
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid #d6a84f;
+  background: rgba(214, 168, 79, 0.1);
+  color: #e6d19a;
+  line-height: 1.4;
+}
+.library-setup-card button,
+.library-browser-toolbar button,
+.library-parent-button {
+  justify-self: start;
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.library-setup-card button:hover,
+.library-setup-card button:focus,
+.library-browser-toolbar button:hover,
+.library-browser-toolbar button:focus,
+.library-parent-button:hover,
+.library-parent-button:focus {
+  background: #006fca;
+}
+.library-browser-toolbar {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.library-browser-toolbar button {
+  flex: 0 0 auto;
+}
+.library-current-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library-parent-button {
+  margin-top: -0.35rem;
+}
+.library-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+.library-entry {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.7rem;
+  overflow: hidden;
+  background: #181818;
+  border: 1px solid #292a2d;
+  border-radius: 6px;
+  color: #ddd;
+  text-align: center;
+}
+.library-entry:hover,
+.library-entry:focus {
+  background: #202124;
+  border-color: #0082f0;
+}
+.library-entry .ogs-mini-goban {
+  width: 4.5rem;
+}
+.library-folder-icon {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  color: #d6a84f;
+  font-size: 2.5rem;
+}
+.library-entry-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .home-matchmaking-toast {
   position: fixed;
   right: 1.25rem;
