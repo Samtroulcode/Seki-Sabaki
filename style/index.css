@@ -2684,7 +2684,20 @@ button:active {
   color: #ff8585;
 }
 .ogs-history.compact .ogs-history-card {
+  grid-template-columns: 6rem minmax(0, 1fr);
+  grid-template-rows: auto;
   height: fit-content;
+  gap: 0.7rem;
+  padding: 0.65rem;
+}
+.ogs-history.compact .ogs-mini-goban {
+  grid-column: 1;
+  grid-row: 1;
+  width: 5.5rem;
+}
+.ogs-history.compact .ogs-history-card-body {
+  grid-column: 2;
+  grid-row: 1;
 }
 .ogs-history-card:not(:disabled):hover,
 .ogs-history-card:not(:disabled):focus {

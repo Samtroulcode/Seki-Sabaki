@@ -171,7 +171,7 @@
   },
   "scripts": {
     "test": "mocha --require tsx",
-    "start": "node ./scripts/start.js",
+    "start": "npm run bundle && node ./scripts/start.js",
     "bundle": "webpack --mode production",
     "prepare:analyze-sgf": "node ./scripts/prepare-analyze-sgf-binaries.js",
     "diagnose:analyze-sgf": "node ./scripts/diagnose-analyze-sgf.js",

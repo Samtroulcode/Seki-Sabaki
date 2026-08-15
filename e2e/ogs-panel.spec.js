@@ -635,6 +635,12 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.home-ogs-history-card')).toContainText(
       'History Fixture',
     )
+    let compactCardHeights = await page
+      .locator('.home-ogs-history-card .ogs-history-card')
+      .evaluateAll((cards) =>
+        cards.map((card) => card.getBoundingClientRect().height),
+      )
+    expect(Math.max(...compactCardHeights)).toBeLessThan(240)
 
     await page.getByRole('button', {name: 'View all OGS history'}).click()
 
