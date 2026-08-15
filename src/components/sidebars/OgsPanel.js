@@ -1,6 +1,8 @@
 import {h, Component} from 'preact'
 
 import i18n from '../../i18n.js'
+import {showMessageBox} from '../../modules/dialog.js'
+import {selectBestReview} from '../../ogs/review-sanitize.js'
 import sabaki from '../../modules/sabaki.js'
 import onlineStore from '../../modules/onlinestore.js'
 import {getOgsOnlineController} from '../../modules/ogsonlinecontroller.js'
@@ -106,6 +108,47 @@ export default class OgsPanel extends Component {
 
       if (!success) {
         onlineStore.setState({gameHistoryError: t('Unable to open OGS SGF.')})
+      }
+    }
+
+    this.handleAnalyzeSekiButtonClick = async (gameId) => {
+      let result = await onlineStore.downloadGameSgf(gameId)
+      if (result.stale || !result.ok) return
+
+      await sabaki.startCurrentGameSgfAnalysis({sgfContent: result.sgf})
+    }
+
+    this.handleAnalyzeOgsButtonClick = async (gameId) => {
+      let result = await onlineStore.listAiReviews(gameId)
+      let review = selectBestReview(result.reviews)
+
+      if (!result.ok || review == null) {
+        await showMessageBox(
+          result.error?.message ||
+            t('No OGS AI review is available for this game.'),
+          'info',
+        )
+        return
+      }
+
+      let connection = await window.sabaki.ogsReviews.connect(gameId, review)
+      if (!connection?.ok) {
+        await showMessageBox(
+          connection?.error?.message ||
+            t('Unable to connect to OGS AI review.'),
+          'warning',
+        )
+        return
+      }
+
+      let sgf = await onlineStore.downloadGameSgf(gameId)
+      if (sgf.ok) {
+        await sabaki.openContentInNewBoardTab(sgf.sgf, 'sgf', {
+          gotoEnd: true,
+          representedFilename: null,
+        })
+      } else {
+        await window.sabaki.ogsReviews.disconnect(review.uuid)
       }
     }
 
@@ -287,6 +330,8 @@ export default class OgsPanel extends Component {
                     onPreviousPage: this.handlePreviousHistoryPageButtonClick,
                     onNextPage: this.handleNextHistoryPageButtonClick,
                     onOpenGame: this.handleOpenHistoryGameButtonClick,
+                    onAnalyzeOgs: this.handleAnalyzeOgsButtonClick,
+                    onAnalyzeSeki: this.handleAnalyzeSekiButtonClick,
                   }),
                 ),
               ),

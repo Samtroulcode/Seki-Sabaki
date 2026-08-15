@@ -25,6 +25,7 @@ import * as gametree from '../modules/gametree.js'
 import * as gtplogger from '../modules/gtplogger.js'
 import * as helper from '../modules/helper.js'
 import * as utils from '../modules/utils.js'
+import {getOgsReviewAnalysis} from '../modules/ogsreviewanalysis.js'
 import onlineStore from '../modules/onlinestore.js'
 import {
   OgsOnlineController,
@@ -69,6 +70,13 @@ class App extends Component {
   }
 
   componentDidMount() {
+    this.ogsReviewUnsubscribe = window.sabaki.ogsReviews?.onStateChange(
+      (ogsReviewState) => this.setState({ogsReviewState}),
+    )
+    let ogsReviewStatePromise = window.sabaki.ogsReviews?.getState?.()
+    ogsReviewStatePromise?.then((ogsReviewState) => {
+      this.setState({ogsReviewState})
+    })
     gtplogger.updatePath()
     ogsOnlineController.initialize()
     onlineStore.initialize()
@@ -369,7 +377,33 @@ class App extends Component {
       }
     }
 
-    state = {...state, ...inferredState, scoreBoard, areaMap}
+    let activeReview = Object.values(state.ogsReviewState?.reviews || {})[0]
+    let rootSource = String(gametree.getRootProperty(tree, 'SO', '') || '')
+    let reviewMatchesBoard =
+      activeReview != null &&
+      (state.onlineGameId === activeReview.gameId ||
+        rootSource.includes(`/game/${activeReview.gameId}`))
+    let ogsAnalysis = getOgsReviewAnalysis(
+      reviewMatchesBoard ? state.ogsReviewState : null,
+      tree,
+      state.treePosition,
+    )
+    let hasOgsReview =
+      state.ogsReviewState != null &&
+      Object.keys(state.ogsReviewState.reviews || {}).length > 0
+    state = {
+      ...state,
+      ...inferredState,
+      scoreBoard,
+      areaMap,
+      analysis: hasOgsReview ? ogsAnalysis : state.analysis,
+      analysisTreePosition: hasOgsReview
+        ? ogsAnalysis
+          ? state.treePosition
+          : null
+        : state.analysisTreePosition,
+      showAnalysis: hasOgsReview ? ogsAnalysis != null : state.showAnalysis,
+    }
 
     return h(
       'section',

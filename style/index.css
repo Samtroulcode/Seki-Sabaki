@@ -2687,6 +2687,22 @@ button:active {
   color: #aaa;
   font-size: 0.85rem;
 }
+.ogs-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+.ogs-history-actions button {
+  padding: 0.35rem 0.55rem;
+  background: #292a2d;
+  color: #eee;
+  font-size: 0.78rem;
+}
+.ogs-history-actions button:hover,
+.ogs-history-actions button:focus {
+  background: #006fca;
+}
 .ogs-stone {
   display: inline-block;
   width: 0.75em;

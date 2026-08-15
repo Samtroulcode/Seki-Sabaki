@@ -27,6 +27,8 @@ export function OgsGameHistoryPanel({
   onNextPage,
   onPreviousPage,
   onOpenGame,
+  onAnalyzeOgs,
+  onAnalyzeSeki,
   onOpenOgs,
 }) {
   return h(
@@ -65,7 +67,13 @@ export function OgsGameHistoryPanel({
             'div',
             {class: 'ogs-history-grid'},
             games.map((game) =>
-              h(OgsGameHistoryCard, {key: game.id, game, onOpenGame}),
+              h(OgsGameHistoryCard, {
+                key: game.id,
+                game,
+                onOpenGame,
+                onAnalyzeOgs,
+                onAnalyzeSeki,
+              }),
             ),
           ),
     !compact &&
@@ -92,13 +100,21 @@ export function OgsGameHistoryPanel({
   )
 }
 
-function OgsGameHistoryCard({game, onOpenGame}) {
+function OgsGameHistoryCard({game, onOpenGame, onAnalyzeOgs, onAnalyzeSeki}) {
   return h(
-    'button',
+    'article',
     {
       type: 'button',
       class: 'ogs-history-card',
+      role: 'button',
+      tabIndex: 0,
       onClick: () => onOpenGame?.(game.id),
+      onKeyDown: (evt) => {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault()
+          onOpenGame?.(game.id)
+        }
+      },
     },
     h(LazyMiniGoban, {game}),
     h(
@@ -128,6 +144,7 @@ function OgsGameHistoryCard({game, onOpenGame}) {
       h(
         'span',
         {class: 'ogs-history-result'},
+        resultStone(game.result),
         game.result || t('Result unknown'),
       ),
       h(
@@ -136,8 +153,43 @@ function OgsGameHistoryCard({game, onOpenGame}) {
         formatBoard(game.board, t),
         game.ended ? ` · ${game.ended.slice(0, 10)}` : '',
       ),
+      h(
+        'span',
+        {class: 'ogs-history-actions'},
+        h(
+          'button',
+          {
+            type: 'button',
+            onClick: (evt) => {
+              evt.stopPropagation()
+              onAnalyzeOgs?.(game.id)
+            },
+            onKeyDown: (evt) => evt.stopPropagation(),
+          },
+          t('Analyze OGS'),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            onClick: (evt) => {
+              evt.stopPropagation()
+              onAnalyzeSeki?.(game.id)
+            },
+            onKeyDown: (evt) => evt.stopPropagation(),
+          },
+          t('Analyze Seki'),
+        ),
+      ),
     ),
   )
+}
+
+function resultStone(result) {
+  let color = typeof result === 'string' ? result.trim()[0] : null
+  if (color !== 'B' && color !== 'W') return null
+
+  return h('i', {class: `ogs-stone ${color === 'B' ? 'black' : 'white'}`})
 }
 
 class LazyMiniGoban extends Component {

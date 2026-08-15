@@ -1,5 +1,7 @@
 import {h, Component} from 'preact'
 import i18n from '../i18n.js'
+import {showMessageBox} from '../modules/dialog.js'
+import {selectBestReview} from '../ogs/review-sanitize.js'
 import sabaki from '../modules/sabaki.js'
 import onlineStore from '../modules/onlinestore.js'
 import HomeBoardPreview from './HomeBoardPreview.js'
@@ -63,17 +65,9 @@ export default class HomeDashboard extends Component {
     }
 
     this.handleOgsHistoryGameClick = async (gameId) => {
-      let result = await onlineStore.downloadGameSgf(gameId)
+      let result = await this.downloadOgsGame(gameId)
 
-      if (result.stale) return
-
-      if (!result.ok) {
-        onlineStore.setState({
-          gameHistoryError:
-            result.error?.message || t('Unable to download SGF from OGS.'),
-        })
-        return
-      }
+      if (result == null) return
 
       let success = await sabaki.openContentInNewBoardTab(result.sgf, 'sgf', {
         gotoEnd: true,
@@ -83,6 +77,72 @@ export default class HomeDashboard extends Component {
       if (!success) {
         onlineStore.setState({gameHistoryError: t('Unable to open OGS SGF.')})
       }
+    }
+
+    this.handleAnalyzeSeki = async (gameId) => {
+      let result = await this.downloadOgsGame(gameId)
+      if (result == null) return
+
+      await sabaki.startCurrentGameSgfAnalysis({sgfContent: result.sgf})
+    }
+
+    this.handleAnalyzeOgs = async (gameId) => {
+      let result = await onlineStore.listAiReviews(gameId)
+      if (!result.ok) {
+        await showMessageBox(
+          result.error?.message || t('Unable to load OGS AI reviews.'),
+          'warning',
+        )
+        return
+      }
+
+      let review = selectBestReview(result.reviews)
+
+      if (review == null) {
+        await showMessageBox(
+          t('No OGS AI review is available for this game.'),
+          'info',
+        )
+        return
+      }
+
+      let connection = await window.sabaki.ogsReviews.connect(gameId, review)
+      if (!connection?.ok) {
+        await showMessageBox(
+          connection?.error?.message ||
+            t('Unable to connect to OGS AI review.'),
+          'warning',
+        )
+        return
+      }
+
+      let sgf = await this.downloadOgsGame(gameId)
+      if (sgf == null) {
+        await window.sabaki.ogsReviews.disconnect(review.uuid)
+        return
+      }
+
+      let success = await sabaki.openContentInNewBoardTab(sgf.sgf, 'sgf', {
+        gotoEnd: true,
+        representedFilename: null,
+      })
+      if (!success) await window.sabaki.ogsReviews.disconnect(review.uuid)
+    }
+
+    this.downloadOgsGame = async (gameId) => {
+      let result = await onlineStore.downloadGameSgf(gameId)
+
+      if (result.stale) return null
+
+      if (!result.ok) {
+        onlineStore.setState({
+          gameHistoryError:
+            result.error?.message || t('Unable to download SGF from OGS.'),
+        })
+        return null
+      }
+
+      return result
     }
   }
 
@@ -241,6 +301,8 @@ export default class HomeDashboard extends Component {
                 emptyText: t('No recent OGS games loaded yet.'),
                 onRefresh: this.handleOgsHistoryRefresh,
                 onOpenGame: this.handleOgsHistoryGameClick,
+                onAnalyzeOgs: this.handleAnalyzeOgs,
+                onAnalyzeSeki: this.handleAnalyzeSeki,
                 onOpenOgs: this.handleOgsButtonClick,
               }),
               ogsAuthenticated &&

@@ -51,6 +51,17 @@ ipcRenderer.on('ogs:stateChange', (_, state) => {
   }
 })
 
+const ogsReviewStateChangeCallbacks = new Set()
+ipcRenderer.on('ogsReviews:stateChange', (_, state) => {
+  for (const callback of ogsReviewStateChangeCallbacks) {
+    try {
+      callback(state)
+    } catch (err) {
+      console.error('[preload] OGS review state callback failed:', err)
+    }
+  }
+})
+
 const analysisStateChangeCallbacks = new Set()
 ipcRenderer.on('analysis:stateChange', (_, state) => {
   for (const callback of analysisStateChangeCallbacks) {
@@ -198,7 +209,24 @@ window.sabaki = {
       ipcRenderer.invoke('ogs:listGameHistory', options),
     downloadGameSgf: (gameId) =>
       ipcRenderer.invoke('ogs:downloadGameSgf', {gameId}),
+    listAiReviews: (gameId) =>
+      ipcRenderer.invoke('ogs:listAiReviews', {gameId}),
     logout: () => ipcRenderer.invoke('ogs:logout'),
+  },
+
+  ogsReviews: {
+    getState: () => ipcRenderer.invoke('ogsReviews:getState'),
+    connect: (gameId, review) =>
+      ipcRenderer.invoke('ogsReviews:connect', {gameId, review}),
+    disconnect: (uuid) => ipcRenderer.invoke('ogsReviews:disconnect', uuid),
+    onStateChange: (callback) => {
+      if (typeof callback !== 'function') {
+        throw new TypeError('OGS review state callback must be a function.')
+      }
+
+      ogsReviewStateChangeCallbacks.add(callback)
+      return () => ogsReviewStateChangeCallbacks.delete(callback)
+    },
   },
 
   analysis: {

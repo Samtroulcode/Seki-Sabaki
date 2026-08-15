@@ -61,6 +61,7 @@ const {
   mergeMoves,
 } = require('./ogs/moves.js')
 const {createElectronOgsCredentialStore} = require('./ogs/credentialstore.js')
+const {createOgsReviewApi} = require('./ogs/review-api.js')
 
 const DEFAULT_SERVER_URL = 'https://online-go.com'
 const USER_AGENT = 'Seki-Sabaki/0.1'
@@ -392,6 +393,10 @@ class OgsClient {
   } = {}) {
     this.serverUrl = serverUrl.replace(/\/$/, '')
     this.fetch = fetchImpl
+    this.reviewApi = createOgsReviewApi({
+      serverUrl: this.serverUrl,
+      fetch: this.fetch,
+    })
     this.now = now
     this.socket = new OgsSocket({
       serverUrl: this.serverUrl,
@@ -417,6 +422,14 @@ class OgsClient {
 
   getSession() {
     return this.session == null ? null : this.session.user
+  }
+
+  getJwtToken() {
+    return this.session?.jwtToken || null
+  }
+
+  getServerUrl() {
+    return this.serverUrl
   }
 
   getState() {
@@ -927,6 +940,14 @@ class OgsClient {
     }
 
     return sgfText
+  }
+
+  async listAiReviews(input = {}) {
+    if (this.session == null) {
+      throw new OgsError('not-authenticated', 'Connect to OGS first.')
+    }
+
+    return await this.reviewApi.listReviews(input.gameId)
   }
 
   assertAuthenticatedSocket() {
@@ -1972,6 +1993,14 @@ function setupOgsIpcHandlers(
   ipcMain.handle('ogs:downloadGameSgf', async (evt, input) => {
     try {
       return {ok: true, sgf: await client.downloadGameSgf(input || {})}
+    } catch (err) {
+      return {ok: false, error: serializeError(err)}
+    }
+  })
+
+  ipcMain.handle('ogs:listAiReviews', async (evt, input) => {
+    try {
+      return {ok: true, reviews: await client.listAiReviews(input || {})}
     } catch (err) {
       return {ok: false, error: serializeError(err)}
     }

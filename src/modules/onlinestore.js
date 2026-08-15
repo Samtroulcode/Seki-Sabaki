@@ -308,6 +308,24 @@ export class OnlineStore {
     }
   }
 
+  async listAiReviews(gameId) {
+    try {
+      let result = await this.ogs().listAiReviews(gameId)
+
+      if (result?.ok === false) return result
+
+      return {ok: true, reviews: result?.reviews || result || []}
+    } catch (err) {
+      return {
+        ok: false,
+        error: serializeOnlineStoreError(err, {
+          code: 'ai-review-failed',
+          message: t('Unable to load OGS AI reviews.'),
+        }),
+      }
+    }
+  }
+
   async connectGame(gameId, {manageBusy = true} = {}) {
     if (manageBusy) this.setState({busy: true, error: null})
 

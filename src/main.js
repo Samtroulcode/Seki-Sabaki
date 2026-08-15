@@ -9,11 +9,14 @@ const {
   Menu,
 } = require('electron')
 const {resolve} = require('path')
+const {pathToFileURL} = require('url')
 const i18n = require('./i18n')
 const setting = require('./setting')
 const updater = require('./updater')
 const {getOpenFileFromArgv} = require('./argv')
 const {setupOgsIpcHandlers} = require('./ogs')
+const {OgsAiReviewClient} = require('./ogs/ai-review-client.js')
+const {setupOgsReviewIpcHandlers} = require('./ogs/review-ipc.js')
 const {setupSgfAnalysisIpcHandlers} = require('./sgfanalysis')
 const {openExternalUrl} = require('./shell')
 
@@ -366,11 +369,54 @@ function setupIpcHandlers() {
     }
   })
 
-  setupOgsIpcHandlers(ipcMain, undefined, {
+  let ogsAiReviewClient = null
+  let expectedAppUrl = pathToFileURL(resolve(__dirname, '../index.html'))
+  let ogsClient = setupOgsIpcHandlers(ipcMain, undefined, {
     sendStateChange: (state) => {
+      if (state.user == null) ogsAiReviewClient?.dispose()
       BrowserWindow.getAllWindows().forEach((win) => {
         win.webContents.send('ogs:stateChange', state)
       })
+    },
+  })
+
+  ogsAiReviewClient = new OgsAiReviewClient({
+    getJwtToken: () => ogsClient.getJwtToken(),
+    serverUrl: ogsClient.getServerUrl(),
+    onStateChange: (state) => {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('ogsReviews:stateChange', state)
+      })
+    },
+  })
+  setupOgsReviewIpcHandlers(ipcMain, {
+    reviewClient: ogsAiReviewClient,
+    sendStateChange: (state) => {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('ogsReviews:stateChange', state)
+      })
+    },
+    serializeError: (err) => ({
+      code: 'network',
+      message: err?.message || 'Unable to load OGS AI review.',
+    }),
+    isTrustedSender: (sender, senderFrame) => {
+      let window = BrowserWindow.fromWebContents(sender)
+      let url = senderFrame?.url || sender?.getURL?.() || ''
+      let parsedUrl
+      try {
+        parsedUrl = new URL(url)
+      } catch (err) {
+        return false
+      }
+
+      return (
+        window?.webContents === sender &&
+        senderFrame?.parent === null &&
+        parsedUrl.protocol === 'file:' &&
+        parsedUrl.hostname === '' &&
+        parsedUrl.href === expectedAppUrl.href
+      )
     },
   })
 
