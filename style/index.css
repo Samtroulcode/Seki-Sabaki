@@ -342,19 +342,8 @@
   border-radius: 0;
   box-shadow: none;
 }
-.home-board-preview svg {
-  display: block;
+.home-board-preview .ogs-mini-goban {
   width: min(100%, 19rem);
-  height: auto;
-  background-color: #c78b47;
-  border: 1px solid #1e160e;
-  color: #1e160e;
-  stroke: currentColor;
-  stroke-width: 0.08;
-}
-.home-board-preview svg circle {
-  fill: currentColor;
-  stroke: none;
 }
 .home-create-board-button {
   display: grid;
@@ -446,19 +435,8 @@
   border: 0;
   border-radius: 0;
 }
-.home-online-preview svg {
-  display: block;
+.home-online-preview .ogs-mini-goban {
   width: 100%;
-  height: auto;
-  background-color: #c78b47;
-  border: 1px solid #1e160e;
-  color: #1e160e;
-  stroke: currentColor;
-  stroke-width: 0.08;
-}
-.home-online-preview svg circle {
-  fill: currentColor;
-  stroke: none;
 }
 .home-online-settings {
   display: grid;
