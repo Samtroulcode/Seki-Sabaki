@@ -126,6 +126,7 @@ class Sabaki extends EventEmitter {
       activeOnlineGameTabId: null,
       workspaceTabs: [],
       activeWorkspaceTabId: null,
+      activityTabOrder: [],
 
       // Bars
 
@@ -344,6 +345,10 @@ class Sabaki extends EventEmitter {
       change = {...change, onlineGameTabs: this.state.onlineGameTabs}
     }
 
+    if (!('activityTabOrder' in change)) {
+      change = {...change, activityTabOrder: this.state.activityTabOrder}
+    }
+
     this.emit('change', {change, callback})
   }
 
@@ -543,6 +548,7 @@ class Sabaki extends EventEmitter {
     this.setMode('play')
     this.syncCurrentActivityTab()
     this.state.boardTabs = [...this.state.boardTabs, tab]
+    this.insertActivityTab('board', tab.id)
     this.applyBoardTab(tab)
     this.treeHash = this.generateTreeHash()
     this.fileHash = this.generateFileHash()
@@ -560,6 +566,56 @@ class Sabaki extends EventEmitter {
     return this.state.workspaceTabs.find((tab) => tab.id === id) || null
   }
 
+  insertActivityTab(type, id) {
+    let key = `${type}:${id}`
+    let order = (this.state.activityTabOrder || []).filter(
+      (entry) => entry !== key,
+    )
+    let activeKey = getActiveActivityTabKey(this.state)
+    let activeIndex = activeKey == null ? -1 : order.indexOf(activeKey)
+    if (activeIndex < 0) order.push(key)
+    else order.splice(activeIndex + 1, 0, key)
+    this.state.activityTabOrder = order
+  }
+
+  removeActivityTab(type, id) {
+    let key = `${type}:${id}`
+    this.state.activityTabOrder = (this.state.activityTabOrder || []).filter(
+      (entry) => entry !== key,
+    )
+  }
+
+  getAdjacentActivityTab(type, id) {
+    let order = this.state.activityTabOrder || []
+    let index = order.indexOf(`${type}:${id}`)
+    if (index < 0) return null
+
+    for (let offset of [-1, 1]) {
+      let key = order[index + offset]
+      if (key == null) continue
+      let [tabType, tabId] = key.split(':')
+      let tab =
+        tabType === 'board'
+          ? this.getBoardTab(tabId)
+          : tabType === 'online-game'
+            ? this.getOnlineGameTab(tabId)
+            : tabType === 'workspace'
+              ? this.getWorkspaceTab(tabId)
+              : null
+      if (tab != null) return {type: tabType, tab}
+    }
+    return null
+  }
+
+  activateActivityTab(activity) {
+    if (activity == null) return false
+    if (activity.type === 'board') return this.switchBoardTab(activity.tab.id)
+    if (activity.type === 'online-game') {
+      return this.switchOnlineGameTab(activity.tab.id)
+    }
+    return this.switchWorkspaceTab(activity.tab.id)
+  }
+
   openWorkspaceTab(type) {
     if (!['ogs', 'analysis', 'library'].includes(type)) return false
 
@@ -569,6 +625,7 @@ class Sabaki extends EventEmitter {
     if (tab == null) {
       tab = {id: uuid(), type}
       this.state.workspaceTabs = [...this.state.workspaceTabs, tab]
+      this.insertActivityTab('workspace', tab.id)
     }
 
     this.setState({
@@ -592,13 +649,22 @@ class Sabaki extends EventEmitter {
     if (index < 0) return false
 
     let wasActive = id === this.state.activeWorkspaceTabId
+    let nextActivity = wasActive
+      ? this.getAdjacentActivityTab('workspace', id)
+      : null
     let tabs = this.state.workspaceTabs.filter((tab) => tab.id !== id)
+    this.removeActivityTab('workspace', id)
     if (!wasActive) {
       this.setState({workspaceTabs: tabs})
       return true
     }
 
     let nextTab = tabs[Math.max(0, index - 1)] || tabs[0] || null
+    if (nextActivity?.type !== 'workspace') {
+      this.setState({workspaceTabs: tabs})
+      this.activateActivityTab(nextActivity)
+      return true
+    }
     this.setState({
       workspaceTabs: tabs,
       activeWorkspace: nextTab == null ? 'home' : 'workspace-tab',
@@ -672,17 +738,23 @@ class Sabaki extends EventEmitter {
     if (tab == null) return false
 
     let wasActive = id === this.state.activeOnlineGameTabId
+    let nextActivity = wasActive
+      ? this.getAdjacentActivityTab('online-game', id)
+      : null
     let previousWorkspace = this.state.activeWorkspace
     let tabs = this.state.onlineGameTabs.filter((tab) => tab.id !== id)
     let nextTab =
-      tabs[
-        Math.max(
-          0,
-          this.state.onlineGameTabs.findIndex((tab) => tab.id === id) - 1,
-        )
-      ]
+      nextActivity?.type === 'online-game'
+        ? this.getOnlineGameTab(nextActivity.tab.id)
+        : tabs[
+            Math.max(
+              0,
+              this.state.onlineGameTabs.findIndex((tab) => tab.id === id) - 1,
+            )
+          ]
 
     this.state.onlineGameTabs = tabs
+    this.removeActivityTab('online-game', id)
 
     if (wasActive && nextTab != null) {
       this.ogsBoardSession.invalidateOperations()
@@ -715,6 +787,10 @@ class Sabaki extends EventEmitter {
       this.setState({onlineGameTabs: tabs})
     }
 
+    if (wasActive && nextActivity?.type !== 'online-game') {
+      this.activateActivityTab(nextActivity)
+    }
+
     return true
   }
 
@@ -723,6 +799,9 @@ class Sabaki extends EventEmitter {
     if (tab == null) return false
 
     let wasActive = id === this.state.activeBoardTabId
+    let nextActivity = wasActive
+      ? this.getAdjacentActivityTab('board', id)
+      : null
     let previousActiveTab = this.getBoardTab(this.state.activeBoardTabId)
     let previousWorkspace = this.state.activeWorkspace
 
@@ -743,10 +822,16 @@ class Sabaki extends EventEmitter {
     }
 
     let tabs = this.state.boardTabs.filter((tab) => tab.id !== id)
+    this.removeActivityTab('board', id)
     let nextTab =
-      tabs[
-        Math.max(0, this.state.boardTabs.findIndex((tab) => tab.id === id) - 1)
-      ]
+      nextActivity?.type === 'board'
+        ? this.getBoardTab(nextActivity.tab.id)
+        : tabs[
+            Math.max(
+              0,
+              this.state.boardTabs.findIndex((tab) => tab.id === id) - 1,
+            )
+          ]
 
     this.state.boardTabs = tabs
     this.applyingBoardTab = true
@@ -809,6 +894,10 @@ class Sabaki extends EventEmitter {
           syncCurrent: false,
         })
       }
+    }
+
+    if (wasActive && nextActivity?.type !== 'board') {
+      this.activateActivityTab(nextActivity)
     }
 
     return true
@@ -1570,6 +1659,7 @@ class Sabaki extends EventEmitter {
 
       this.syncCurrentActivityTab()
       this.state.onlineGameTabs = [...this.state.onlineGameTabs, tab]
+      this.insertActivityTab('online-game', tab.id)
       this.applyOnlineGameTab(tab)
     }
 
@@ -1644,6 +1734,7 @@ class Sabaki extends EventEmitter {
     let onlineGameTabs = this.state.onlineGameTabs.filter(
       (tab) => tab.onlineGameId !== targetGameId,
     )
+    if (targetTab != null) this.removeActivityTab('online-game', targetTab.id)
 
     this.ogsBoardSession.invalidateOperations()
     this.setState({
@@ -4924,6 +5015,25 @@ function getOgsColorPlayerLabel(color, player) {
 
 function normalizeWorkspaceChange(change) {
   return change
+}
+
+function getActiveActivityTabKey(state) {
+  if (state.activeWorkspace === 'board' && state.activeBoardTabId != null) {
+    return `board:${state.activeBoardTabId}`
+  }
+  if (
+    state.activeWorkspace === 'online-game' &&
+    state.activeOnlineGameTabId != null
+  ) {
+    return `online-game:${state.activeOnlineGameTabId}`
+  }
+  if (
+    state.activeWorkspace === 'workspace-tab' &&
+    state.activeWorkspaceTabId != null
+  ) {
+    return `workspace:${state.activeWorkspaceTabId}`
+  }
+  return null
 }
 
 export default new Sabaki()

@@ -57,8 +57,15 @@ export default class AppTabs extends Component {
     activeOnlineGameTabId,
     workspaceTabs = [],
     activeWorkspaceTabId,
+    activityTabOrder = [],
   }) {
     let homeSelected = activeWorkspace === 'home'
+    let orderedTabs = getOrderedTabs(
+      activityTabOrder,
+      boardTabs,
+      onlineGameTabs,
+      workspaceTabs,
+    )
 
     return h(
       'nav',
@@ -82,32 +89,33 @@ export default class AppTabs extends Component {
       h(
         'div',
         {class: 'app-activity-tabs'},
-        boardTabs.map((tab) =>
-          h(BoardTab, {
-            key: tab.id,
-            tab,
-            selected:
-              activeWorkspace === 'board' && tab.id === activeBoardTabId,
-            closeable: true,
-            onClick: () => this.handleBoardTabClick(tab.id),
-            onClose: (evt) => this.handleBoardTabCloseButtonClick(evt, tab.id),
-          }),
-        ),
-        onlineGameTabs.map((tab) =>
-          h(OnlineGameTab, {
-            key: tab.id,
-            tab,
-            selected:
-              activeWorkspace === 'online-game' &&
-              tab.id === activeOnlineGameTabId,
-            closeable: true,
-            onClick: () => this.handleOnlineGameTabClick(tab.id),
-            onClose: (evt) =>
-              this.handleOnlineGameTabCloseButtonClick(evt, tab.id),
-          }),
-        ),
-        workspaceTabs.map((tab) =>
-          h(WorkspaceTab, {
+        orderedTabs.map(({type, tab}) => {
+          if (type === 'board') {
+            return h(BoardTab, {
+              key: tab.id,
+              tab,
+              selected:
+                activeWorkspace === 'board' && tab.id === activeBoardTabId,
+              closeable: true,
+              onClick: () => this.handleBoardTabClick(tab.id),
+              onClose: (evt) =>
+                this.handleBoardTabCloseButtonClick(evt, tab.id),
+            })
+          }
+          if (type === 'online-game') {
+            return h(OnlineGameTab, {
+              key: tab.id,
+              tab,
+              selected:
+                activeWorkspace === 'online-game' &&
+                tab.id === activeOnlineGameTabId,
+              closeable: true,
+              onClick: () => this.handleOnlineGameTabClick(tab.id),
+              onClose: (evt) =>
+                this.handleOnlineGameTabCloseButtonClick(evt, tab.id),
+            })
+          }
+          return h(WorkspaceTab, {
             key: tab.id,
             tab,
             selected:
@@ -116,11 +124,31 @@ export default class AppTabs extends Component {
             onClick: () => this.handleWorkspaceTabClick(tab.id),
             onClose: (evt) =>
               this.handleWorkspaceTabCloseButtonClick(evt, tab.id),
-          }),
-        ),
+          })
+        }),
       ),
     )
   }
+}
+
+function getOrderedTabs(order, boardTabs, onlineGameTabs, workspaceTabs) {
+  let byKey = new Map([
+    ...boardTabs.map((tab) => [`board:${tab.id}`, {type: 'board', tab}]),
+    ...onlineGameTabs.map((tab) => [
+      `online-game:${tab.id}`,
+      {type: 'online-game', tab},
+    ]),
+    ...workspaceTabs.map((tab) => [
+      `workspace:${tab.id}`,
+      {type: 'workspace', tab},
+    ]),
+  ])
+  let result = (order || []).map((key) => byKey.get(key)).filter(Boolean)
+  let known = new Set(order || [])
+  for (let [key, tab] of byKey) {
+    if (!known.has(key)) result.push(tab)
+  }
+  return result
 }
 
 function BoardTab({tab, selected, closeable, onClick, onClose}) {

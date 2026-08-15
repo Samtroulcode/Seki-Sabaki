@@ -448,6 +448,7 @@ class App extends Component {
         activeOnlineGameTabId: state.activeOnlineGameTabId,
         workspaceTabs: state.workspaceTabs,
         activeWorkspaceTabId: state.activeWorkspaceTabId,
+        activityTabOrder: state.activityTabOrder,
       }),
 
       h(MatchmakingToast),

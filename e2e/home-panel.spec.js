@@ -70,6 +70,9 @@ test.describe('Home panel navigation', () => {
     await expect(
       page.locator('.app-workspace-tab.type-ogs.selected'),
     ).toHaveCount(1)
+    await expect(
+      page.locator('.app-activity-tabs > .app-board-tab'),
+    ).toHaveCount(1)
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
@@ -82,6 +85,14 @@ test.describe('Home panel navigation', () => {
     await expect(
       page.locator('.app-workspace-tab.type-library.selected'),
     ).toHaveCount(1)
+    let tabClasses = await page
+      .locator('.app-activity-tabs > div')
+      .evaluateAll((tabs) => tabs.map((tab) => tab.className))
+    expect(tabClasses).toEqual([
+      'app-board-tab',
+      'app-workspace-tab type-ogs',
+      'app-workspace-tab type-library selected',
+    ])
     await page
       .locator('.app-workspace-tab.type-library .app-workspace-tab-close')
       .click()
