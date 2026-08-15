@@ -31,6 +31,8 @@ export function OgsGameHistoryPanel({
   onAnalyzeSeki,
   onOpenOgs,
 }) {
+  let currentUserId = onlineStore.getState().user?.id ?? null
+
   return h(
     'section',
     {class: `ogs-history ${compact ? 'compact' : ''}`},
@@ -70,6 +72,7 @@ export function OgsGameHistoryPanel({
               h(OgsGameHistoryCard, {
                 key: game.id,
                 game,
+                currentUserId,
                 onOpenGame,
                 onAnalyzeOgs,
                 onAnalyzeSeki,
@@ -100,12 +103,20 @@ export function OgsGameHistoryPanel({
   )
 }
 
-function OgsGameHistoryCard({game, onOpenGame, onAnalyzeOgs, onAnalyzeSeki}) {
+function OgsGameHistoryCard({
+  game,
+  currentUserId,
+  onOpenGame,
+  onAnalyzeOgs,
+  onAnalyzeSeki,
+}) {
+  let outcome = getGameOutcome(game, currentUserId)
+
   return h(
     'article',
     {
       type: 'button',
-      class: 'ogs-history-card',
+      class: `ogs-history-card ${outcome.status}`,
       role: 'button',
       tabIndex: 0,
       onClick: () => onOpenGame?.(game.id),
@@ -116,6 +127,14 @@ function OgsGameHistoryCard({game, onOpenGame, onAnalyzeOgs, onAnalyzeSeki}) {
         }
       },
     },
+    outcome.winner != null &&
+      h(
+        'span',
+        {class: 'ogs-history-outcome'},
+        outcome.status === 'won' ? '✓' : outcome.status === 'lost' ? '×' : '',
+        ' ',
+        outcome.winner,
+      ),
     h(LazyMiniGoban, {game}),
     h(
       'span',
@@ -203,6 +222,19 @@ function resultWinner(result) {
   if (color === 'B') return t('Black')
   if (color === 'W') return t('White')
   return null
+}
+
+function getGameOutcome(game, currentUserId) {
+  let winner = resultWinner(game.result)
+  if (winner == null) return {status: '', winner: null}
+
+  let winnerId = winner === t('Black') ? game.black?.id : game.white?.id
+  let status = ''
+  if (currentUserId != null && winnerId != null) {
+    status = Number(winnerId) === Number(currentUserId) ? 'won' : 'lost'
+  }
+
+  return {status, winner}
 }
 
 class LazyMiniGoban extends Component {

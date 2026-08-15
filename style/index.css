@@ -2645,6 +2645,7 @@ button:active {
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 }
 .ogs-history-card {
+  position: relative;
   display: grid;
   grid-template-rows: auto auto;
   align-self: start;
@@ -2657,6 +2658,30 @@ button:active {
   background: #181818;
   color: #ddd;
   text-align: left;
+}
+.ogs-history-card.won {
+  border-color: rgba(55, 190, 105, 0.72);
+}
+.ogs-history-card.lost {
+  border-color: rgba(220, 75, 75, 0.72);
+}
+.ogs-history-outcome {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #ddd;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+.ogs-history-card.won .ogs-history-outcome {
+  color: #62db91;
+}
+.ogs-history-card.lost .ogs-history-outcome {
+  color: #ff8585;
 }
 .ogs-history.compact .ogs-history-card {
   height: fit-content;
