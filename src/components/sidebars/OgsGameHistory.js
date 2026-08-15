@@ -146,6 +146,12 @@ function OgsGameHistoryCard({game, onOpenGame, onAnalyzeOgs, onAnalyzeSeki}) {
         {class: 'ogs-history-result'},
         resultStone(game.result),
         game.result || t('Result unknown'),
+        resultWinner(game.result) != null &&
+          h(
+            'span',
+            {class: 'ogs-history-winner'},
+            ` · ${resultWinner(game.result)}`,
+          ),
       ),
       h(
         'span',
@@ -190,6 +196,13 @@ function resultStone(result) {
   if (color !== 'B' && color !== 'W') return null
 
   return h('i', {class: `ogs-stone ${color === 'B' ? 'black' : 'white'}`})
+}
+
+function resultWinner(result) {
+  let color = typeof result === 'string' ? result.trim()[0] : null
+  if (color === 'B') return t('Black')
+  if (color === 'W') return t('White')
+  return null
 }
 
 class LazyMiniGoban extends Component {

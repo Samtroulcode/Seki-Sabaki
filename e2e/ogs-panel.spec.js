@@ -645,6 +645,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-history-card')).toContainText('sekibot')
     await expect(page.locator('.ogs-history-card')).toContainText('opponent')
     await expect(page.locator('.ogs-history-card')).toContainText('B+R')
+    await expect(page.locator('.ogs-history-winner')).toHaveText(' · Black')
     await expect(
       page.locator('.ogs-history-actions button', {hasText: 'Analyze OGS'}),
     ).toBeVisible()
