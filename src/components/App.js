@@ -382,15 +382,13 @@ class App extends Component {
     let reviewMatchesBoard =
       activeReview != null &&
       (state.onlineGameId === activeReview.gameId ||
-        rootSource.includes(`/game/${activeReview.gameId}`))
+        new RegExp(`/game/${activeReview.gameId}(?:/|$)`).test(rootSource))
     let ogsAnalysis = getOgsReviewAnalysis(
       reviewMatchesBoard ? state.ogsReviewState : null,
       tree,
       state.treePosition,
     )
-    let hasOgsReview =
-      state.ogsReviewState != null &&
-      Object.keys(state.ogsReviewState.reviews || {}).length > 0
+    let hasOgsReview = reviewMatchesBoard
     state = {
       ...state,
       ...inferredState,

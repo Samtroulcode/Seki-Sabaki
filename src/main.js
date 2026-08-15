@@ -23,6 +23,32 @@ const {openExternalUrl} = require('./shell')
 let windows = []
 let openfile = null
 let isQuitting = false
+let explicitOzonePlatform = process.argv
+  .find((arg) => arg.startsWith('--ozone-platform='))
+  ?.split('=')[1]
+let runningWayland =
+  process.platform === 'linux' &&
+  !!process.env.WAYLAND_DISPLAY &&
+  explicitOzonePlatform !== 'x11'
+
+// Electron 43 can hang during first paint on Wayland when Vulkan is selected.
+// Prefer XWayland when it is available; explicit Electron CLI flags remain
+// authoritative for users who need a different backend.
+if (
+  runningWayland &&
+  process.env.DISPLAY &&
+  !process.argv.some((arg) => arg.startsWith('--ozone-platform='))
+) {
+  app.commandLine.appendSwitch('ozone-platform', 'x11')
+}
+
+if (
+  runningWayland &&
+  !process.argv.includes('--disable-gpu') &&
+  !process.argv.includes('--enable-gpu')
+) {
+  app.commandLine.appendSwitch('disable-gpu')
+}
 
 function newWindow(path) {
   let window = new BrowserWindow({

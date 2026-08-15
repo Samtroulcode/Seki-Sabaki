@@ -27,7 +27,7 @@ function createOgsReviewApi({serverUrl, fetch}) {
       }
 
       let body = await readLimitedBody(response)
-      if (body.length > maxReviewResponseBytes) {
+      if (Buffer.byteLength(body, 'utf8') > maxReviewResponseBytes) {
         throw new Error('OGS AI reviews response is too large.')
       }
 

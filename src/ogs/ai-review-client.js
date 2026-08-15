@@ -164,7 +164,15 @@ class OgsAiReviewClient {
     let uuid = data[0]
     let payload = data[1]
     let review = this.state.reviews[uuid]
-    if (typeof uuid !== 'string' || review == null || payload == null) return
+    if (
+      typeof uuid !== 'string' ||
+      !/^[0-9a-f-]{16,80}$/i.test(uuid) ||
+      !Object.prototype.hasOwnProperty.call(this.state.reviews, uuid) ||
+      review == null ||
+      payload == null
+    ) {
+      return
+    }
 
     let update = sanitizeReviewUpdate(payload)
     if (update == null) return
