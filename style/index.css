@@ -2642,7 +2642,8 @@ button:active {
   gap: 0.9rem;
 }
 .ogs-history.compact .ogs-history-grid {
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 22rem));
+  justify-content: start;
 }
 .ogs-history-card {
   position: relative;
