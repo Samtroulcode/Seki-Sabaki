@@ -5,17 +5,17 @@ Sabaki-style feature workspace into a clearer application for everyday use.
 
 ## Product Decision
 
-Seki should not replace the left AppRail with a simple horizontal list of the
-same app sections. Tabs should represent concrete work the user has open, not
-just product categories.
+Seki should use a permanent Home tab followed by ordinary closeable workspace
+and activity tabs. Home is the discovery hub; substantial product areas such as
+Library, OGS, and Analysis become tabs when the user opens them.
 
 Target principle:
 
-> Home is the permanent hub. Tabs are open activities.
+> Home is permanent. Every other open workspace or activity is an ordinary tab.
 
 Corollary:
 
-> Global singleton areas live inside Home, not as app tabs.
+> Home stays lightweight; full workspaces live in closeable tabs.
 
 Examples of good tabs:
 
@@ -35,7 +35,9 @@ Examples of tabs to avoid as the only model:
 - `Library`
 - `Analysis`
 
-Those are product areas, not necessarily user work objects.
+These areas are ordinary tabs when opened. They are reused rather than
+duplicated in the initial implementation: one OGS, one Library, and one Analysis
+tab at a time.
 
 ## Why This Is Better
 
@@ -64,34 +66,35 @@ not:
 - The safe fallback when no other tabs are open.
 - Owns product discovery, quick actions, recent/continue cards, and module
   previews.
-- Owns singleton/global areas through internal Home navigation, rather than
-  promoting them to app tabs.
+- Opens full workspaces in ordinary tabs instead of embedding their complete
+  workflows inside Home.
 
-Home internal navigation can use a sidebar or similar local navigation pattern.
-It should organize global sections such as:
+Home can still use lightweight navigation buttons for opening workspaces such
+as:
 
-- Dashboard;
-- OGS overview: account, connection, active games, matchmaking, invitations;
-- Library / SGF Explorer overview;
-- Analysis setup, queue, and global status;
+- OGS overview: account, connection, matchmaking, and history;
+- Library / SGF Explorer;
+- Analysis setup, queue, and results;
 - Engines and reusable service status.
 
-These Home sections are not closeable app tabs. They are part of the permanent
-hub. Selecting a concrete item from them can still open an activity tab: for
-example, choosing an active OGS game opens an `online-game` tab, and choosing an
-SGF opens a `board` tab.
+Home itself is not closeable. The opened OGS, Library, and Analysis workspaces
+are closeable ordinary tabs. Selecting a concrete item from them can still open
+an activity tab: choosing an SGF opens a `board` tab, and a live game opens an
+`online-game` tab.
 
-### Activity Tabs
+### Ordinary Workspace And Activity Tabs
 
-Activity tabs represent user work. They are generally closeable and should have
-human titles.
+All non-Home tabs are generally closeable and should have human titles. They may
+represent a full workspace or a concrete user activity.
 
 Initial activity tab candidates:
 
 - local board tab;
 - opened SGF tab;
 - online game tab;
-- analysis/report tab.
+- OGS workspace tab;
+- Library workspace tab;
+- Analysis workspace/report tab.
 
 Later candidates:
 

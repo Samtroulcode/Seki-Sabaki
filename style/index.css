@@ -81,7 +81,8 @@
   overflow-y: hidden;
 }
 #apptabs .app-board-tab,
-#apptabs .app-online-game-tab {
+#apptabs .app-online-game-tab,
+#apptabs .app-workspace-tab {
   display: flex;
   align-items: stretch;
   min-width: 8rem;
@@ -90,19 +91,22 @@
   border-radius: 5px 5px 0 0;
 }
 #apptabs .app-board-tab.selected,
-#apptabs .app-online-game-tab.selected {
+#apptabs .app-online-game-tab.selected,
+#apptabs .app-workspace-tab.selected {
   background: #292a2d;
   box-shadow: inset 0 -3px 0 #0082f0;
 }
 #apptabs .app-board-tab-button,
-#apptabs .app-online-game-tab-button {
+#apptabs .app-online-game-tab-button,
+#apptabs .app-workspace-tab-button {
   flex: 1 1 auto;
   gap: 0.5rem;
   margin: 0;
   border-radius: 5px 0 0 0;
 }
 #apptabs .app-board-tab-close,
-#apptabs .app-online-game-tab-close {
+#apptabs .app-online-game-tab-close,
+#apptabs .app-workspace-tab-close {
   flex: 0 0 auto;
   width: 1.7rem;
   margin: 0;
@@ -113,11 +117,19 @@
 #apptabs .app-board-tab-close:hover,
 #apptabs .app-board-tab-close:focus,
 #apptabs .app-online-game-tab-close:hover,
-#apptabs .app-online-game-tab-close:focus {
+#apptabs .app-online-game-tab-close:focus,
+#apptabs .app-workspace-tab-close:hover,
+#apptabs .app-workspace-tab-close:focus {
   color: white;
 }
 #apptabs .app-online-game-tab.selected {
   box-shadow: inset 0 -3px 0 #46a758;
+}
+#apptabs .app-workspace-tab.type-ogs.selected {
+  box-shadow: inset 0 -3px 0 #46a758;
+}
+#apptabs .app-workspace-tab.type-analysis.selected {
+  box-shadow: inset 0 -3px 0 #b06cff;
 }
 #apptabs .app-activity-tab {
   gap: 0.5rem;
@@ -454,6 +466,9 @@
 }
 .home-recent-games .home-ogs-history-card {
   min-height: 0;
+}
+.home-ogs-history-card.is-disabled {
+  opacity: 0.55;
 }
 .home-online-panel {
   display: grid;

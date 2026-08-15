@@ -40,6 +40,13 @@ export default class AppTabs extends Component {
 
       sabaki.closeOnlineGameTab(id)
     }
+
+    this.handleWorkspaceTabClick = (id) => sabaki.switchWorkspaceTab(id)
+
+    this.handleWorkspaceTabCloseButtonClick = (evt, id) => {
+      evt.stopPropagation()
+      sabaki.closeWorkspaceTab(id)
+    }
   }
 
   render({
@@ -48,8 +55,10 @@ export default class AppTabs extends Component {
     activeBoardTabId,
     onlineGameTabs = [],
     activeOnlineGameTabId,
+    workspaceTabs = [],
+    activeWorkspaceTabId,
   }) {
-    let homeSelected = !['board', 'online-game'].includes(activeWorkspace)
+    let homeSelected = activeWorkspace === 'home'
 
     return h(
       'nav',
@@ -95,6 +104,18 @@ export default class AppTabs extends Component {
             onClick: () => this.handleOnlineGameTabClick(tab.id),
             onClose: (evt) =>
               this.handleOnlineGameTabCloseButtonClick(evt, tab.id),
+          }),
+        ),
+        workspaceTabs.map((tab) =>
+          h(WorkspaceTab, {
+            key: tab.id,
+            tab,
+            selected:
+              activeWorkspace === 'workspace-tab' &&
+              tab.id === activeWorkspaceTabId,
+            onClick: () => this.handleWorkspaceTabClick(tab.id),
+            onClose: (evt) =>
+              this.handleWorkspaceTabCloseButtonClick(evt, tab.id),
           }),
         ),
       ),
@@ -178,6 +199,43 @@ function OnlineGameTab({tab, selected, closeable, onClick, onClose}) {
         },
         '×',
       ),
+  )
+}
+
+function WorkspaceTab({tab, selected, onClick, onClose}) {
+  let title =
+    tab.type === 'ogs'
+      ? t('OGS')
+      : tab.type === 'analysis'
+        ? t('Analysis')
+        : t('Library')
+
+  return h(
+    'div',
+    {class: classNames('app-workspace-tab', `type-${tab.type}`, {selected})},
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'app-workspace-tab-button',
+        title,
+        'aria-label': title,
+        'aria-current': selected ? 'page' : undefined,
+        onClick,
+      },
+      h('span', {class: 'app-activity-tab-title'}, title),
+    ),
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'app-workspace-tab-close',
+        title: t('Close tab'),
+        'aria-label': t('Close ') + title,
+        onClick: onClose,
+      },
+      '×',
+    ),
   )
 }
 

@@ -3,6 +3,7 @@ import {h, Component} from 'preact'
 import AnalysisPanel from './sidebars/AnalysisPanel.js'
 import HomeDashboard from './HomeDashboard.js'
 import HomePlaceholder from './HomePlaceholder.js'
+import LibraryPanel from './LibraryPanel.js'
 import OgsPanel from './sidebars/OgsPanel.js'
 
 import i18n from '../i18n.js'
@@ -15,10 +16,11 @@ export default class HomeView extends Component {
     super(props)
 
     this.handleNavigate = (homeSection) => {
-      sabaki.setState({
-        activeWorkspace: 'home',
-        homeSection,
-      })
+      if (['ogs', 'analysis', 'library'].includes(homeSection)) {
+        sabaki.openWorkspaceTab(homeSection)
+      } else {
+        sabaki.setState({activeWorkspace: 'home', homeSection})
+      }
     }
   }
 
@@ -44,21 +46,7 @@ function renderHomeSection(activeSection, props, onNavigate) {
     case 'analysis':
       return h(AnalysisPanel)
     case 'library':
-      return h(
-        HomePlaceholder,
-        {
-          id: 'home-library',
-          title: t('Library'),
-          description: t(
-            'Folder browsing and mini goban previews will live here.',
-          ),
-        },
-        h(
-          'button',
-          {type: 'button', onClick: () => sabaki.openFileInNewBoardTab()},
-          t('Open SGF'),
-        ),
-      )
+      return h(LibraryPanel)
     case 'engines':
       return h(HomePlaceholder, {
         id: 'home-engines',

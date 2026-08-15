@@ -3,6 +3,7 @@ import i18n from '../i18n.js'
 import onlineStore from '../modules/onlinestore.js'
 import {defaultMatchmakingOptions} from './sidebars/ogsPanelData.js'
 import HomeBoardPreview from './HomeBoardPreview.js'
+import {LoginForm} from './sidebars/OgsPanelAccount.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -61,6 +62,20 @@ export default class HomeOnlinePanel extends Component {
       presetId: timePresets[19].byoyomi[1][0],
     }
 
+    this.handleUsernameInput = (evt) => {
+      onlineStore.setUsername(evt.currentTarget.value)
+    }
+
+    this.handleSubmit = async (evt) => {
+      evt.preventDefault()
+      let username = onlineStore.getState().username.trim()
+      let password = this.passwordInputElement?.value || ''
+      if (username === '') return
+      if (this.passwordInputElement != null)
+        this.passwordInputElement.value = ''
+      await onlineStore.login(username, password)
+    }
+
     this.handleBoardSizeChange = (boardSize) => {
       let presets = timePresets[boardSize][this.state.clockMode]
       this.setState({boardSize, presetId: presets[1][0]})
@@ -97,6 +112,21 @@ export default class HomeOnlinePanel extends Component {
     let authenticated = onlineState.socket?.status === 'authenticated'
     let presets = timePresets[boardSize][clockMode]
     let selectedPreset = presets.find((preset) => preset[0] === presetId)
+
+    if (!authenticated) {
+      return h(
+        'section',
+        {class: 'home-online-panel'},
+        h(LoginForm, {
+          username: onlineState.username,
+          busy: onlineState.busy,
+          error: onlineState.error,
+          passwordRef: (el) => (this.passwordInputElement = el),
+          onUsernameInput: this.handleUsernameInput,
+          onSubmit: this.handleSubmit,
+        }),
+      )
+    }
 
     return h(
       'section',

@@ -104,11 +104,7 @@ export default class RecentlyOpenedGames extends Component {
           'button',
           {
             type: 'button',
-            onClick: () =>
-              sabaki.setState({
-                activeWorkspace: 'home',
-                homeSection: 'library',
-              }),
+            onClick: () => sabaki.openWorkspaceTab('library'),
           },
           t('Open Library'),
         ),

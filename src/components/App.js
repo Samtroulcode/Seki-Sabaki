@@ -19,6 +19,9 @@ import InputBox from './InputBox.js'
 import BusyScreen from './BusyScreen.js'
 import InfoOverlay from './InfoOverlay.js'
 import MatchmakingToast from './MatchmakingToast.js'
+import LibraryPanel from './LibraryPanel.js'
+import AnalysisPanel from './sidebars/AnalysisPanel.js'
+import OgsPanel from './sidebars/OgsPanel.js'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
@@ -443,6 +446,8 @@ class App extends Component {
         activeBoardTabId: state.activeBoardTabId,
         onlineGameTabs: state.onlineGameTabs,
         activeOnlineGameTabId: state.activeOnlineGameTabId,
+        workspaceTabs: state.workspaceTabs,
+        activeWorkspaceTabId: state.activeWorkspaceTabId,
       }),
 
       h(MatchmakingToast),
@@ -501,9 +506,21 @@ function renderWorkspace(state) {
       return h(MainView, state)
     case 'online-game':
       return h(OnlineGameView, state)
+    case 'workspace-tab':
+      return renderWorkspaceTab(state)
     default:
       return h(MainView, state)
   }
+}
+
+function renderWorkspaceTab(state) {
+  let tab = state.workspaceTabs?.find(
+    (candidate) => candidate.id === state.activeWorkspaceTabId,
+  )
+  if (tab?.type === 'ogs') return h(OgsPanel)
+  if (tab?.type === 'analysis') return h(AnalysisPanel)
+  if (tab?.type === 'library') return h(LibraryPanel)
+  return h(HomeView, {...state, homeSection: 'dashboard'})
 }
 
 // Render

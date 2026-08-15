@@ -14,8 +14,7 @@ test.describe('Home panel navigation', () => {
     )
     await expect(page.locator('#home')).toContainText('Your Go workspace')
     await expect(page.locator('.home-sidebar')).toHaveCount(0)
-    await expect(page.locator('#home')).toContainText('Board size')
-    await expect(page.locator('#home')).toContainText('Play online')
+    await expect(page.locator('#home')).toContainText('Connect account')
     await expect(page.locator('#home')).not.toContainText('Status')
     await expect(page.locator('#home')).toContainText('Recent OGS games')
     await expect(page.locator('#home')).toContainText(
@@ -28,27 +27,8 @@ test.describe('Home panel navigation', () => {
     ).toBeVisible()
     await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
     await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
-    await expect(page.locator('.home-online-panel')).toContainText(
-      'Play online',
-    )
     await expect(
       page.locator('.home-board-preview .ogs-mini-goban'),
-    ).toBeVisible()
-    await expect(
-      page.locator('.home-online-preview .ogs-mini-goban'),
-    ).toBeVisible()
-    await page
-      .locator('.home-online-sizes')
-      .getByRole('button', {name: '9x9'})
-      .click()
-    await page
-      .locator('.home-online-modes')
-      .getByRole('button', {name: 'Fischer'})
-      .click()
-    await expect(
-      page
-        .locator('.home-online-presets')
-        .getByRole('button', {name: '2m + 7s'}),
     ).toBeVisible()
     await expect(
       page.locator('.home-board-sizes').getByRole('button', {name: '19x19'}),
@@ -83,11 +63,31 @@ test.describe('Home panel navigation', () => {
     await page.getByRole('button', {name: /Online play/}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(
-      page.locator('#apptabs').getByRole('button', {name: 'OGS'}),
-    ).toHaveCount(0)
+      page.locator('.app-workspace-tab.type-ogs .app-workspace-tab-button'),
+    ).toHaveCount(1)
+    await expect(
+      page.locator('.app-workspace-tab.type-ogs.selected'),
+    ).toHaveCount(1)
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
+
+    await page.getByRole('button', {name: 'Library', exact: true}).click()
+    await expect(page.locator('#library-dashboard')).toBeVisible()
+    await expect(page.locator('.library-setup-card')).toContainText(
+      'Choose your Library folder',
+    )
+    await expect(
+      page.locator('.app-workspace-tab.type-library.selected'),
+    ).toHaveCount(1)
+    await page
+      .locator('.app-workspace-tab.type-library .app-workspace-tab-close')
+      .click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await expect(
+      page.locator('.app-workspace-tab.type-ogs.selected'),
+    ).toHaveCount(1)
+    await page.getByTitle('Home').click()
 
     await page
       .locator('#home')

@@ -21,15 +21,12 @@ engine/analysis state, and dedicated OGS online-game activity tabs.
 ## Decisions
 
 - Home is the central product hub.
-- Target navigation model: Home is permanent and non-closeable; tabs should
-  represent open activities such as boards, SGFs, OGS games, and reports rather
-  than merely replacing AppRail with feature-category tabs.
-- Current Home internal navigation foundation has Dashboard, OGS, Library,
-  Analysis, and Engines sections; OGS Overview and Analysis setup are no longer
-  modeled as app tabs.
-- Global singleton areas belong inside Home internal navigation, not in app
-  tabs. This includes OGS Overview, Library overview, Analysis setup/status, and
-  engine status.
+- Target navigation model: Home is permanent and non-closeable; every other
+  workspace or activity is an ordinary closeable tab.
+- Home remains a lightweight dashboard with quick actions, recent games,
+  continuation paths, and service summaries.
+- OGS, Library, and Analysis open as full ordinary tabs. Concrete boards, online
+  games, and reports remain ordinary activity tabs as well.
 - Manage Games remains a board-internal SGF collection tool, not an app-level
   tab system. Its UI should be clarified so users understand those mini-gobans
   are games inside the current board document.
@@ -77,8 +74,7 @@ engine/analysis state, and dedicated OGS online-game activity tabs.
   reusable Library/Board modules.
 - Decide how far the first dedicated Online Game workspace should go before the
   broader OGS panel polish phase.
-- Decide the exact Home internal navigation shape, likely a sidebar, for
-  Dashboard, OGS, Library, Analysis, Engines, and future global sections.
+- Decide the final ordering and visual grouping of workspace and activity tabs.
 - Decide startup restoration policy for tabs: Home only, previous tabs, or later
   user preference.
 - Decide the final user-facing label for Manage Games: `Games in this file`,
@@ -94,9 +90,9 @@ Product rule:
 
 > Home is the permanent hub. Tabs are open activities.
 
-Global singleton areas are Home sections, not app tabs. `OGS Overview` is the
-clearest example: it should live under Home internal navigation, while a
-specific OGS game opens an online-game tab.
+Home is the permanent hub, while full OGS, Library, and Analysis workflows open
+in ordinary closeable tabs. A specific OGS game still opens its own online-game
+activity tab.
 
 This means Seki should not simply move the existing AppRail entries into a top
 tab bar. Tabs should eventually represent user work objects, for example:
@@ -132,9 +128,8 @@ tab bar. Tabs should eventually represent user work objects, for example:
 - Board tabs own live engines and live board analysis state.
 - OGS live games, future OGS chats, communities, profiles, study rooms, and
   reports are valid future tab types when scoped to concrete activities.
-- OGS Overview, Library overview, Analysis setup/status, and engine status
-  should be modeled as Home sections unless a future flow turns into a concrete
-  repeatable activity.
+- OGS overview, Library, and Analysis are ordinary workspace tabs; Home only
+  carries their compact summaries and entry points.
 - A visual-only TabBar can mislead users if it appears to support true
   multi-document behavior before the state model does.
 - Closing tabs must not lose unsaved SGF work or live OGS state.
@@ -385,10 +380,12 @@ Purpose: answer “What should I learn from this game?”
 - [x] Move attached live engines and live board analysis fully into board-tab
       state.
 - [x] Add dedicated online-game tabs for OGS live play.
+- [x] Keep Home permanent while making OGS, Library, and Analysis ordinary
+      closeable workspace tabs.
 
 ### Phase 3 — Library MVP
 
-- [ ] Decide default library root.
+- [x] Define a user-selected Library root with explicit setup warning.
 - [ ] Add library listing logic.
 - [ ] Add folder and SGF metadata display.
 - [ ] Add import/copy behavior without silently moving user files.
@@ -443,6 +440,10 @@ Purpose: answer “What should I learn from this game?”
 - Avoid live OGS/network requirements in automated tests.
 
 ## Last Updated
+
+2026-08-15 — Navigation model revised: Home is the only permanent tab; OGS,
+Library, and Analysis now open as ordinary closeable workspace tabs. Library
+setup and optional OGS connection states are being built within that model.
 
 2026-08-15 — OGS panel checkpoint: recent history is available on Home, the
 misleading `Active games` card was removed, matchmaking status is global across

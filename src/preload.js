@@ -148,6 +148,11 @@ window.sabaki = {
     open: (id) => ipcRenderer.invoke('recentFiles:open', id),
   },
 
+  library: {
+    getConfig: () => ipcRenderer.invoke('library:getConfig'),
+    chooseRoot: () => ipcRenderer.invoke('library:chooseRoot'),
+  },
+
   // Menu
   menu: {
     popup: (template, x, y) => ipcRenderer.invoke('menu:popup', template, x, y),

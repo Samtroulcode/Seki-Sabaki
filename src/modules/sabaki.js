@@ -124,6 +124,8 @@ class Sabaki extends EventEmitter {
       activeBoardTabId: null,
       onlineGameTabs: [],
       activeOnlineGameTabId: null,
+      workspaceTabs: [],
+      activeWorkspaceTabId: null,
 
       // Bars
 
@@ -300,6 +302,18 @@ class Sabaki extends EventEmitter {
   setState(change, callback = null) {
     if (typeof change === 'function') {
       change = change(this.state)
+    }
+
+    let legacyWorkspaceType = {
+      online: 'ogs',
+      analysis: 'analysis',
+      'sgf-explorer': 'library',
+    }[change?.activeWorkspace]
+    if (legacyWorkspaceType != null) {
+      let {activeWorkspace, homeSection, ...rest} = change
+      this.openWorkspaceTab(legacyWorkspaceType)
+      if (Object.keys(rest).length > 0) this.setState(rest, callback)
+      return
     }
 
     change = normalizeWorkspaceChange(change)
@@ -540,6 +554,57 @@ class Sabaki extends EventEmitter {
 
   switchBoardTab(id) {
     return this.applyBoardTab(this.getBoardTab(id))
+  }
+
+  getWorkspaceTab(id) {
+    return this.state.workspaceTabs.find((tab) => tab.id === id) || null
+  }
+
+  openWorkspaceTab(type) {
+    if (!['ogs', 'analysis', 'library'].includes(type)) return false
+
+    let tab = this.state.workspaceTabs.find(
+      (candidate) => candidate.type === type,
+    )
+    if (tab == null) {
+      tab = {id: uuid(), type}
+      this.state.workspaceTabs = [...this.state.workspaceTabs, tab]
+    }
+
+    this.setState({
+      activeWorkspace: 'workspace-tab',
+      activeWorkspaceTabId: tab.id,
+      workspaceTabs: this.state.workspaceTabs,
+    })
+    return tab
+  }
+
+  switchWorkspaceTab(id) {
+    let tab = this.getWorkspaceTab(id)
+    if (tab == null) return false
+
+    this.setState({activeWorkspace: 'workspace-tab', activeWorkspaceTabId: id})
+    return true
+  }
+
+  closeWorkspaceTab(id) {
+    let index = this.state.workspaceTabs.findIndex((tab) => tab.id === id)
+    if (index < 0) return false
+
+    let wasActive = id === this.state.activeWorkspaceTabId
+    let tabs = this.state.workspaceTabs.filter((tab) => tab.id !== id)
+    if (!wasActive) {
+      this.setState({workspaceTabs: tabs})
+      return true
+    }
+
+    let nextTab = tabs[Math.max(0, index - 1)] || tabs[0] || null
+    this.setState({
+      workspaceTabs: tabs,
+      activeWorkspace: nextTab == null ? 'home' : 'workspace-tab',
+      activeWorkspaceTabId: nextTab?.id || null,
+    })
+    return true
   }
 
   applyOnlineGameTab(tab, {syncCurrent = true} = {}) {
@@ -1841,7 +1906,7 @@ class Sabaki extends EventEmitter {
     )
 
     if (result?.ok) {
-      this.setState({activeWorkspace: 'home', homeSection: 'analysis'})
+      this.openWorkspaceTab('analysis')
     } else if (result?.error?.message != null) {
       await dialog.showMessageBox(result.error.message, 'warning')
     } else if (result == null) {
@@ -4858,16 +4923,7 @@ function getOgsColorPlayerLabel(color, player) {
 }
 
 function normalizeWorkspaceChange(change) {
-  let homeSectionByWorkspace = {
-    online: 'ogs',
-    analysis: 'analysis',
-    'sgf-explorer': 'library',
-  }
-  let homeSection = homeSectionByWorkspace[change.activeWorkspace]
-
-  return homeSection == null
-    ? change
-    : {...change, activeWorkspace: 'home', homeSection}
+  return change
 }
 
 export default new Sabaki()

@@ -58,7 +58,7 @@ export default class HomeDashboard extends Component {
     }
 
     this.handleOgsHistoryButtonClick = () => {
-      sabaki.setState({activeWorkspace: 'home', homeSection: 'ogs'})
+      sabaki.openWorkspaceTab('ogs')
     }
 
     this.handleOgsHistoryRefresh = async () => {
@@ -295,7 +295,11 @@ export default class HomeDashboard extends Component {
               ),
               h(
                 'article',
-                {class: 'home-card home-ogs-history-card'},
+                {
+                  class: `home-card home-ogs-history-card ${
+                    ogsAuthenticated ? '' : 'is-disabled'
+                  }`,
+                },
                 h(OgsGameHistoryPanel, {
                   games: ogsHistoryPreview,
                   busy: onlineState.gameHistoryBusy,
@@ -307,7 +311,9 @@ export default class HomeDashboard extends Component {
                   onOpenGame: this.handleOgsHistoryGameClick,
                   onAnalyzeOgs: this.handleAnalyzeOgs,
                   onAnalyzeSeki: this.handleAnalyzeSeki,
-                  onOpenOgs: this.handleOgsButtonClick,
+                  onOpenOgs: ogsAuthenticated
+                    ? this.handleOgsButtonClick
+                    : null,
                 }),
                 ogsAuthenticated &&
                   h(

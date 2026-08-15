@@ -20,6 +20,7 @@ const {setupOgsReviewIpcHandlers} = require('./ogs/review-ipc.js')
 const {setupSgfAnalysisIpcHandlers} = require('./sgfanalysis')
 const {openExternalUrl} = require('./shell')
 const recentFiles = require('./recentfiles')
+const library = require('./library')
 
 let windows = []
 let openfile = null
@@ -392,6 +393,7 @@ function setupIpcHandlers() {
   })
 
   let recentFilesApi = recentFiles.create(setting)
+  let libraryApi = library.create(setting, dialog)
   ipcMain.handle('recentFiles:list', (e) => {
     if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
     return recentFilesApi.list()
@@ -403,6 +405,25 @@ function setupIpcHandlers() {
   ipcMain.handle('recentFiles:open', (e, id) => {
     if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
     return recentFilesApi.open(id)
+  })
+  ipcMain.handle('library:getConfig', (e) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.getConfig()
+  })
+  ipcMain.handle('library:chooseRoot', async (e) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    let result = await libraryApi.chooseRoot(
+      BrowserWindow.fromWebContents(e.sender),
+    )
+    if (result.ok) {
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send('setting:change', {
+          key: 'library.root',
+          value: result.root,
+        })
+      })
+    }
+    return result
   })
   ipcMain.on('setting:getPathsSync', (e) => {
     try {
