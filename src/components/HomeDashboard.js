@@ -188,7 +188,6 @@ export default class HomeDashboard extends Component {
     let hasBoardTabs = boardTabs.length > 0
     let onlineState = this.state
     let ogsAuthenticated = onlineState.socket?.status === 'authenticated'
-    let automatchStatus = onlineState.matchmaking?.status
     let ogsHistoryPreview = getHistoryPreview(onlineState.gameHistory, 3)
     let selectedBoardSize = this.state.selectedBoardSize
     let previewDimensions = selectedBoardSize
@@ -315,28 +314,6 @@ export default class HomeDashboard extends Component {
           ),
         ),
       ),
-      ['searching', 'matched'].includes(automatchStatus) &&
-        h(
-          'div',
-          {class: 'home-matchmaking-toast', role: 'status'},
-          h(
-            'span',
-            {},
-            automatchStatus === 'matched'
-              ? t('Match found. Opening board…')
-              : t('Searching for an opponent…'),
-          ),
-          automatchStatus === 'searching' &&
-            h(
-              'button',
-              {
-                type: 'button',
-                disabled: onlineState.busy,
-                onClick: () => onlineStore.cancelAutomatch(),
-              },
-              t('Cancel'),
-            ),
-        ),
     )
   }
 }

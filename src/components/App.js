@@ -18,6 +18,7 @@ import DrawerManager from './DrawerManager.js'
 import InputBox from './InputBox.js'
 import BusyScreen from './BusyScreen.js'
 import InfoOverlay from './InfoOverlay.js'
+import MatchmakingToast from './MatchmakingToast.js'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
@@ -443,6 +444,8 @@ class App extends Component {
         onlineGameTabs: state.onlineGameTabs,
         activeOnlineGameTabId: state.activeOnlineGameTabId,
       }),
+
+      h(MatchmakingToast),
 
       h(TripleSplitContainer, {
         id: 'mainlayout',

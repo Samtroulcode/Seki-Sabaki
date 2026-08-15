@@ -367,7 +367,18 @@ test.describe('OGS mock panel', () => {
     await expect(
       page.getByRole('button', {name: 'Cancel search'}),
     ).toBeVisible()
+    await page.getByTitle('Home').click()
+    await expect(page.locator('.home-matchmaking-toast')).toHaveCount(1)
+    await expect(page.locator('.home-matchmaking-toast')).toBeVisible()
+    await page.getByRole('button', {name: 'New board'}).click()
+    await expect(page.locator('.home-matchmaking-toast')).toHaveCount(1)
+    await expect(page.locator('.home-matchmaking-toast')).toBeVisible()
+    await page.getByTitle('Home').click()
+    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.home-matchmaking-toast')).toHaveCount(1)
+    await expect(page.locator('.home-matchmaking-toast')).toBeVisible()
     await page.getByRole('button', {name: 'Cancel search'}).click()
+    await expect(page.locator('.home-matchmaking-toast')).toHaveCount(0)
     await expect(
       page.getByRole('button', {name: 'Find opponent'}),
     ).toBeVisible()
@@ -395,7 +406,7 @@ test.describe('OGS mock panel', () => {
       () =>
         window.__sabaki.state.activeWorkspace === 'online-game' &&
         window.__sabaki.state.onlineGameTabs.length === 1 &&
-        window.__sabaki.state.boardTabs.length === 0,
+        window.__sabaki.state.boardTabs.length === 1,
     )
     await expect(page.locator('#online-game')).toBeVisible()
     await expect(page.locator('#goban')).toBeVisible()
@@ -671,7 +682,7 @@ test.describe('OGS mock panel', () => {
       () =>
         window.__ogsDownloadedGames.includes(123) &&
         window.__sabaki.state.activeWorkspace === 'board' &&
-        window.__sabaki.state.boardTabs.length === 1,
+        window.__sabaki.state.boardTabs.length === 2,
     )
     await expect(page.locator('#goban')).toBeVisible()
   })
@@ -738,8 +749,14 @@ test.describe('OGS mock panel', () => {
         window.__sabaki.state.activeWorkspace === 'online-game' &&
         window.__sabaki.state.onlineGameId === 42 &&
         window.__sabaki.state.onlineGameTabs.length === 1 &&
+        window.__sabaki.state.activeOnlineGameTabId ===
+          window.__sabaki.state.onlineGameTabs[0].id &&
         window.__ogsAcknowledgedAutomatchGame === 42,
     )
+    await expect(page.locator('.app-online-game-tab.selected')).toHaveCount(1)
+    await expect(
+      page.locator('.app-online-game-tab-button[aria-current="page"]'),
+    ).toHaveCount(1)
     await expect(page.locator('#goban')).toBeVisible()
   })
 
