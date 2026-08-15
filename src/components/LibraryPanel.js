@@ -154,7 +154,10 @@ export default class LibraryPanel extends Component {
 
     return h(
       'section',
-      {id: 'library-dashboard', class: 'library-panel'},
+      {
+        id: 'library-dashboard',
+        class: `library-panel ${configured ? 'is-configured' : ''}`,
+      },
       h('h1', {}, t('Library')),
       h(
         'p',
@@ -273,7 +276,12 @@ function renderLibraryEntry(entry, onClick) {
       onClick: () => onClick(entry),
     },
     entry.type === 'directory'
-      ? h('span', {class: 'library-folder-icon'}, '▰')
+      ? h('img', {
+          class: 'library-folder-icon',
+          src: './node_modules/@primer/octicons/build/svg/file-directory-16.svg',
+          alt: '',
+          'aria-hidden': 'true',
+        })
       : h(MiniGoban, {
           board: preview,
           preview,

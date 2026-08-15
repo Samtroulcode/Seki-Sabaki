@@ -592,6 +592,9 @@
   box-sizing: border-box;
   overflow: auto;
 }
+.library-panel.is-configured {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
 .library-panel h1,
 .library-panel h2,
 .library-panel p {
@@ -620,6 +623,12 @@
   background: #111;
   border: 1px solid #292a2d;
   border-radius: 8px;
+}
+.library-browser-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 .library-setup-card h2,
 .library-browser-card h2 {
@@ -679,7 +688,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: 0.75rem;
-  max-height: calc(100vh - 18rem);
+  min-height: 0;
+  flex: 1 1 auto;
+  max-height: none;
+  height: 100%;
   overflow: auto;
   padding: 0.25rem;
 }
@@ -705,12 +717,14 @@
   width: 8rem;
 }
 .library-folder-icon {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 8rem;
   height: 8rem;
+  padding: 2rem;
+  box-sizing: border-box;
   color: #d6a84f;
-  font-size: 2.5rem;
+  filter: invert(77%) sepia(52%) saturate(551%) hue-rotate(359deg)
+    brightness(91%) contrast(88%);
 }
 .library-entry-name {
   max-width: 100%;
