@@ -137,9 +137,17 @@
 }
 #apptabs .app-activity-tab-title,
 #apptabs .app-activity-tab-meta {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+#apptabs .app-activity-tab-title {
+  flex: 1 1 auto;
+}
+#apptabs .app-online-game-tab-button {
+  min-width: 0;
+  overflow: hidden;
 }
 #apptabs .app-activity-tab-meta {
   color: #8cdcda;
@@ -2533,19 +2541,27 @@ button:active {
   padding-left: 1.2rem;
   max-height: 12rem;
   overflow: auto;
+  min-height: 4rem;
 }
 .ogs-game-context-chat-form {
   display: grid;
   grid-template-columns: 1fr auto;
+  align-items: end;
   gap: 0.35rem;
 }
-.ogs-game-context-chat-form input {
+.ogs-game-context-chat-form textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   min-width: 0;
   padding: 0.35rem 0.5rem;
   border: 1px solid #3a3b40;
   border-radius: 4px;
   background: #111;
   color: #eee;
+  font: inherit;
+  line-height: 1.35;
+  resize: vertical;
 }
 .ogs-game-context-chat-form button {
   padding: 0.35rem 0.7rem;
@@ -3441,6 +3457,18 @@ button:active {
     border-top: 1px solid #292a2d;
     border-left: 0;
     max-height: 32rem;
+  }
+  .ogs-game-context-header {
+    grid-template-columns: 1fr;
+  }
+  .ogs-game-context-live-status {
+    justify-self: start;
+  }
+  .ogs-game-context-chat-form {
+    grid-template-columns: 1fr;
+  }
+  .ogs-game-context-chat-form button {
+    justify-self: end;
   }
   .ogs-panel,
   .analysis-panel {

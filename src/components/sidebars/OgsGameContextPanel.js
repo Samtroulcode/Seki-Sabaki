@@ -439,12 +439,12 @@ function ChatSection({chat = [], body = '', disabled, onInput, onSubmit}) {
     h(
       'form',
       {class: 'ogs-game-context-chat-form', onSubmit},
-      h('input', {
-        type: 'text',
+      h('textarea', {
         name: 'ogsChatMessage',
         value: body,
         maxlength: 1000,
         placeholder: t('Send a message…'),
+        rows: 2,
         disabled,
         onInput,
       }),

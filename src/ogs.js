@@ -421,6 +421,9 @@ class OgsClient {
     this.lastNetworkPingClient = null
     this.lastNetworkPongClient = null
     this.friends = []
+    this.pendingPlayerProfileRequests = new Map()
+    this.playerProfileCache = new Map()
+    this.onlineGameRevision = 0
   }
 
   getSession() {
@@ -472,6 +475,9 @@ class OgsClient {
     this.lastNetworkPingClient = null
     this.lastNetworkPongClient = null
     this.friends = []
+    this.pendingPlayerProfileRequests = new Map()
+    this.playerProfileCache = new Map()
+    this.onlineGameRevision++
     this.emitStateChange()
     return true
   }
@@ -727,6 +733,93 @@ class OgsClient {
     }
   }
 
+  enrichOnlineGamePlayers(gameId, revision = this.onlineGameRevision) {
+    if (
+      gameId == null ||
+      this.onlineGame.gameId !== gameId ||
+      this.onlineGameRevision !== revision
+    ) {
+      return
+    }
+
+    for (let player of [
+      this.onlineGame.players?.black,
+      this.onlineGame.players?.white,
+    ]) {
+      let playerId = sanitizeOptionalGameId(player?.id)
+      if (playerId == null || hasCompletePlayerProfile(player)) continue
+
+      this.fetchPlayerProfile(playerId).then((profile) => {
+        if (
+          profile == null ||
+          this.onlineGame.gameId !== gameId ||
+          this.onlineGameRevision !== revision ||
+          this.onlineGame.players == null
+        ) {
+          return
+        }
+
+        let color =
+          this.onlineGame.players.black?.id === playerId ? 'black' : 'white'
+        let current = this.onlineGame.players[color]
+        if (current == null || current.id !== playerId) return
+
+        this.onlineGame = {
+          ...this.onlineGame,
+          players: {
+            ...this.onlineGame.players,
+            [color]: {
+              ...profile,
+              ...current,
+              rank: current.rank || profile.rank,
+              iconUrl: current.iconUrl || profile.iconUrl,
+            },
+          },
+        }
+        this.emitStateChange()
+      })
+    }
+  }
+
+  async fetchPlayerProfile(userId) {
+    let sanitizedUserId = sanitizeOptionalGameId(userId)
+    if (sanitizedUserId == null || typeof this.fetch !== 'function') return null
+
+    if (this.playerProfileCache.has(sanitizedUserId)) {
+      return this.playerProfileCache.get(sanitizedUserId)
+    }
+
+    if (this.pendingPlayerProfileRequests.has(sanitizedUserId)) {
+      return await this.pendingPlayerProfileRequests.get(sanitizedUserId)
+    }
+
+    let request = (async () => {
+      try {
+        let response = await this.fetch(
+          `${this.serverUrl}/api/v1/players/${sanitizedUserId}/`,
+          {
+            headers: {'User-Agent': USER_AGENT, Accept: 'application/json'},
+            redirect: 'error',
+          },
+        )
+        if (!response?.ok) return null
+
+        return sanitizePlayer(await response.json(), this.serverUrl)
+      } catch (err) {
+        return null
+      }
+    })()
+
+    this.pendingPlayerProfileRequests.set(sanitizedUserId, request)
+    try {
+      let profile = await request
+      this.playerProfileCache.set(sanitizedUserId, profile)
+      return profile
+    } finally {
+      this.pendingPlayerProfileRequests.delete(sanitizedUserId)
+    }
+  }
+
   async listFriends() {
     if (this.session == null) {
       throw new OgsError('not-authenticated', 'Connect to OGS first.')
@@ -885,6 +978,7 @@ class OgsClient {
       status: 'connecting',
       gameId,
     }
+    this.onlineGameRevision++
     this.pendingClocks = new Map()
 
     this.sendNetworkPing()
@@ -901,6 +995,7 @@ class OgsClient {
     this.socket.send('game/disconnect', {game_id: gameId})
 
     if (this.onlineGame.gameId === gameId) {
+      this.onlineGameRevision++
       this.onlineGame = getInitialOnlineGameState()
       this.pendingClocks = new Map()
     }
@@ -1238,6 +1333,12 @@ class OgsClient {
       return
     }
 
+    if (event === 'notification') {
+      this.applyOgsNotification(payload)
+      this.emitStateChange()
+      return
+    }
+
     if (event === 'automatch/entry') {
       let entry = sanitizeAutomatchEntry(payload)
       if (entry == null) return
@@ -1327,6 +1428,10 @@ class OgsClient {
         if (hasOwn(payload, 'clock'))
           this.applyClock(sanitizeClock(payload.clock))
         this.applyPendingClock()
+        this.enrichOnlineGamePlayers(
+          this.onlineGame.gameId,
+          this.onlineGameRevision,
+        )
         break
 
       case 'data':
@@ -1339,6 +1444,7 @@ class OgsClient {
         if (hasOwn(payload, 'clock'))
           this.applyClock(sanitizeClock(payload.clock))
         this.applyPendingClock()
+        this.enrichOnlineGamePlayers(this.onlineGame.gameId)
         break
 
       case 'move':
@@ -1438,6 +1544,26 @@ class OgsClient {
           error: sanitizeErrorMessage(payload),
         }
         break
+    }
+  }
+
+  applyOgsNotification(payload) {
+    let gameId = sanitizeOptionalGameId(payload?.game_id)
+    if (gameId == null || gameId !== this.onlineGame.gameId) return
+    if (payload?.type !== 'gameEnded') return
+
+    let winner = sanitizeOptionalGameId(
+      payload?.winner_id ?? payload?.winner ?? payload?.player_id,
+    )
+    let outcome = sanitizeString(payload?.outcome, 200)
+
+    this.onlineGame = {
+      ...this.onlineGame,
+      status: 'connected',
+      phase: 'finished',
+      outcome: outcome || this.onlineGame.outcome,
+      winner: winner || this.onlineGame.winner,
+      error: null,
     }
   }
 
@@ -1706,6 +1832,10 @@ function sanitizeActiveGame(data, serverUrl) {
     black: sanitizePlayer(data?.black, serverUrl),
     white: sanitizePlayer(data?.white, serverUrl),
   }
+}
+
+function hasCompletePlayerProfile(player) {
+  return player?.rank != null && player?.iconUrl != null
 }
 
 function getPlayerToMoveFromHistory(onlineGame) {

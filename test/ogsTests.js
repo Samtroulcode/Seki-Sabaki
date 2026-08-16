@@ -1548,6 +1548,86 @@ describe('OGS client', () => {
     assert.strictEqual(state.onlineGame.gameId, null)
   })
 
+  it('enriches incomplete online-game players from their OGS profiles', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: async (url, options = {}) => {
+        if (url.endsWith('/api/v1/players/7/')) return loginFetch(url, options)
+        if (url.endsWith('/api/v1/players/8/')) {
+          return response({
+            body: {
+              id: 8,
+              username: 'gote',
+              ranking: 27,
+              icon: 'https://user-uploads.online-go.com/gote.png',
+            },
+          })
+        }
+
+        return loginFetch(url, options)
+      },
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+    client.connectGame({gameId: 12345})
+    socket.receive('game/12345/gamedata', {
+      game_name: 'Profile game',
+      width: 19,
+      height: 19,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente', rank: '1d'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: '',
+    })
+
+    await new Promise((resolve) => setImmediate(resolve))
+    let player = client.getState().onlineGame.players.white
+
+    assert.strictEqual(player.rank, '3k')
+    assert.strictEqual(
+      player.iconUrl,
+      'https://user-uploads.online-go.com/gote.png',
+    )
+  })
+
+  it('finishes an OGS game from a gameEnded notification', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: loginFetch,
+      webSocketImpl: FakeWebSocket,
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+    let socket = FakeWebSocket.instances[0]
+    client.connectGame({gameId: 12345})
+    socket.receive('game/12345/gamedata', {
+      game_name: 'Finished game',
+      width: 19,
+      height: 19,
+      phase: 'play',
+      players: {
+        black: {id: 7, username: 'sente'},
+        white: {id: 8, username: 'gote'},
+      },
+      moves: '',
+    })
+    socket.receive('notification', {
+      type: 'gameEnded',
+      game_id: 12345,
+      winner: 7,
+      outcome: '5.5 points',
+    })
+
+    let state = client.getState()
+    assert.strictEqual(state.onlineGame.phase, 'finished')
+    assert.strictEqual(state.onlineGame.winner, 7)
+    assert.strictEqual(state.onlineGame.outcome, '5.5 points')
+  })
+
   it('rejects invalid game IDs before sending game commands', async () => {
     FakeWebSocket.instances = []
     let client = new OgsClient({

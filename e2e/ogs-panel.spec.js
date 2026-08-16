@@ -441,7 +441,9 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.ogs-game-context-chat')).toContainText(
       'good luck',
     )
-    await page.locator('.ogs-game-context-chat input').fill('hello from Sabaki')
+    await page
+      .locator('.ogs-game-context-chat textarea')
+      .fill('hello from Sabaki')
     await page.locator('.ogs-game-context-chat button').click()
     await page.waitForFunction(
       () =>
