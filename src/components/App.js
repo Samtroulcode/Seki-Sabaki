@@ -75,10 +75,23 @@ class App extends Component {
 
   componentDidMount() {
     this.ogsReviewUnsubscribe = window.sabaki.ogsReviews?.onStateChange(
-      (ogsReviewState) => this.setState({ogsReviewState}),
+      (ogsReviewState) => {
+        let activeReview = Object.values(ogsReviewState?.reviews || {})[0]
+        if (
+          activeReview != null &&
+          this.isReviewForCurrentBoard(activeReview)
+        ) {
+          sabaki.applyOgsReview(activeReview)
+        }
+        this.setState({ogsReviewState})
+      },
     )
     let ogsReviewStatePromise = window.sabaki.ogsReviews?.getState?.()
     ogsReviewStatePromise?.then((ogsReviewState) => {
+      let activeReview = Object.values(ogsReviewState?.reviews || {})[0]
+      if (activeReview != null && this.isReviewForCurrentBoard(activeReview)) {
+        sabaki.applyOgsReview(activeReview)
+      }
       this.setState({ogsReviewState})
     })
     gtplogger.updatePath()
@@ -225,6 +238,12 @@ class App extends Component {
         }
       })
     })
+  }
+
+  isReviewForCurrentBoard(review) {
+    let tree = sabaki.inferredState.gameTree
+    let source = String(gametree.getRootProperty(tree, 'SO', '') || '')
+    return new RegExp(`/game/${review.gameId}(?:/|$)`).test(source)
   }
 
   componentDidUpdate(_, prevState = {}) {

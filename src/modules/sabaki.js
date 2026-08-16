@@ -42,6 +42,7 @@ import {
   updateOnlineGameTab,
 } from './onlinegametabs.js'
 import OgsBoardSessionController from './ogsboardsessioncontroller.js'
+import {mergeOgsReviewIntoGameTree} from './ogsreviewconverter.js'
 import {buildOgsGameTree} from './ogsboard.js'
 import {
   getOgsLineMoves,
@@ -1981,6 +1982,23 @@ class Sabaki extends EventEmitter {
     return sgf.stringify([tree.root], {
       linebreak: setting.get('sgf.format_code') ? helper.linebreak : '',
     })
+  }
+
+  applyOgsReview(review) {
+    if (review == null) return false
+
+    let {gameTrees, gameIndex, treePosition} = this.state
+    let tree = gameTrees[gameIndex]
+    let enrichedTree = mergeOgsReviewIntoGameTree(tree, review)
+    if (enrichedTree === tree) return false
+
+    this.setState({
+      gameTrees: gameTrees.map((current, index) =>
+        index === gameIndex ? enrichedTree : current,
+      ),
+    })
+    this.setCurrentTreePosition(enrichedTree, treePosition)
+    return true
   }
 
   async startCurrentGameSgfAnalysis({

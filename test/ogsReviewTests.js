@@ -1,8 +1,10 @@
 import assert from 'assert'
+import GameTree from '@sabaki/immutable-gametree'
 
 import {createOgsReviewApi} from '../src/ogs/review-api.js'
 import {sanitizeReviewList} from '../src/ogs/review-sanitize.js'
 import {getOgsReviewAnalysis} from '../src/modules/ogsreviewanalysis.js'
+import {mergeOgsReviewIntoGameTree} from '../src/modules/ogsreviewconverter.js'
 import {OgsAiReviewClient} from '../src/ogs/ai-review-client.js'
 
 describe('OGS AI reviews', () => {
@@ -108,6 +110,38 @@ describe('OGS AI reviews', () => {
     })
   })
 
+  it('merges OGS review values and branches into a game tree', () => {
+    let tree = createReviewTestTree()
+
+    let enriched = mergeOgsReviewIntoGameTree(tree, {
+      moves: {
+        1: {
+          winRate: 0.62,
+          score: 3.5,
+          branches: [
+            {
+              winRate: 0.7,
+              score: 4.2,
+              visits: 120,
+              moves: [
+                {x: 2, y: 2},
+                {x: 3, y: 3},
+              ],
+            },
+          ],
+        },
+      },
+    })
+
+    let first = [...enriched.getSequence(enriched.root.id)][1]
+    assert.deepStrictEqual(first.data.SBKV, ['62.00'])
+    assert.deepStrictEqual(first.data.SBKS, ['3.50'])
+    assert.strictEqual(first.children.length, 2)
+    assert.deepStrictEqual(first.children[1].data.W, ['cc'])
+    assert.deepStrictEqual(first.children[1].data.SBKV, ['70.00'])
+    assert.deepStrictEqual(first.children[1].data.SBKS, ['4.20'])
+  })
+
   it('rejects malformed review entries without exposing private fields', () => {
     let reviews = sanitizeReviewList({results: [{id: 1, auth: 'secret'}]})
     assert.deepStrictEqual(reviews[0].id, 1)
@@ -181,3 +215,18 @@ describe('OGS AI reviews', () => {
     client.dispose()
   })
 })
+
+function createReviewTestTree() {
+  let tree = new GameTree({
+    getId: (() => {
+      let id = 0
+      return () => String(id++)
+    })(),
+    merger: () => null,
+  })
+
+  return tree.mutate((draft) => {
+    let first = draft.appendNode(draft.root.id, {B: ['aa']})
+    draft.appendNode(first, {W: ['bb']})
+  })
+}
