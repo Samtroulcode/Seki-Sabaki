@@ -126,6 +126,7 @@ export default class HomeDashboard extends Component {
       let success = await sabaki.openContentInNewBoardTab(sgf.sgf, 'sgf', {
         gotoEnd: true,
         representedFilename: null,
+        ogsGameId: gameId,
       })
       if (!success) await window.sabaki.ogsReviews.disconnect(review.uuid)
     }

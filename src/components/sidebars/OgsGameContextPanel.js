@@ -180,6 +180,7 @@ export default class OgsGameContextPanel extends Component {
     let clockView = getOgsClockView(game?.clock, game?.players, Date.now(), {
       drift: network?.drift,
       freezeActive: pendingMove,
+      freezeFinished: game?.phase === 'finished',
       freezeAt: sabaki.ogsPendingMove?.submittedAt,
     })
 

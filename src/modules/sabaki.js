@@ -1387,7 +1387,7 @@ class Sabaki extends EventEmitter {
   async openContentInNewBoardTab(
     content,
     extension,
-    {gotoEnd = null, representedFilename = null} = {},
+    {gotoEnd = null, representedFilename = null, ogsGameId = null} = {},
   ) {
     this.setBusy(true)
 
@@ -1399,7 +1399,12 @@ class Sabaki extends EventEmitter {
     try {
       let fileFormatModule = fileformats.getModuleByExtension(extension)
 
-      gameTrees = fileFormatModule.parse(content, (evt) => {
+      let parsedContent =
+        extension === 'sgf' && ogsGameId != null
+          ? ensureOgsReviewSource(content, ogsGameId)
+          : content
+
+      gameTrees = fileFormatModule.parse(parsedContent, (evt) => {
         if (evt.progress - lastProgress < 0.1) return
         this.window.setProgressBar(evt.progress)
         lastProgress = evt.progress
@@ -2983,6 +2988,10 @@ class Sabaki extends EventEmitter {
         pendingMove: this.ogsPendingMove,
       },
     )
+
+    try {
+      await window.sabaki.ogs.connectGame?.(onlineGame.gameId)
+    } catch (err) {}
 
     return true
   }
@@ -4927,6 +4936,25 @@ class Sabaki extends EventEmitter {
       y,
     )
   }
+}
+
+function ensureOgsReviewSource(content, gameId) {
+  let id = Number(gameId)
+  if (!Number.isInteger(id) || id <= 0 || typeof content !== 'string') {
+    return content
+  }
+
+  let sourcePattern = new RegExp(`\\bSO\\[[^\\]]*\\/game\\/${id}(?:\\/|\\]|$)`)
+  if (sourcePattern.test(content)) {
+    return content
+  }
+
+  if (!/^\s*\(\s*;/.test(content)) return content
+
+  return content.replace(
+    /^(\s*\(\s*;)/,
+    `$1SO[https://online-go.com/game/${id}]`,
+  )
 }
 
 function getOgsGameEndMessage(onlineGame) {

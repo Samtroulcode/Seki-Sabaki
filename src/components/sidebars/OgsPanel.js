@@ -126,6 +126,7 @@ export default class OgsPanel extends Component {
         await sabaki.openContentInNewBoardTab(sgf.sgf, 'sgf', {
           gotoEnd: true,
           representedFilename: null,
+          ogsGameId: gameId,
         })
       } else {
         await window.sabaki.ogsReviews.disconnect(review.uuid)

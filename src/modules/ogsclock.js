@@ -27,9 +27,11 @@ export function getOgsClockView(
 function getPlayerClockView(clock, playerId, time, now, options) {
   let active = clock?.currentPlayer != null && clock.currentPlayer === playerId
   let paused = clock?.pause?.paused === true
-  let freezeActive = options.freezeActive === true && active
+  let freezeActive =
+    (options.freezeActive === true || options.freezeFinished === true) && active
   let state = getPlayerClockState(clock, time, active, now, {
     freezeActive,
+    freezeFinished: options.freezeFinished === true,
     freezeAt: options.freezeAt,
     drift: options.drift,
   })
@@ -44,7 +46,7 @@ function getPlayerClockView(clock, playerId, time, now, options) {
         : formatClockDuration(state.milliseconds),
     detail: getClockDetail(time, {
       paused,
-      submitting: freezeActive,
+      submitting: freezeActive && options.freezeFinished !== true,
       stoneRemoval: clock?.stoneRemovalMode,
       periods: state.periods,
     }),
@@ -56,7 +58,8 @@ function getPlayerClockState(clock, time, active, now, options = {}) {
     active &&
     clock?.expiration != null &&
     clock?.pause?.paused !== true &&
-    clock?.stoneRemovalMode !== true
+    clock?.stoneRemovalMode !== true &&
+    options.freezeFinished !== true
   ) {
     let clockNow = options.freezeActive
       ? Math.max(options.freezeAt || now, clock.receivedAt || 0)
