@@ -6,7 +6,7 @@ import {selectBestReview} from '../../ogs/review-sanitize.js'
 import sabaki from '../../modules/sabaki.js'
 import onlineStore from '../../modules/onlinestore.js'
 import {getOgsOnlineController} from '../../modules/ogsonlinecontroller.js'
-import {AccountStatus, LoginForm} from './OgsPanelAccount.js'
+import {AccountStatus, LoginForm, PlayerStatsCard} from './OgsPanelAccount.js'
 import {OgsGameHistoryPanel} from './OgsGameHistory.js'
 import {OgsFriendsPanel} from './OgsFriendsList.js'
 import {AutomatchForm} from './OgsPanelMatchmaking.js'
@@ -149,6 +149,10 @@ export default class OgsPanel extends Component {
       await onlineStore.refreshFriends()
     }
 
+    this.handleRefreshPlayerProfileButtonClick = async () => {
+      await onlineStore.refreshPlayerProfile()
+    }
+
     this.handleOnlineStoreState = (state) => this.setState(state)
 
     this.lastFallbackRefreshAt = 0
@@ -216,6 +220,7 @@ export default class OgsPanel extends Component {
 
     await onlineStore.refreshGameHistory({page: 1, pageSize: 12})
     await onlineStore.refreshFriends()
+    await onlineStore.refreshPlayerProfile()
   }
 
   render(
@@ -237,6 +242,9 @@ export default class OgsPanel extends Component {
       friends,
       friendsBusy,
       friendsError,
+      playerProfile,
+      playerProfileBusy,
+      playerProfileError,
     },
   ) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
@@ -354,6 +362,16 @@ export default class OgsPanel extends Component {
                   'section',
                   {class: 'ogs-dashboard-card'},
                   h(AccountStatus, {user, username, socket}),
+                ),
+                h(
+                  'section',
+                  {class: 'ogs-dashboard-card'},
+                  h(PlayerStatsCard, {
+                    profile: playerProfile,
+                    busy: playerProfileBusy,
+                    error: playerProfileError,
+                    onRefresh: this.handleRefreshPlayerProfileButtonClick,
+                  }),
                 ),
                 h(
                   'section',

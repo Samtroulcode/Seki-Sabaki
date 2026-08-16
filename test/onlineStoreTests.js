@@ -47,6 +47,9 @@ describe('online store', () => {
       friends: [],
       friendsBusy: false,
       friendsError: null,
+      playerProfile: null,
+      playerProfileBusy: false,
+      playerProfileError: null,
     })
   })
 

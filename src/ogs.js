@@ -43,6 +43,7 @@ const {
 } = require('./ogs/sanitize.js')
 const {
   sanitizeUser,
+  sanitizePlayerProfile,
   sanitizePlayers,
   sanitizePlayer,
   sanitizeFriends,
@@ -804,7 +805,7 @@ class OgsClient {
         )
         if (!response?.ok) return null
 
-        return sanitizePlayer(await response.json(), this.serverUrl)
+        return sanitizePlayerProfile(this.serverUrl, await response.json())
       } catch (err) {
         return null
       }
@@ -818,6 +819,22 @@ class OgsClient {
     } finally {
       this.pendingPlayerProfileRequests.delete(sanitizedUserId)
     }
+  }
+
+  async getPlayerProfile() {
+    if (this.session == null) {
+      throw new OgsError('not-authenticated', 'Connect to OGS first.')
+    }
+
+    let profile = await this.fetchPlayerProfile(this.session.user?.id)
+    if (profile == null) {
+      throw new OgsError(
+        'invalid-response',
+        'OGS player profile is unavailable.',
+      )
+    }
+
+    return profile
   }
 
   async listFriends() {
@@ -2293,6 +2310,14 @@ function setupOgsIpcHandlers(
       }
     } catch (err) {
       return {ok: false, error: serializeError(err), state: client.getState()}
+    }
+  })
+
+  ipcMain.handle('ogs:getPlayerProfile', async () => {
+    try {
+      return {ok: true, profile: await client.getPlayerProfile()}
+    } catch (err) {
+      return {ok: false, error: serializeError(err)}
     }
   })
 

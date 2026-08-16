@@ -32,6 +32,9 @@ export function createInitialOnlineState() {
     friends: [],
     friendsBusy: false,
     friendsError: null,
+    playerProfile: null,
+    playerProfileBusy: false,
+    playerProfileError: null,
   }
 }
 
@@ -194,6 +197,9 @@ export class OnlineStore {
       friends: [],
       friendsBusy: false,
       friendsError: null,
+      playerProfile: null,
+      playerProfileBusy: false,
+      playerProfileError: null,
     })
 
     await this.ogs().logout()
@@ -215,6 +221,12 @@ export class OnlineStore {
       gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
+      friends: [],
+      friendsBusy: false,
+      friendsError: null,
+      playerProfile: null,
+      playerProfileBusy: false,
+      playerProfileError: null,
     })
   }
 
@@ -304,6 +316,50 @@ export class OnlineStore {
     }
 
     this.setState({friendsBusy: false})
+    return result
+  }
+
+  async refreshPlayerProfile() {
+    let sessionRequestId = this.sessionRequestId
+    let userId = this.state.user?.id ?? null
+
+    this.setState({playerProfileBusy: true, playerProfileError: null})
+
+    let result
+    try {
+      result = await this.ogs().getPlayerProfile()
+    } catch (err) {
+      result = {
+        ok: false,
+        error: serializeOnlineStoreError(err, {
+          code: 'profile-failed',
+          message: t('Unable to load OGS player profile.'),
+        }),
+      }
+    }
+
+    if (
+      sessionRequestId !== this.sessionRequestId ||
+      userId !== this.state.user?.id
+    ) {
+      return result
+    }
+
+    if (result.ok) {
+      this.setState({playerProfile: result.profile, playerProfileError: null})
+    } else {
+      this.applySyncError(result.error, {
+        code: result.error?.code || 'profile-failed',
+        message:
+          result.error?.message || t('Unable to load OGS player profile.'),
+      })
+      this.setState({
+        playerProfileError:
+          result.error?.message || t('Unable to load OGS player profile.'),
+      })
+    }
+
+    this.setState({playerProfileBusy: false})
     return result
   }
 
@@ -576,6 +632,10 @@ export class OnlineStore {
       friends: state?.friends || (userChanged ? [] : this.state.friends),
       friendsBusy: userChanged ? false : this.state.friendsBusy,
       friendsError: userChanged ? null : this.state.friendsError,
+      playerProfile:
+        state?.playerProfile || (userChanged ? null : this.state.playerProfile),
+      playerProfileBusy: userChanged ? false : this.state.playerProfileBusy,
+      playerProfileError: userChanged ? null : this.state.playerProfileError,
       connected: true,
       ...extra,
     })
@@ -605,6 +665,9 @@ export class OnlineStore {
       friends: [],
       friendsBusy: false,
       friendsError: null,
+      playerProfile: null,
+      playerProfileBusy: false,
+      playerProfileError: null,
       connected: false,
       ...extra,
     })
@@ -680,6 +743,8 @@ function cloneOnlineState(state) {
     gameHistory: Array.isArray(state.gameHistory)
       ? state.gameHistory.map(cloneObject)
       : [],
+    friends: Array.isArray(state.friends) ? state.friends.map(cloneObject) : [],
+    playerProfile: cloneObject(state.playerProfile),
   }
 }
 

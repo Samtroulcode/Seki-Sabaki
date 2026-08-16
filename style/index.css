@@ -2840,6 +2840,23 @@ button:active {
   margin: 0;
   color: white;
 }
+.ogs-player-stats {
+  display: grid;
+  gap: 0.7rem;
+}
+.ogs-player-stats dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.8rem;
+  margin: 0;
+}
+.ogs-player-stats dt {
+  color: #aaa;
+}
+.ogs-player-stats dd {
+  margin: 0;
+  color: white;
+}
 .ogs-friends {
   display: grid;
   gap: 0.7rem;

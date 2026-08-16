@@ -81,6 +81,22 @@ function sanitizeUser(serverUrl, user) {
   }
 }
 
+function sanitizePlayerProfile(serverUrl, user) {
+  if (user == null || typeof user !== 'object') return null
+
+  let player = sanitizePlayer(user, serverUrl)
+  if (player == null || player.id == null) return null
+
+  return {
+    ...player,
+    country: sanitizeString(user.country, 8),
+    supporter: user.supporter === true,
+    professional: user.professional === true,
+    bot: user.is_bot === true,
+    registrationDate: sanitizeString(user.registration_date, 40),
+  }
+}
+
 function sanitizePlayers(players, serverUrl) {
   if (players == null || typeof players !== 'object') return null
 
@@ -131,6 +147,7 @@ function sanitizeFriends(friends, serverUrl) {
 module.exports = {
   resolveOgsUrl,
   sanitizeUser,
+  sanitizePlayerProfile,
   sanitizePlayers,
   sanitizePlayer,
   sanitizeFriends,

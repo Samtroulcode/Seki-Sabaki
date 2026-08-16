@@ -79,3 +79,41 @@ export function AccountStatus({user, username, socket}) {
     ),
   )
 }
+
+export function PlayerStatsCard({profile, busy, error, onRefresh}) {
+  if (profile == null && !busy && error == null) return null
+
+  return h(
+    'div',
+    {class: 'ogs-player-stats'},
+    h(
+      'div',
+      {class: 'ogs-friends-header'},
+      h('h3', {}, t('Player')),
+      h(
+        'button',
+        {type: 'button', disabled: busy, onClick: onRefresh},
+        busy ? t('Loading...') : t('Refresh'),
+      ),
+    ),
+    error != null && h('p', {class: 'ogs-error'}, error),
+    profile == null
+      ? h('p', {class: 'ogs-empty'}, t('Loading player profile…'))
+      : h(
+          'dl',
+          {},
+          profile.rank != null && h('dt', {}, t('Rank')),
+          profile.rank != null && h('dd', {}, profile.rank),
+          profile.rating != null && h('dt', {}, t('Rating')),
+          profile.rating != null && h('dd', {}, String(profile.rating)),
+          profile.country != null && h('dt', {}, t('Country')),
+          profile.country != null && h('dd', {}, profile.country.toUpperCase()),
+          h('dt', {}, t('Supporter')),
+          h('dd', {}, profile.supporter ? t('Yes') : t('No')),
+          profile.professional && h('dt', {}, t('Professional')),
+          profile.professional && h('dd', {}, t('Yes')),
+          profile.bot && h('dt', {}, t('Bot')),
+          profile.bot && h('dd', {}, t('Yes')),
+        ),
+  )
+}
