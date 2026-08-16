@@ -189,31 +189,62 @@ export default class OgsGameContextPanel extends Component {
       h(
         'header',
         {class: 'ogs-game-context-header'},
-        h('h2', {}, t('Online game')),
-        h('p', {}, game?.gameName || formatGameId(onlineGameId)),
+        h(
+          'div',
+          {class: 'ogs-game-context-heading'},
+          h('p', {class: 'ogs-game-context-kicker'}, t('Online game')),
+          h('h2', {}, game?.gameName || t('Online game')),
+          h(
+            'p',
+            {class: 'ogs-game-context-game-id'},
+            formatGameId(onlineGameId),
+          ),
+        ),
+        h(
+          'span',
+          {
+            class: `ogs-game-context-live-status ${
+              game?.status === 'connected'
+                ? 'connected'
+                : error != null
+                  ? 'error'
+                  : ''
+            }`,
+            'aria-live': 'polite',
+          },
+          game?.status === 'connected'
+            ? t('Connected')
+            : error != null
+              ? t('Connection error')
+              : t('Connecting…'),
+        ),
       ),
 
       game == null
         ? h('p', {class: 'ogs-empty'}, t('Loading OGS game details…'))
         : [
-            h(PlayerCard, {
-              color: 'black',
-              title: t('Black'),
-              player: game.players?.black,
-              user,
-              currentPlayerId: game.clock?.currentPlayer,
-              captures: captures.black,
-              clock: clockView.black,
-            }),
-            h(PlayerCard, {
-              color: 'white',
-              title: t('White'),
-              player: game.players?.white,
-              user,
-              currentPlayerId: game.clock?.currentPlayer,
-              captures: captures.white,
-              clock: clockView.white,
-            }),
+            h(
+              'div',
+              {class: 'ogs-game-context-players'},
+              h(PlayerCard, {
+                color: 'black',
+                title: t('Black'),
+                player: game.players?.black,
+                user,
+                currentPlayerId: game.clock?.currentPlayer,
+                captures: captures.black,
+                clock: clockView.black,
+              }),
+              h(PlayerCard, {
+                color: 'white',
+                title: t('White'),
+                player: game.players?.white,
+                user,
+                currentPlayerId: game.clock?.currentPlayer,
+                captures: captures.white,
+                clock: clockView.white,
+              }),
+            ),
             h(
               'dl',
               {class: 'ogs-game-context-status'},
@@ -262,40 +293,48 @@ export default class OgsGameContextPanel extends Component {
         'div',
         {class: 'ogs-game-context-actions'},
         h(
-          'button',
-          {
-            type: 'button',
-            disabled: busy || !playable,
-            onClick: this.handlePassButtonClick,
-          },
-          t('Pass'),
+          'div',
+          {class: 'ogs-game-context-primary-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              disabled: busy || !playable,
+              onClick: this.handlePassButtonClick,
+            },
+            t('Pass'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              disabled: busy || !playable,
+              onClick: this.handleResignButtonClick,
+            },
+            t('Resign'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              disabled: busy || !removingStones,
+              onClick: this.handleAcceptRemovedStonesButtonClick,
+            },
+            t('Accept dead stones'),
+          ),
         ),
         h(
-          'button',
-          {
-            type: 'button',
-            disabled: busy || !playable,
-            onClick: this.handleResignButtonClick,
-          },
-          t('Resign'),
-        ),
-        h(
-          'button',
-          {
-            type: 'button',
-            disabled: busy || !removingStones,
-            onClick: this.handleAcceptRemovedStonesButtonClick,
-          },
-          t('Accept dead stones'),
-        ),
-        h(
-          'button',
-          {
-            type: 'button',
-            disabled: busy || onlineGameId == null,
-            onClick: this.handleDisconnectButtonClick,
-          },
-          t('Disconnect game'),
+          'div',
+          {class: 'ogs-game-context-secondary-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              disabled: busy || onlineGameId == null,
+              onClick: this.handleDisconnectButtonClick,
+            },
+            t('Disconnect game'),
+          ),
         ),
       ),
     )

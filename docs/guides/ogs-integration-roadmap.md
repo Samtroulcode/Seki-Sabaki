@@ -52,8 +52,9 @@ complete.**
 
 ### Lot 1 — Online Game UX And Player Stats
 
-- [ ] Complete the `online-game` tab refactor: clearer player cards, opponent
-      avatar and rank, cleaner chat, clocks, game state, and network errors.
+- [x] Complete the first `online-game` tab refactor tranche: clearer player
+      cards, opponent avatar and rank, cleaner chat, clocks, game state, and
+      network errors.
 - [ ] Add a dedicated OGS player statistics card using only verified OGS data
       (profile, rank/rating, available results and history indicators).
 - [ ] Cover the online-game and player-statistics workflows with fake OGS state

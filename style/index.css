@@ -2399,7 +2399,7 @@ button:active {
 .ogs-game-context-panel {
   display: grid;
   align-content: start;
-  gap: 0.7rem;
+  gap: 0.85rem;
   height: 100%;
   box-sizing: border-box;
   padding: 1rem;
@@ -2420,6 +2420,49 @@ button:active {
 .ogs-game-context-chat {
   display: grid;
   gap: 0.4rem;
+}
+.ogs-game-context-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  padding-bottom: 0.2rem;
+}
+.ogs-game-context-heading {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.ogs-game-context-kicker {
+  color: #8cdcda;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ogs-game-context-game-id {
+  color: #888;
+  font-size: 0.8rem;
+}
+.ogs-game-context-live-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0 0.55rem;
+  border: 1px solid #3a3b40;
+  border-radius: 999px;
+  color: #aaa;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.ogs-game-context-live-status.connected {
+  border-color: rgba(55, 200, 118, 0.45);
+  color: #78d89d;
+}
+.ogs-game-context-live-status.error {
+  border-color: rgba(242, 92, 61, 0.45);
+  color: #f28a76;
+}
+.ogs-game-context-players {
+  display: grid;
+  gap: 0.5rem;
 }
 .ogs-game-context-player {
   display: grid;
@@ -2488,6 +2531,8 @@ button:active {
   gap: 0.25rem;
   margin: 0;
   padding-left: 1.2rem;
+  max-height: 12rem;
+  overflow: auto;
 }
 .ogs-game-context-chat-form {
   display: grid;
@@ -2511,16 +2556,32 @@ button:active {
   opacity: 0.5;
 }
 .ogs-game-context-actions {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid #292a2d;
+}
+.ogs-game-context-primary-actions,
+.ogs-game-context-secondary-actions {
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
-  padding-top: 0.7rem;
-  border-top: 1px solid #292a2d;
 }
 .ogs-game-context-actions button {
   padding: 0.35rem 0.7rem;
   background: #292a2d;
   color: #eee;
+}
+.ogs-game-context-primary-actions button:not(:disabled):first-child {
+  border-color: rgba(0, 130, 240, 0.55);
+  background: #064b87;
+}
+.ogs-game-context-secondary-actions {
+  justify-content: flex-end;
+}
+.ogs-game-context-secondary-actions button {
+  color: #aaa;
+  font-size: 0.85rem;
 }
 .ogs-game-context-actions button:disabled {
   opacity: 0.5;
@@ -3372,6 +3433,15 @@ button:active {
 }
 
 @media (max-width: 760px) {
+  .online-game-workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(18rem, 1fr) minmax(19rem, auto);
+  }
+  .online-game-context {
+    border-top: 1px solid #292a2d;
+    border-left: 0;
+    max-height: 32rem;
+  }
   .ogs-panel,
   .analysis-panel {
     padding: 1rem;
