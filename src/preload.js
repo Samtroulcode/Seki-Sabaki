@@ -224,6 +224,7 @@ window.sabaki = {
       ipcRenderer.invoke('ogs:downloadGameSgf', {gameId}),
     listAiReviews: (gameId) =>
       ipcRenderer.invoke('ogs:listAiReviews', {gameId}),
+    listFriends: () => ipcRenderer.invoke('ogs:listFriends'),
     logout: () => ipcRenderer.invoke('ogs:logout'),
   },
 

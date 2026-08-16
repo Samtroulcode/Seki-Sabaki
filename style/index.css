@@ -486,6 +486,34 @@
 .home-online-heading p {
   color: #aaa;
 }
+.home-online-account {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+.home-online-avatar,
+.home-online-avatar-fallback {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.home-online-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #292a2d;
+  color: #eee;
+  font-weight: bold;
+}
+.home-online-username {
+  display: block;
+  color: white;
+}
+.home-online-rank {
+  color: #8cdcda;
+  font-size: 0.85rem;
+}
 .home-online-content {
   display: grid;
   gap: 1rem;
@@ -2421,6 +2449,7 @@ button:active {
   background: #292a2d;
   color: white;
   font-weight: bold;
+  object-fit: cover;
 }
 .ogs-game-context-player-info {
   display: grid;
@@ -2606,9 +2635,6 @@ button:active {
   gap: 1rem;
   align-items: start;
 }
-.ogs-dashboard-grid.logged-out {
-  grid-template-columns: minmax(260px, 420px);
-}
 .ogs-dashboard-login-card {
   max-width: 420px;
 }
@@ -2627,18 +2653,6 @@ button:active {
   border-radius: 12px;
   background: #111;
 }
-.ogs-dashboard-quick-links dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.35rem 0.8rem;
-  margin: 0;
-}
-.ogs-dashboard-quick-links dt {
-  color: #aaa;
-}
-.ogs-dashboard-quick-links dd {
-  margin: 0;
-}
 .ogs-panel-logo {
   display: flex;
   align-items: center;
@@ -2650,6 +2664,10 @@ button:active {
   color: white;
   font-weight: bold;
   letter-spacing: 0.08em;
+}
+.ogs-panel-logo-avatar {
+  object-fit: cover;
+  border: 2px solid rgba(140, 220, 218, 0.45);
 }
 .ogs-login-form,
 .ogs-status,
@@ -2716,6 +2734,8 @@ button:active {
   height: 4rem;
   border-radius: 50%;
   background: #111;
+  object-fit: cover;
+  border: 1px solid #292a2d;
 }
 .ogs-panel button {
   justify-self: start;
@@ -2730,14 +2750,6 @@ button:active {
 .ogs-panel button:disabled {
   opacity: 0.5;
 }
-.ogs-panel .ogs-dashboard-nav button.selected,
-.ogs-panel .ogs-dashboard-nav button.selected:hover,
-.ogs-panel .ogs-dashboard-nav button.selected:focus,
-.ogs-panel .ogs-dashboard-nav button.selected:active {
-  border-color: #0082f0;
-  background: #0082f0;
-  color: white;
-}
 .ogs-status dl {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -2750,6 +2762,83 @@ button:active {
 .ogs-status dd {
   margin: 0;
   color: white;
+}
+.ogs-friends {
+  display: grid;
+  gap: 0.7rem;
+}
+.ogs-friends-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.ogs-friends-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 20rem;
+  overflow: auto;
+}
+.ogs-friend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.ogs-friend-avatar {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: #292a2d;
+  color: #eee;
+  font-weight: bold;
+}
+.ogs-friend-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ogs-friend-presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  border: 2px solid #111;
+  background: #555;
+}
+.ogs-friend-presence.online {
+  background: #37c876;
+}
+.ogs-friend-presence.offline {
+  background: #555;
+}
+.ogs-friend-presence.unknown {
+  background: #3a3b40;
+  opacity: 0.7;
+}
+.ogs-friend-info {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+.ogs-friend-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ogs-friend-rank {
+  color: #aaa;
+  font-size: 0.85rem;
 }
 .ogs-matchmaking {
   min-width: 0;

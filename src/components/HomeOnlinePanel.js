@@ -134,6 +134,32 @@ export default class HomeOnlinePanel extends Component {
       h(
         'div',
         {class: 'home-online-heading'},
+        h(
+          'div',
+          {class: 'home-online-account'},
+          onlineState.user?.iconUrl != null
+            ? h('img', {
+                class: 'ogs-avatar home-online-avatar',
+                src: onlineState.user.iconUrl,
+                alt: '',
+              })
+            : h(
+                'span',
+                {class: 'ogs-avatar home-online-avatar-fallback'},
+                getInitial(onlineState.user?.username || onlineState.username),
+              ),
+          h(
+            'div',
+            {},
+            h(
+              'strong',
+              {class: 'home-online-username'},
+              onlineState.user?.username || onlineState.username,
+            ),
+            onlineState.user?.rank != null &&
+              h('span', {class: 'home-online-rank'}, onlineState.user.rank),
+          ),
+        ),
         h('h2', {}, t('Play online')),
         h('p', {}, t('Find an OGS opponent with a ready-to-play clock.')),
       ),
@@ -232,4 +258,10 @@ function getSelectedPreset({boardSize, clockMode, presetId}) {
       (preset) => preset[0] === presetId,
     ) || timePresets[boardSize][clockMode][0]
   )
+}
+
+function getInitial(username) {
+  if (typeof username !== 'string' || username.trim() === '') return '?'
+
+  return username.trim()[0].toUpperCase()
 }

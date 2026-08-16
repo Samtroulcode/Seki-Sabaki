@@ -44,6 +44,9 @@ describe('online store', () => {
       gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
+      friends: [],
+      friendsBusy: false,
+      friendsError: null,
     })
   })
 
@@ -140,6 +143,65 @@ describe('online store', () => {
     assert.strictEqual(store.getState().gameHistoryHasPrevious, true)
     assert.strictEqual(store.getState().gameHistoryBusy, false)
     assert.strictEqual(store.getState().gameHistoryError, null)
+  })
+
+  it('refreshes OGS friends through IPC', async () => {
+    let store = createStore({
+      listFriends: async () => ({
+        ok: true,
+        friends: [{id: 8, username: 'gote', rank: '15k', online: true}],
+      }),
+    })
+    store.setState({user: {id: 1, username: 'Seki'}})
+
+    let result = await store.refreshFriends()
+
+    assert.strictEqual(result.ok, true)
+    assert.deepStrictEqual(store.getState().friends, [
+      {id: 8, username: 'gote', rank: '15k', online: true},
+    ])
+    assert.strictEqual(store.getState().friendsBusy, false)
+    assert.strictEqual(store.getState().friendsError, null)
+  })
+
+  it('records OGS friends failures', async () => {
+    let store = createStore({
+      listFriends: async () => ({
+        ok: false,
+        error: {code: 'friends-failed', message: 'Friends failed.'},
+      }),
+    })
+    store.setState({user: {id: 1, username: 'Seki'}})
+
+    let result = await store.refreshFriends()
+
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(store.getState().friendsError, 'Friends failed.')
+    assert.strictEqual(store.getState().friendsBusy, false)
+    assert.strictEqual(store.getState().network.status, 'degraded')
+  })
+
+  it('ignores late OGS friends results after account changes', async () => {
+    let resolveFriends
+    let friendsPromise = new Promise((resolve) => {
+      resolveFriends = resolve
+    })
+    let store = createStore({
+      listFriends: async () => await friendsPromise,
+    })
+    store.setState({user: {id: 1, username: 'First'}})
+
+    let refreshPromise = store.refreshFriends()
+    store.applyPublicState(createPublicState({user: {id: 2, username: 'Next'}}))
+
+    resolveFriends({
+      ok: true,
+      friends: [{id: 8, username: 'gote', online: true}],
+    })
+    await refreshPromise
+
+    assert.deepStrictEqual(store.getState().friends, [])
+    assert.strictEqual(store.getState().friendsBusy, false)
   })
 
   it('records OGS game history failures', async () => {

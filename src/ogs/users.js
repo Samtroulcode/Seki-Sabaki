@@ -6,6 +6,19 @@ const {
   sanitizeString,
 } = require('./sanitize.js')
 
+function getDefaultAllowedIconOrigins(serverUrl) {
+  try {
+    let server = new URL(serverUrl)
+
+    // OGS serves uploaded avatars from a dedicated subdomain, separate from
+    // the main site origin. Verified against https://online-go.com/api/v1/
+    // players/{id}/ returning icons hosted on user-uploads.online-go.com.
+    return [`https://user-uploads.${server.hostname}`]
+  } catch (err) {
+    return []
+  }
+}
+
 function resolveOgsUrl(serverUrl, value) {
   if (typeof value !== 'string' || value.trim() === '') return null
 
@@ -13,7 +26,14 @@ function resolveOgsUrl(serverUrl, value) {
     let server = new URL(serverUrl)
     let url = new URL(value, server)
 
-    if (url.protocol !== 'https:' || url.origin !== server.origin) return null
+    if (url.protocol !== 'https:') return null
+
+    let allowedOrigins = new Set([
+      server.origin,
+      ...getDefaultAllowedIconOrigins(serverUrl),
+    ])
+
+    if (!allowedOrigins.has(url.origin)) return null
 
     return url.toString()
   } catch (err) {
@@ -71,9 +91,27 @@ function sanitizePlayer(player, serverUrl) {
   }
 }
 
+function sanitizeFriends(friends, serverUrl) {
+  if (!Array.isArray(friends)) return []
+
+  let sanitized = []
+
+  for (let friend of friends) {
+    let player = sanitizePlayer(friend, serverUrl)
+    if (player == null || player.id == null) continue
+
+    // Online status is unknown until a `user/state` socket event arrives
+    // for this friend (see `user/monitor` in the goban protocol).
+    sanitized.push({...player, online: null})
+  }
+
+  return sanitized
+}
+
 module.exports = {
   resolveOgsUrl,
   sanitizeUser,
   sanitizePlayers,
   sanitizePlayer,
+  sanitizeFriends,
 }

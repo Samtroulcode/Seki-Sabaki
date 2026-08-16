@@ -45,6 +45,8 @@ const {
   sanitizeUser,
   sanitizePlayers,
   sanitizePlayer,
+  sanitizeFriends,
+  resolveOgsUrl,
 } = require('./ogs/users.js')
 const {ratingToRank} = require('./ogs/ranks.js')
 const {
@@ -418,6 +420,7 @@ class OgsClient {
     this.pendingNetworkPings = new Set()
     this.lastNetworkPingClient = null
     this.lastNetworkPongClient = null
+    this.friends = []
   }
 
   getSession() {
@@ -440,6 +443,7 @@ class OgsClient {
       matchmaking: {...this.matchmaking},
       onlineGame: cloneOnlineGameState(this.onlineGame),
       activeGames: this.activeGames.map(cloneActiveGameState),
+      friends: this.friends.map((friend) => ({...friend})),
     }
   }
 
@@ -467,6 +471,7 @@ class OgsClient {
     this.pendingNetworkPings = new Set()
     this.lastNetworkPingClient = null
     this.lastNetworkPongClient = null
+    this.friends = []
     this.emitStateChange()
     return true
   }
@@ -530,6 +535,19 @@ class OgsClient {
 
     let user = sanitizeUser(this.serverUrl, loginData.user)
 
+    if (user.iconUrl == null) {
+      let iconUrl = await this.fetchPlayerIconUrl(user.id)
+      if (iconUrl != null) user = {...user, iconUrl}
+    }
+
+    // The session cookie authenticates OGS REST endpoints that require a
+    // signed-in user (e.g. the friends list). It is kept in memory only for
+    // this process and is never persisted to disk with the JWT.
+    let sessionCookieHeader = getCookieHeader([
+      ...extractSetCookie(configResponse.headers),
+      ...extractSetCookie(loginResponse.headers),
+    ])
+
     await this.socket.connect(jwtToken)
     this.sendNetworkPing()
 
@@ -540,7 +558,11 @@ class OgsClient {
       return this.getSession()
     }
 
-    this.session = {jwtToken, user}
+    this.session = {
+      jwtToken,
+      user,
+      cookieHeader: sessionCookieHeader !== '' ? sessionCookieHeader : null,
+    }
     if (!this.persistSession({jwtToken, user})) {
       this.credentialStore?.clearSession?.()
     }
@@ -651,6 +673,100 @@ class OgsClient {
     } catch (err) {
       return false
     }
+  }
+
+  async fetchPlayerIconUrl(userId) {
+    let sanitizedUserId = sanitizeOptionalGameId(userId)
+    if (sanitizedUserId == null || typeof this.fetch !== 'function') {
+      return null
+    }
+
+    try {
+      // OGS documents player profiles as anonymously readable where ACL
+      // permits, so this does not require the session cookie.
+      let response = await this.fetch(
+        `${this.serverUrl}/api/v1/players/${sanitizedUserId}/`,
+        {
+          headers: {'User-Agent': USER_AGENT, Accept: 'application/json'},
+          redirect: 'error',
+        },
+      )
+
+      if (!response?.ok) return null
+
+      let data = await response.json()
+      let icon = data?.icon || data?.icon_url || data?.picture || data?.avatar
+
+      return resolveOgsUrl(this.serverUrl, icon)
+    } catch (err) {
+      return null
+    }
+  }
+
+  async listFriends() {
+    if (this.session == null) {
+      throw new OgsError('not-authenticated', 'Connect to OGS first.')
+    }
+
+    if (typeof this.fetch !== 'function') {
+      throw new OgsError('network', 'Fetch is not available.')
+    }
+
+    if (!this.session.cookieHeader) {
+      throw new OgsError(
+        'not-authenticated',
+        'Sign in again in this session to load OGS friends.',
+      )
+    }
+
+    let response = await this.fetch(`${this.serverUrl}/api/v1/ui/friends`, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'application/json',
+        Cookie: this.session.cookieHeader,
+      },
+      redirect: 'error',
+    })
+
+    await assertOk(response, 'friends')
+
+    let data = await response.json()
+    let friends = sanitizeFriends(data?.friends, this.serverUrl)
+
+    this.friends = friends
+    this.monitorFriendsPresence(friends.map((friend) => friend.id))
+    this.emitStateChange()
+
+    return friends
+  }
+
+  monitorFriendsPresence(userIds) {
+    let ids = (userIds || []).filter((id) => Number.isInteger(id))
+    if (ids.length === 0) return
+    if (this.socket.getState().status !== 'authenticated') return
+
+    try {
+      this.socket.send('user/monitor', {user_ids: ids})
+    } catch (err) {}
+  }
+
+  applyUserStatePayload(payload) {
+    if (payload == null || typeof payload !== 'object') return false
+
+    let changed = false
+
+    this.friends = this.friends.map((friend) => {
+      let key = String(friend.id)
+      if (!Object.prototype.hasOwnProperty.call(payload, key)) return friend
+
+      let online = Boolean(payload[key])
+      if (friend.online === online) return friend
+
+      changed = true
+      return {...friend, online}
+    })
+
+    return changed
   }
 
   setMatchmakingOptions(options) {
@@ -1084,6 +1200,11 @@ class OgsClient {
     if (event === 'net/pong') {
       this.handleNetworkPong(payload)
       this.emitStateChange()
+      return
+    }
+
+    if (event === 'user/state') {
+      if (this.applyUserStatePayload(payload)) this.emitStateChange()
       return
     }
 
@@ -2006,6 +2127,18 @@ function setupOgsIpcHandlers(
       return {ok: true, reviews: await client.listAiReviews(input || {})}
     } catch (err) {
       return {ok: false, error: serializeError(err)}
+    }
+  })
+
+  ipcMain.handle('ogs:listFriends', async () => {
+    try {
+      return {
+        ok: true,
+        friends: await client.listFriends(),
+        state: client.getState(),
+      }
+    } catch (err) {
+      return {ok: false, error: serializeError(err), state: client.getState()}
     }
   })
 

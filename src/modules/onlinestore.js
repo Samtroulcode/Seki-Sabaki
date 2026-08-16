@@ -29,6 +29,9 @@ export function createInitialOnlineState() {
     gameHistoryHasPrevious: false,
     gameHistoryBusy: false,
     gameHistoryError: null,
+    friends: [],
+    friendsBusy: false,
+    friendsError: null,
   }
 }
 
@@ -188,6 +191,9 @@ export class OnlineStore {
       gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
+      friends: [],
+      friendsBusy: false,
+      friendsError: null,
     })
 
     await this.ogs().logout()
@@ -261,6 +267,43 @@ export class OnlineStore {
     }
 
     this.setState({gameHistoryBusy: false})
+    return result
+  }
+
+  async refreshFriends() {
+    let sessionRequestId = this.sessionRequestId
+
+    this.setState({friendsBusy: true, friendsError: null})
+
+    let result
+
+    try {
+      result = await this.ogs().listFriends()
+    } catch (err) {
+      result = {
+        ok: false,
+        error: serializeOnlineStoreError(err, {
+          code: 'friends-failed',
+          message: t('Unable to load OGS friends.'),
+        }),
+      }
+    }
+
+    if (sessionRequestId !== this.sessionRequestId) return result
+
+    if (result.ok) {
+      this.setState({friends: result.friends || [], friendsError: null})
+    } else {
+      this.applySyncError(result.error, {
+        code: result.error?.code || 'friends-failed',
+        message: result.error?.message || t('Unable to load OGS friends.'),
+      })
+      this.setState({
+        friendsError: result.error?.message || t('Unable to load OGS friends.'),
+      })
+    }
+
+    this.setState({friendsBusy: false})
     return result
   }
 
@@ -530,6 +573,9 @@ export class OnlineStore {
         : this.state.gameHistoryHasPrevious,
       gameHistoryBusy: userChanged ? false : this.state.gameHistoryBusy,
       gameHistoryError: userChanged ? null : this.state.gameHistoryError,
+      friends: state?.friends || (userChanged ? [] : this.state.friends),
+      friendsBusy: userChanged ? false : this.state.friendsBusy,
+      friendsError: userChanged ? null : this.state.friendsError,
       connected: true,
       ...extra,
     })
@@ -556,6 +602,9 @@ export class OnlineStore {
       gameHistoryHasPrevious: false,
       gameHistoryBusy: false,
       gameHistoryError: null,
+      friends: [],
+      friendsBusy: false,
+      friendsError: null,
       connected: false,
       ...extra,
     })

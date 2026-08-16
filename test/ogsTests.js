@@ -141,6 +141,16 @@ function loginFetch(url, options = {}) {
     })
   }
 
+  if (url.endsWith('/api/v1/players/7/')) {
+    return response({
+      body: {
+        id: 7,
+        username: 'sente',
+        icon: 'https://user-uploads.online-go.com/avatar-7.png',
+      },
+    })
+  }
+
   return response({
     body: {
       user_jwt: 'jwt-token',
@@ -229,7 +239,7 @@ describe('OGS client', () => {
 
     let user = await client.login({username: ' sente ', password: 'secret'})
 
-    assert.strictEqual(calls.length, 2)
+    assert.strictEqual(calls.length, 3)
     assert.strictEqual(calls[0].options.redirect, 'error')
     assert.strictEqual(calls[1].options.method, 'POST')
     assert.strictEqual(calls[1].options.redirect, 'error')
@@ -239,8 +249,13 @@ describe('OGS client', () => {
       username: 'sente',
       password: 'secret',
     })
+    assert.ok(calls[2].url.endsWith('/api/v1/players/7/'))
     assert.deepStrictEqual(user, client.getSession())
     assert.strictEqual(user.jwtToken, undefined)
+    assert.strictEqual(
+      user.iconUrl,
+      'https://user-uploads.online-go.com/avatar-7.png',
+    )
     assert.strictEqual(client.getState().socket.status, 'authenticated')
     assert.strictEqual(client.getState().socket.authenticated, true)
 
@@ -316,6 +331,88 @@ describe('OGS client', () => {
         white: {id: 8, username: 'gote', rank: '2k'},
       },
     ])
+  })
+
+  it('loads OGS friends using the login session cookie and monitors presence', async () => {
+    FakeWebSocket.instances = []
+    let calls = []
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async (url, options = {}) => {
+        calls.push({url, options})
+
+        if (url.endsWith('/api/v1/ui/friends')) {
+          return response({
+            body: {
+              friends: [
+                {
+                  id: 8,
+                  username: 'gote',
+                  icon: 'https://user-uploads.online-go.com/avatar-8.png',
+                  ranking: 15,
+                },
+              ],
+              friend_requests: [],
+              friend_requests_sent: [],
+            },
+          })
+        }
+
+        return loginFetch(url, options)
+      },
+    })
+
+    await client.login({username: 'sente', password: 'secret'})
+
+    let friends = await client.listFriends()
+
+    assert.deepStrictEqual(friends, [
+      {
+        id: 8,
+        username: 'gote',
+        rank: '15k',
+        rating: null,
+        iconUrl: 'https://user-uploads.online-go.com/avatar-8.png',
+        online: null,
+      },
+    ])
+    assert.deepStrictEqual(client.getState().friends, friends)
+
+    let friendsCall = calls.find((call) => call.url.endsWith('/ui/friends'))
+    assert.strictEqual(friendsCall.options.headers.Cookie, 'csrftoken=csrf')
+
+    let socket = FakeWebSocket.instances[0]
+    let monitorMessage = socket.sent
+      .map((message) => JSON.parse(message))
+      .find((message) => message[0] === 'user/monitor')
+
+    assert.deepStrictEqual(monitorMessage[1], {user_ids: [8]})
+
+    socket.receive('user/state', {8: true})
+
+    assert.deepStrictEqual(client.getState().friends, [
+      {...friends[0], online: true},
+    ])
+
+    socket.receive('user/state', {8: false})
+
+    assert.deepStrictEqual(client.getState().friends, [
+      {...friends[0], online: false},
+    ])
+  })
+
+  it('rejects listing OGS friends without an authenticated session', async () => {
+    let client = new OgsClient({
+      webSocketImpl: FakeWebSocket,
+      fetchImpl: async () => {
+        throw new Error('fetch should not be called')
+      },
+    })
+
+    await assert.rejects(
+      () => client.listFriends(),
+      (err) => err instanceof OgsError && err.code === 'not-authenticated',
+    )
   })
 
   it('caps sanitized OGS game history to the requested page size', async () => {

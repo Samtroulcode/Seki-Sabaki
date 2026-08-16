@@ -8,6 +8,7 @@ import onlineStore from '../../modules/onlinestore.js'
 import {getOgsOnlineController} from '../../modules/ogsonlinecontroller.js'
 import {AccountStatus, LoginForm} from './OgsPanelAccount.js'
 import {OgsGameHistoryPanel} from './OgsGameHistory.js'
+import {OgsFriendsPanel} from './OgsFriendsList.js'
 import {AutomatchForm} from './OgsPanelMatchmaking.js'
 import {defaultMatchmakingOptions, getSocketLabel} from './ogsPanelData.js'
 
@@ -143,6 +144,10 @@ export default class OgsPanel extends Component {
       await onlineStore.cancelAutomatch()
     }
 
+    this.handleRefreshFriendsButtonClick = async () => {
+      await onlineStore.refreshFriends()
+    }
+
     this.handleOnlineStoreState = (state) => this.setState(state)
 
     this.lastFallbackRefreshAt = 0
@@ -157,6 +162,7 @@ export default class OgsPanel extends Component {
 
     if (this.state.connected) {
       await onlineStore.refreshGameHistory({page: 1, pageSize: 12})
+      await onlineStore.refreshFriends()
     }
   }
 
@@ -201,6 +207,9 @@ export default class OgsPanel extends Component {
       gameHistoryHasPrevious,
       gameHistoryBusy,
       gameHistoryError,
+      friends,
+      friendsBusy,
+      friendsError,
     },
   ) {
     let matchmakingOptions = matchmaking?.options || defaultMatchmakingOptions
@@ -216,12 +225,24 @@ export default class OgsPanel extends Component {
         h(
           'div',
           {class: 'ogs-dashboard-title'},
-          h('div', {class: 'ogs-panel-logo'}, 'OGS'),
+          connected && user?.iconUrl != null
+            ? h('img', {
+                class: 'ogs-panel-logo ogs-panel-logo-avatar',
+                src: user.iconUrl,
+                alt: '',
+              })
+            : h('div', {class: 'ogs-panel-logo'}, 'OGS'),
           h(
             'div',
             {},
             h('p', {class: 'ogs-dashboard-kicker'}, t('Online workspace')),
-            h('h2', {}, t('Online Go Server')),
+            h(
+              'h2',
+              {},
+              connected && user?.username
+                ? t(`Welcome back, ${user.username}`)
+                : t('Online Go Server'),
+            ),
             h('p', {}, t('Play, review history, and manage your account.')),
           ),
         ),
@@ -306,6 +327,17 @@ export default class OgsPanel extends Component {
                   'section',
                   {class: 'ogs-dashboard-card'},
                   h(AccountStatus, {user, username, socket}),
+                ),
+                h(
+                  'section',
+                  {class: 'ogs-dashboard-card ogs-dashboard-friends-card'},
+                  h(OgsFriendsPanel, {
+                    friends,
+                    busy: friendsBusy,
+                    error: friendsError,
+                    authenticated,
+                    onRefresh: this.handleRefreshFriendsButtonClick,
+                  }),
                 ),
               ),
             ),
