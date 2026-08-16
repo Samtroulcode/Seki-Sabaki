@@ -7,9 +7,10 @@
 // Solution markers are read from node comments (`C`) containing "Correct
 // Answer". The first correct move is the shallowest such node that carries a
 // move (`B`/`W`). The starting position is that move's parent, and the player
-// to move is the color of that first move (overridable by `PL` on the starting
-// position). If no reliable marker is found, `analyzeProblem` returns `null`
-// rather than guessing.
+// to move is the color of that first move. A `PL` on the starting position must
+// agree with that color; if it contradicts it, the problem is considered
+// unreliable and `analyzeProblem` returns `null`. If no reliable marker is
+// found, `analyzeProblem` returns `null` rather than guessing.
 
 const CORRECT_ANSWER_RE = /\bcorrect answer\b/i
 
@@ -81,10 +82,13 @@ export function analyzeProblem(tree, options = {}) {
   let startNodeId = best.node.parentId
   let playerToMove = best.node.data.B != null ? 'B' : 'W'
 
+  // The first correct move's color defines the player to move. A `PL` on the
+  // starting position must agree with it; a contradicting `PL` makes the
+  // problem unreliable, so fail cleanly instead of picking one arbitrarily.
   let startNode = tree.get(startNodeId)
   if (startNode != null && startNode.data.PL != null) {
     let pl = startNode.data.PL[0]
-    if (pl === 'B' || pl === 'W') playerToMove = pl
+    if ((pl === 'B' || pl === 'W') && pl !== playerToMove) return null
   }
 
   return {startNodeId, playerToMove, firstMove: best.node}

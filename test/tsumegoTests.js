@@ -134,15 +134,37 @@ describe('analyzeProblem', () => {
     assert.strictEqual(result.firstMove.data.B[0], 'gl')
   })
 
-  it('uses PL on the starting position to determine the player to move', () => {
+  it('keeps the first-move color when a matching PL is on the starting position', () => {
+    // FF[4] forbids mixing a move (B/W) and a setup property (PL) in one node,
+    // so the starting position is a setup node carrying only PL.
     let tree = gametree.new().mutate((draft) => {
-      let setup = draft.appendNode(draft.root.id, {W: ['gm'], PL: ['W']})
+      let setup = draft.appendNode(draft.root.id, {PL: ['B']})
       draft.appendNode(setup, {B: ['gl'], C: ['Correct Answer']})
     })
 
     let result = analyzeProblem(tree)
     assert(result != null)
-    assert.strictEqual(result.playerToMove, 'W')
+    assert.strictEqual(result.playerToMove, 'B')
+  })
+
+  it('returns null when PL on the starting position contradicts the first move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let setup = draft.appendNode(draft.root.id, {PL: ['W']})
+      draft.appendNode(setup, {B: ['gl'], C: ['Correct Answer']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('ignores an invalid PL on the starting position', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let setup = draft.appendNode(draft.root.id, {PL: ['X']})
+      draft.appendNode(setup, {B: ['gl'], C: ['Correct Answer']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.playerToMove, 'B')
   })
 
   it('ignores TE markers unless the tsumego fallback is enabled', () => {
