@@ -541,8 +541,8 @@ class OgsClient {
     }
 
     // The session cookie authenticates OGS REST endpoints that require a
-    // signed-in user (e.g. the friends list). It is kept in memory only for
-    // this process and is never persisted to disk with the JWT.
+    // signed-in user (e.g. the friends list). When secure persistence is
+    // available, it is stored encrypted alongside the JWT.
     let sessionCookieHeader = getCookieHeader([
       ...extractSetCookie(configResponse.headers),
       ...extractSetCookie(loginResponse.headers),
@@ -563,7 +563,9 @@ class OgsClient {
       user,
       cookieHeader: sessionCookieHeader !== '' ? sessionCookieHeader : null,
     }
-    if (!this.persistSession({jwtToken, user})) {
+    if (
+      !this.persistSession({jwtToken, cookieHeader: sessionCookieHeader, user})
+    ) {
       this.credentialStore?.clearSession?.()
     }
     this.emitStateChange()
@@ -645,6 +647,11 @@ class OgsClient {
 
       this.session = {
         jwtToken: storedSession.jwtToken,
+        cookieHeader:
+          typeof storedSession.cookieHeader === 'string' &&
+          storedSession.cookieHeader !== ''
+            ? storedSession.cookieHeader
+            : null,
         user,
       }
 
@@ -678,11 +685,12 @@ class OgsClient {
     return this.getState()
   }
 
-  persistSession({jwtToken, user}) {
+  persistSession({jwtToken, cookieHeader = null, user}) {
     try {
       return !!this.credentialStore?.saveSession?.({
         serverUrl: this.serverUrl,
         jwtToken,
+        cookieHeader,
         user,
         createdAt: this.now(),
       })

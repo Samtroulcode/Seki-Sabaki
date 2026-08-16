@@ -29,7 +29,13 @@ class OgsCredentialStore {
       : null
   }
 
-  saveSession({serverUrl, jwtToken, user, createdAt = Date.now()} = {}) {
+  saveSession({
+    serverUrl,
+    jwtToken,
+    cookieHeader = null,
+    user,
+    createdAt = Date.now(),
+  } = {}) {
     if (!this.isAvailable()) return false
     if (typeof jwtToken !== 'string' || jwtToken === '') return false
 
@@ -40,6 +46,11 @@ class OgsCredentialStore {
       user,
       createdAt,
       encryptedToken: Buffer.from(encryptedToken).toString('base64'),
+    }
+
+    if (typeof cookieHeader === 'string' && cookieHeader !== '') {
+      let encryptedCookie = this.safeStorage.encryptString(cookieHeader)
+      data.encryptedCookie = Buffer.from(encryptedCookie).toString('base64')
     }
 
     fs.mkdirSync(path.dirname(this.storagePath), {recursive: true})
@@ -67,9 +78,25 @@ class OgsCredentialStore {
 
     if (typeof jwtToken !== 'string' || jwtToken === '') return null
 
+    let cookieHeader = null
+
+    if (
+      typeof data.encryptedCookie === 'string' &&
+      data.encryptedCookie !== ''
+    ) {
+      cookieHeader = this.safeStorage.decryptString(
+        Buffer.from(data.encryptedCookie, 'base64'),
+      )
+
+      if (typeof cookieHeader !== 'string' || cookieHeader === '') {
+        cookieHeader = null
+      }
+    }
+
     return {
       serverUrl: typeof data.serverUrl === 'string' ? data.serverUrl : '',
       jwtToken,
+      cookieHeader,
       user: data.user,
       createdAt: data.createdAt,
     }

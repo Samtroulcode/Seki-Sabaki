@@ -31,6 +31,7 @@ describe('OGS credential store', () => {
       store.saveSession({
         serverUrl: 'https://online-go.com',
         jwtToken: 'secret-jwt',
+        cookieHeader: 'sessionid=secret-cookie; csrftoken=csrf',
         user: {id: '7', username: 'sente'},
         createdAt: 1234,
       }),
@@ -39,10 +40,12 @@ describe('OGS credential store', () => {
 
     let raw = fs.readFileSync(storagePath, 'utf8')
     assert.strictEqual(raw.includes('secret-jwt'), false)
+    assert.strictEqual(raw.includes('secret-cookie'), false)
 
     assert.deepStrictEqual(store.loadSession(), {
       serverUrl: 'https://online-go.com',
       jwtToken: 'secret-jwt',
+      cookieHeader: 'sessionid=secret-cookie; csrftoken=csrf',
       user: {id: '7', username: 'sente'},
       createdAt: 1234,
     })

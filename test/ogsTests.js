@@ -560,6 +560,7 @@ describe('OGS client', () => {
     assert.strictEqual(clearCount, 0)
     assert.strictEqual(savedSession.serverUrl, 'https://online-go.com')
     assert.strictEqual(savedSession.jwtToken, 'jwt-token')
+    assert.strictEqual(savedSession.cookieHeader, 'csrftoken=csrf')
     assert.strictEqual(savedSession.user.username, 'sente')
     assert.strictEqual(savedSession.createdAt, 1234)
     assert.strictEqual(client.getSession().jwtToken, undefined)
@@ -598,6 +599,7 @@ describe('OGS client', () => {
         loadSession: () => ({
           serverUrl: 'https://online-go.com',
           jwtToken: 'stored-jwt',
+          cookieHeader: 'sessionid=stored-cookie; csrftoken=csrf',
           user,
         }),
         clearSession: () => true,
@@ -618,6 +620,58 @@ describe('OGS client', () => {
       JSON.parse(FakeWebSocket.instances[0].sent[0])[1].jwt,
       'stored-jwt',
     )
+    assert.strictEqual(
+      client.session.cookieHeader,
+      'sessionid=stored-cookie; csrftoken=csrf',
+    )
+  })
+
+  it('loads OGS friends after restoring a persisted session cookie', async () => {
+    FakeWebSocket.instances = []
+    let client = new OgsClient({
+      fetchImpl: async (url, options = {}) => {
+        if (url.endsWith('/api/v1/ui/friends')) {
+          assert.strictEqual(
+            options.headers.Cookie,
+            'sessionid=stored-cookie; csrftoken=csrf',
+          )
+
+          return response({
+            body: {
+              friends: [{id: 8, username: 'gote', ranking: 15}],
+              friend_requests: [],
+              friend_requests_sent: [],
+            },
+          })
+        }
+
+        return response({status: 404, body: {}})
+      },
+      webSocketImpl: FakeWebSocket,
+      credentialStore: {
+        loadSession: () => ({
+          serverUrl: 'https://online-go.com',
+          jwtToken: 'stored-jwt',
+          cookieHeader: 'sessionid=stored-cookie; csrftoken=csrf',
+          user: {id: '7', username: 'sente', rank: '1d', iconUrl: null},
+        }),
+        clearSession: () => true,
+      },
+    })
+
+    await client.restoreStoredSession()
+    let friends = await client.listFriends()
+
+    assert.deepStrictEqual(friends, [
+      {
+        id: 8,
+        username: 'gote',
+        rank: '15k',
+        rating: null,
+        iconUrl: null,
+        online: null,
+      },
+    ])
   })
 
   it('ignores stale restore failures after a manual login starts', async () => {
