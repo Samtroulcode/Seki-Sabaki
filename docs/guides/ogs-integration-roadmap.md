@@ -18,9 +18,9 @@ accounts.
 Current OGS work supports a minimal online-play slice:
 
 - OGS login/session state is owned by the main process.
-- OGS session persistence stores only the OGS JWT as a credential, encrypted
-  with Electron `safeStorage` in `ogs-session.json` under `userData`; passwords
-  are never stored and OGS credentials are not written to settings.
+- OGS session persistence stores the OGS JWT and session cookie encrypted with
+  Electron `safeStorage` in `ogs-session.json` under `userData`; passwords are
+  never stored and OGS credentials are not written to settings.
 - `OnlineStore.initialize()` asks the main-process OGS client to restore the
   stored session on app start. If `safeStorage` is unavailable or Electron
   reports the unprotected `basic_text` backend, persistence is disabled and the
@@ -43,6 +43,48 @@ Cleanup still in progress:
 - `OgsPanel` still contains dashboard orchestration.
 - Notifications, historical game review, custom challenges, social surfaces, and
   broader game history remain roadmap items.
+
+## Delivery Roadmap Checklist
+
+This checklist tracks the next three functional delivery lots. Verify each item
+before checking it. **Delete this entire section once all three lots are
+complete.**
+
+### Lot 1 — Online Game UX And Player Stats
+
+- [ ] Complete the `online-game` tab refactor: clearer player cards, opponent
+      avatar and rank, cleaner chat, clocks, game state, and network errors.
+- [ ] Add a dedicated OGS player statistics card using only verified OGS data
+      (profile, rank/rating, available results and history indicators).
+- [ ] Cover the online-game and player-statistics workflows with fake OGS state
+      and deterministic tests.
+
+### Lot 2 — Private Chat And Challenges
+
+- [ ] Add private chat with friends and other known players using the verified
+      OGS private-message protocol.
+- [ ] Keep private messages clearly separate from active-game chat, with
+      loading, reconnect, error, and unread-message states.
+- [ ] Add direct friend challenges with a minimal custom challenge form.
+- [ ] Add custom challenge creation and browsing with verified options for
+      rules, time control, board size, handicap, color, ranked status, and
+      privacy.
+- [ ] Cover challenge creation, acceptance, cancellation, and stale/reconnect
+      states with fake OGS transports.
+
+### Lot 3 — Community And Collaborative Features
+
+- [ ] Add a community card with verified OGS surfaces such as groups, ladders,
+      tournaments, and relevant account activity.
+- [ ] Research and document the supported OGS demo-board creation and sharing
+      workflow before implementing it.
+- [ ] Research and document OGS collaborative-review invitations and permissions
+      before implementing them.
+- [ ] Verify whether locally generated AI reviews can be published or shared on
+      OGS; do not assume that OGS AI reviews and local reviews are
+      interchangeable.
+- [ ] Reassess privacy, authentication, permissions, and compatibility risks for
+      every community or collaborative feature before implementation.
 
 ## Priorities
 
