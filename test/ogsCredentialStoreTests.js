@@ -51,6 +51,35 @@ describe('OGS credential store', () => {
     })
   })
 
+  it('normalizes duplicated persisted OGS cookies on load', () => {
+    let directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sabaki-ogs-store-'))
+    let storagePath = path.join(directory, 'ogs-session.json')
+    let store = new OgsCredentialStore({
+      safeStorage: createSafeStorage(),
+      storagePath,
+    })
+
+    assert.strictEqual(
+      store.saveSession({
+        serverUrl: 'https://online-go.com',
+        jwtToken: 'secret-jwt',
+        cookieHeader:
+          'csrftoken=old; sessionid=old; csrftoken=new; sessionid=new',
+        user: {id: '7', username: 'sente'},
+        createdAt: 1234,
+      }),
+      true,
+    )
+
+    assert.deepStrictEqual(store.loadSession(), {
+      serverUrl: 'https://online-go.com',
+      jwtToken: 'secret-jwt',
+      cookieHeader: 'csrftoken=new; sessionid=new',
+      user: {id: '7', username: 'sente'},
+      createdAt: 1234,
+    })
+  })
+
   it('does not persist when encryption is unavailable', () => {
     let directory = fs.mkdtempSync(path.join(os.tmpdir(), 'sabaki-ogs-store-'))
     let storagePath = path.join(directory, 'ogs-session.json')

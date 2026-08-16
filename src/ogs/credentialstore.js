@@ -1,6 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 
+const {normalizeCookieHeader} = require('./auth.js')
+
 const STORE_VERSION = 1
 const STORE_FILENAME = 'ogs-session.json'
 
@@ -38,6 +40,8 @@ class OgsCredentialStore {
   } = {}) {
     if (!this.isAvailable()) return false
     if (typeof jwtToken !== 'string' || jwtToken === '') return false
+
+    cookieHeader = normalizeCookieHeader(cookieHeader)
 
     let encryptedToken = this.safeStorage.encryptString(jwtToken)
     let data = {
@@ -87,10 +91,7 @@ class OgsCredentialStore {
       cookieHeader = this.safeStorage.decryptString(
         Buffer.from(data.encryptedCookie, 'base64'),
       )
-
-      if (typeof cookieHeader !== 'string' || cookieHeader === '') {
-        cookieHeader = null
-      }
+      cookieHeader = normalizeCookieHeader(cookieHeader)
     }
 
     return {

@@ -28,10 +28,33 @@ function extractSetCookie(headers) {
 }
 
 function getCookieHeader(setCookies) {
-  return setCookies
-    .map((cookie) => cookie.split(';')[0].trim())
-    .filter((cookie) => cookie !== '')
-    .join('; ')
+  let cookiesByName = new Map()
+
+  for (let cookie of setCookies) {
+    let pair = cookie.split(';')[0].trim()
+    if (pair === '') continue
+
+    let separatorIndex = pair.indexOf('=')
+    if (separatorIndex <= 0) continue
+
+    let name = pair.slice(0, separatorIndex).trim()
+    let value = pair.slice(separatorIndex + 1).trim()
+    if (name === '') continue
+
+    // Keep the latest value for each cookie name. OGS may rotate csrftoken
+    // and sessionid between config and login responses.
+    cookiesByName.set(name, `${name}=${value}`)
+  }
+
+  return [...cookiesByName.values()].join('; ')
+}
+
+function normalizeCookieHeader(cookieHeader) {
+  if (typeof cookieHeader !== 'string' || cookieHeader.trim() === '')
+    return null
+
+  let normalized = getCookieHeader(cookieHeader.split(';'))
+  return normalized === '' ? null : normalized
 }
 
 async function assertOk(response, step) {
@@ -51,5 +74,6 @@ module.exports = {
   assertLoginInput,
   extractSetCookie,
   getCookieHeader,
+  normalizeCookieHeader,
   assertOk,
 }

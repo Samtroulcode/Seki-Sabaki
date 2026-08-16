@@ -6,6 +6,7 @@ import {
   assertOk,
   extractSetCookie,
   getCookieHeader,
+  normalizeCookieHeader,
 } from '../src/ogs/auth.js'
 
 describe('OGS auth helpers', () => {
@@ -37,6 +38,21 @@ describe('OGS auth helpers', () => {
     assert.strictEqual(
       getCookieHeader(['a=1; Path=/', ' b=2 ; Path=/']),
       'a=1; b=2',
+    )
+    assert.strictEqual(
+      getCookieHeader([
+        'csrftoken=old; Path=/',
+        'sessionid=old; Path=/',
+        'csrftoken=new; Path=/',
+        'sessionid=new; Path=/',
+      ]),
+      'csrftoken=new; sessionid=new',
+    )
+    assert.strictEqual(
+      normalizeCookieHeader(
+        'csrftoken=old; sessionid=old; csrftoken=new; sessionid=new',
+      ),
+      'csrftoken=new; sessionid=new',
     )
   })
 
