@@ -159,10 +159,20 @@ export default class OgsPanel extends Component {
     )
     this.pollTimer = setInterval(() => this.refreshOgsStateIfDue(), 2000)
     await this.refreshOgsState()
+    this.refreshConnectedSectionsIfNeeded()
+  }
 
-    if (this.state.connected) {
-      await onlineStore.refreshGameHistory({page: 1, pageSize: 12})
-      await onlineStore.refreshFriends()
+  componentDidUpdate(prevProps, prevState) {
+    if (prevState.connected && !this.state.connected) {
+      this.lastConnectedUserId = null
+      return
+    }
+
+    if (
+      (!prevState.connected && this.state.connected) ||
+      prevState.user?.id !== this.state.user?.id
+    ) {
+      this.refreshConnectedSectionsIfNeeded()
     }
   }
 
@@ -189,6 +199,22 @@ export default class OgsPanel extends Component {
 
     this.lastFallbackRefreshAt = now
     await this.refreshOgsState()
+  }
+
+  async refreshConnectedSectionsIfNeeded() {
+    let state = onlineStore.getState()
+    let userId = state.user?.id ?? null
+
+    if (!state.connected || userId == null) {
+      this.lastConnectedUserId = null
+      return
+    }
+
+    if (this.lastConnectedUserId === userId) return
+    this.lastConnectedUserId = userId
+
+    await onlineStore.refreshGameHistory({page: 1, pageSize: 12})
+    await onlineStore.refreshFriends()
   }
 
   render(
@@ -335,7 +361,7 @@ export default class OgsPanel extends Component {
                     friends,
                     busy: friendsBusy,
                     error: friendsError,
-                    authenticated,
+                    connected,
                     onRefresh: this.handleRefreshFriendsButtonClick,
                   }),
                 ),

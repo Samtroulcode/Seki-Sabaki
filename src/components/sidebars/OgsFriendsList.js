@@ -8,7 +8,7 @@ export function OgsFriendsPanel({
   friends = [],
   busy = false,
   error = null,
-  authenticated = false,
+  connected = false,
   onRefresh,
 }) {
   return h(
@@ -23,7 +23,7 @@ export function OgsFriendsPanel({
         h('h3', {}, t('Friends')),
         h('p', {}, t('See who is online and jump into a game together.')),
       ),
-      authenticated &&
+      connected &&
         h(
           'button',
           {type: 'button', disabled: busy, onClick: onRefresh},
@@ -31,7 +31,7 @@ export function OgsFriendsPanel({
         ),
     ),
     error != null && h('p', {class: 'ogs-error'}, error),
-    !authenticated
+    !connected
       ? h('p', {class: 'ogs-empty'}, t('Connect OGS to see your friends.'))
       : friends.length === 0
         ? h(

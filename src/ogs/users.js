@@ -6,35 +6,55 @@ const {
   sanitizeString,
 } = require('./sanitize.js')
 
-function getDefaultAllowedIconOrigins(serverUrl) {
+function getUserUploadsOrigin(serverUrl) {
   try {
     let server = new URL(serverUrl)
 
     // OGS serves uploaded avatars from a dedicated subdomain, separate from
     // the main site origin. Verified against https://online-go.com/api/v1/
     // players/{id}/ returning icons hosted on user-uploads.online-go.com.
-    return [`https://user-uploads.${server.hostname}`]
+    return `https://user-uploads.${server.hostname}`
   } catch (err) {
-    return []
+    return null
   }
+}
+
+function getImageHash(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null
+
+  if (/^[0-9a-fA-F]{16,32}$/.test(value)) return value
+
+  if (!value.startsWith('https://')) return null
+
+  let hash = value.replace('.png', '').split('/').pop()?.split('-')[0]
+  return hash != null && /^[0-9a-fA-F]{16,32}$/.test(hash) ? hash : null
 }
 
 function resolveOgsUrl(serverUrl, value) {
   if (typeof value !== 'string' || value.trim() === '') return null
+  if (value.trim().startsWith('//')) return null
 
   try {
     let server = new URL(serverUrl)
     let url = new URL(value, server)
+    let userUploadsOrigin = getUserUploadsOrigin(serverUrl)
 
     if (url.protocol !== 'https:') return null
+    if (url.username !== '' || url.password !== '') return null
 
-    let allowedOrigins = new Set([
-      server.origin,
-      ...getDefaultAllowedIconOrigins(serverUrl),
-    ])
+    let hash = getImageHash(url.toString())
+    if (hash != null && userUploadsOrigin != null) {
+      return `${userUploadsOrigin}/${hash}.png`
+    }
 
-    if (!allowedOrigins.has(url.origin)) return null
+    if (url.origin === server.origin || url.origin === userUploadsOrigin) {
+      return url.toString()
+    }
 
+    // Match the upstream OGS web client more closely: once the URL is a valid
+    // https absolute URL and isn't one of the known user-uploads forms we
+    // rewrite, keep it as-is. This covers external avatar providers used by
+    // real OGS accounts.
     return url.toString()
   } catch (err) {
     return null

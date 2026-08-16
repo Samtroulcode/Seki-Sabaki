@@ -647,6 +647,22 @@ class OgsClient {
         jwtToken: storedSession.jwtToken,
         user,
       }
+
+      if (user.iconUrl == null) {
+        let iconUrl = await this.fetchPlayerIconUrl(user.id)
+        if (
+          iconUrl != null &&
+          sessionRevision === (this.sessionRevision || 0) &&
+          sessionRevision === this.socketAuthRevision &&
+          this.session != null
+        ) {
+          this.session = {
+            ...this.session,
+            user: {...this.session.user, iconUrl},
+          }
+        }
+      }
+
       this.emitStateChange()
     } catch (err) {
       if (sessionRevision !== (this.sessionRevision || 0)) {

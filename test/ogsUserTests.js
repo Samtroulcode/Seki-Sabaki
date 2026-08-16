@@ -9,14 +9,18 @@ import {
 } from '../src/ogs/users.js'
 
 describe('OGS user helpers', () => {
-  it('resolves only same-origin HTTPS OGS URLs', () => {
+  it('resolves OGS avatar URLs using upstream-compatible HTTPS rules', () => {
     assert.strictEqual(
       resolveOgsUrl('https://online-go.com', '/user/icon.png'),
       'https://online-go.com/user/icon.png',
     )
 
-    for (let value of [
+    assert.strictEqual(
+      resolveOgsUrl('https://online-go.com', 'https://example.com/avatar.png'),
       'https://example.com/avatar.png',
+    )
+
+    for (let value of [
       'http://online-go.com/avatar.png',
       'file:///tmp/avatar.png',
       'data:image/svg+xml,avatar',
@@ -36,29 +40,26 @@ describe('OGS user helpers', () => {
       'https://user-uploads.online-go.com/avatar-1.png',
     )
 
-    // A different upload host (e.g. an unrelated third-party domain) must
-    // still be rejected, only the exact expected subdomain is whitelisted.
+    // External https avatars used by real OGS accounts are preserved as-is.
     assert.strictEqual(
       resolveOgsUrl(
         'https://online-go.com',
         'https://user-uploads.evil.example/avatar-1.png',
       ),
-      null,
+      'https://user-uploads.evil.example/avatar-1.png',
     )
 
-    // A homograph/suffix trick where the expected host is only a prefix of
-    // an attacker-controlled domain must be rejected (origin comparison is
-    // exact, not a `startsWith` check).
+    // Non-HTTPS variants must still be rejected.
     assert.strictEqual(
       resolveOgsUrl(
         'https://online-go.com',
-        'https://user-uploads.online-go.com.evil.example/avatar-1.png',
+        'http://user-uploads.online-go.com/avatar-1.png',
       ),
       null,
     )
 
-    // A userinfo trick where the expected host appears before an `@` must
-    // resolve to the real (attacker) hostname and be rejected.
+    // Userinfo tricks are still rejected even under the more permissive https
+    // policy for external avatars.
     assert.strictEqual(
       resolveOgsUrl(
         'https://online-go.com',

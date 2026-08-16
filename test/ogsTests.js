@@ -208,7 +208,6 @@ describe('OGS client', () => {
 
   it('rejects non-OGS avatar URLs', () => {
     for (let icon of [
-      'https://example.com/avatar.png',
       'http://online-go.com/avatar.png',
       'file:///tmp/avatar.png',
       'data:image/svg+xml,avatar',
@@ -224,6 +223,15 @@ describe('OGS client', () => {
         null,
       )
     }
+
+    assert.strictEqual(
+      sanitizeUser('https://online-go.com', {
+        username: 'sente',
+        icon: 'https://example.com/avatar.png',
+        ratings: {overall: {rating: 1900}},
+      }).iconUrl,
+      'https://example.com/avatar.png',
+    )
   })
 
   it('logs in via CSRF protected OGS endpoints and exposes no token', async () => {
@@ -572,6 +580,19 @@ describe('OGS client', () => {
       online: true,
     }
     let client = new OgsClient({
+      fetchImpl: async (url) => {
+        if (url.endsWith('/api/v1/players/7/')) {
+          return response({
+            body: {
+              id: 7,
+              username: 'sente',
+              icon: 'https://secure.gravatar.com/avatar/abc123?s=128',
+            },
+          })
+        }
+
+        return response({status: 404, body: {}})
+      },
       webSocketImpl: FakeWebSocket,
       credentialStore: {
         loadSession: () => ({
@@ -585,8 +606,13 @@ describe('OGS client', () => {
 
     let state = await client.restoreStoredSession()
 
-    assert.deepStrictEqual(client.getSession(), user)
-    assert.deepStrictEqual(state.user, user)
+    let expectedUser = {
+      ...user,
+      iconUrl: 'https://secure.gravatar.com/avatar/abc123?s=128',
+    }
+
+    assert.deepStrictEqual(client.getSession(), expectedUser)
+    assert.deepStrictEqual(state.user, expectedUser)
     assert.strictEqual(state.socket.status, 'authenticated')
     assert.strictEqual(
       JSON.parse(FakeWebSocket.instances[0].sent[0])[1].jwt,
