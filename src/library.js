@@ -7,7 +7,7 @@ const MAX_PREVIEW_BYTES = 512 * 1024
 const MAX_PREVIEW_TOTAL_BYTES = 4 * 1024 * 1024
 const MAX_OPEN_BYTES = 16 * 1024 * 1024
 
-function validateRoot(root) {
+function canonicalizeRoot(root) {
   if (typeof root !== 'string' || root === '' || root.includes('\0')) {
     return {ok: false, code: 'invalid-root'}
   }
@@ -16,13 +16,28 @@ function validateRoot(root) {
   if (!path.isAbsolute(normalized)) return {ok: false, code: 'invalid-root'}
 
   try {
-    let canonical = fs.realpathSync(normalized)
-    if (!fs.statSync(canonical).isDirectory()) {
+    return {ok: true, root: fs.realpathSync(normalized)}
+  } catch (err) {
+    return {ok: false, code: 'unresolvable'}
+  }
+}
+
+function validateRoot(root) {
+  let result = canonicalizeRoot(root)
+  if (!result.ok) {
+    // Preserve the legacy contract: a path that cannot be resolved (deleted or
+    // unreadable folder) was reported as not-writable, not not-directory.
+    if (result.code === 'unresolvable') return {ok: false, code: 'not-writable'}
+    return result
+  }
+
+  try {
+    if (!fs.statSync(result.root).isDirectory()) {
       return {ok: false, code: 'not-directory'}
     }
 
     let probe = path.join(
-      canonical,
+      result.root,
       `.seki-write-test-${process.pid}-${crypto.randomBytes(8).toString('hex')}`,
     )
     let descriptor = fs.openSync(probe, 'wx', 0o600)
@@ -33,15 +48,13 @@ function validateRoot(root) {
       fs.unlinkSync(probe)
     }
 
-    return {ok: true, root: canonical}
+    return {ok: true, root: result.root}
   } catch (err) {
     return {ok: false, code: 'not-writable'}
   }
 }
 
-function validateRelativeTarget(root, relativePath = '', expectedType) {
-  let rootResult = validateRoot(root)
-  if (!rootResult.ok) return rootResult
+function validateRelativeTargetForRoot(rootResult, relativePath, expectedType) {
   if (typeof relativePath !== 'string' || relativePath.includes('\0')) {
     return {ok: false, code: 'invalid-path'}
   }
@@ -81,6 +94,20 @@ function validateRelativeTarget(root, relativePath = '', expectedType) {
   } catch (err) {
     return {ok: false, code: 'not-directory'}
   }
+}
+
+function validateRelativeTarget(root, relativePath = '', expectedType) {
+  let rootResult = validateRoot(root)
+  if (!rootResult.ok) return rootResult
+  return validateRelativeTargetForRoot(rootResult, relativePath, expectedType)
+}
+
+// Same traversal/symlink protections as validateRelativeTarget, but without
+// the writable probe: used for the read-only built-in library.
+function validateReadOnlyRelativeTarget(root, relativePath = '', expectedType) {
+  let rootResult = canonicalizeRoot(root)
+  if (!rootResult.ok) return rootResult
+  return validateRelativeTargetForRoot(rootResult, relativePath, expectedType)
 }
 
 function isSgfFile(filename) {
@@ -158,7 +185,104 @@ function readBoundedFile(filePath, maxBytes, root = null) {
   }
 }
 
-exports.create = function (setting, dialog) {
+// Resolves the read-only built-in library root. In a packaged build it lives
+// under the app's real resources directory (shipped via extraResources); in
+// development it is read directly from the repository's resources/library.
+function resolveBuiltinRoot({
+  isPackaged = false,
+  resourcesPath = process.resourcesPath,
+  appPath = path.resolve(__dirname, '..'),
+  exists = fs.existsSync,
+} = {}) {
+  let candidates = []
+  if (typeof resourcesPath === 'string' && resourcesPath !== '') {
+    let bundledPath = path.join(resourcesPath, 'library')
+    if (isPackaged || exists(bundledPath)) {
+      candidates.push(bundledPath)
+    }
+  }
+  candidates.push(path.join(appPath, 'resources', 'library'))
+
+  for (let candidate of candidates) {
+    let result = canonicalizeRoot(candidate)
+    if (result.ok) return result
+  }
+  return {ok: false, code: 'builtin-unavailable'}
+}
+
+function listDirectory(root, relativePath, source, validateTarget) {
+  let directory = validateTarget(root, relativePath, (stats) =>
+    stats.isDirectory(),
+  )
+  if (!directory.ok) return {...directory, entries: []}
+
+  try {
+    let directoryEntries = fs
+      .readdirSync(directory.path, {withFileTypes: true})
+      .filter(
+        (entry) =>
+          (entry.isDirectory() && !entry.isSymbolicLink()) ||
+          (entry.isFile() && isSgfFile(entry.name)),
+      )
+      .sort((a, b) =>
+        a.isDirectory() === b.isDirectory()
+          ? a.name.localeCompare(b.name)
+          : a.isDirectory()
+            ? -1
+            : 1,
+      )
+    let truncated = directoryEntries.length > MAX_DIRECTORY_ENTRIES
+    directoryEntries = directoryEntries.slice(0, MAX_DIRECTORY_ENTRIES)
+    let previewBytes = 0
+    let entries = directoryEntries
+      .map((entry) => {
+        let entryPath = path.join(directory.path, entry.name)
+        let stats = fs.statSync(entryPath)
+        let previewContent = null
+        if (
+          entry.isFile() &&
+          stats.size <= MAX_PREVIEW_BYTES &&
+          previewBytes + stats.size <= MAX_PREVIEW_TOTAL_BYTES
+        ) {
+          let preview = readBoundedFile(entryPath, MAX_PREVIEW_BYTES, root)
+          if (preview != null) {
+            previewContent = preview.content
+            previewBytes += preview.size
+          }
+        }
+        return {
+          name: entry.name,
+          type: entry.isDirectory() ? 'directory' : 'file',
+          relativePath: path.relative(root, entryPath),
+          modifiedAt: stats.mtimeMs,
+          size: entry.isFile() ? stats.size : null,
+          previewContent,
+          source,
+        }
+      })
+      .sort((a, b) =>
+        a.type === b.type
+          ? a.name.localeCompare(b.name)
+          : a.type === 'directory'
+            ? -1
+            : 1,
+      )
+
+    return {ok: true, entries, truncated}
+  } catch (err) {
+    return {ok: false, code: 'read-failed', entries: []}
+  }
+}
+
+exports.create = function (setting, dialog, options = {}) {
+  function resolveBuiltin() {
+    let builtin = options.builtin
+    if (typeof builtin === 'string') {
+      return canonicalizeRoot(builtin)
+    }
+    return resolveBuiltinRoot(typeof builtin === 'object' ? builtin : undefined)
+  }
+
   function getConfig() {
     let result = validateRoot(setting.get('library.root'))
     return result.ok
@@ -171,70 +295,24 @@ exports.create = function (setting, dialog) {
     if (!config.configured)
       return {ok: false, code: 'not-configured', entries: []}
 
-    let directory = validateRelativeTarget(config.root, relativePath, (stats) =>
-      stats.isDirectory(),
+    return listDirectory(
+      config.root,
+      relativePath,
+      'user',
+      validateRelativeTarget,
     )
-    if (!directory.ok) return {...directory, entries: []}
+  }
 
-    try {
-      let directoryEntries = fs
-        .readdirSync(directory.path, {withFileTypes: true})
-        .filter(
-          (entry) =>
-            (entry.isDirectory() && !entry.isSymbolicLink()) ||
-            (entry.isFile() && isSgfFile(entry.name)),
-        )
-        .sort((a, b) =>
-          a.isDirectory() === b.isDirectory()
-            ? a.name.localeCompare(b.name)
-            : a.isDirectory()
-              ? -1
-              : 1,
-        )
-      let truncated = directoryEntries.length > MAX_DIRECTORY_ENTRIES
-      directoryEntries = directoryEntries.slice(0, MAX_DIRECTORY_ENTRIES)
-      let previewBytes = 0
-      let entries = directoryEntries
-        .map((entry) => {
-          let entryPath = path.join(directory.path, entry.name)
-          let stats = fs.statSync(entryPath)
-          let previewContent = null
-          if (
-            entry.isFile() &&
-            stats.size <= MAX_PREVIEW_BYTES &&
-            previewBytes + stats.size <= MAX_PREVIEW_TOTAL_BYTES
-          ) {
-            let preview = readBoundedFile(
-              entryPath,
-              MAX_PREVIEW_BYTES,
-              config.root,
-            )
-            if (preview != null) {
-              previewContent = preview.content
-              previewBytes += preview.size
-            }
-          }
-          return {
-            name: entry.name,
-            type: entry.isDirectory() ? 'directory' : 'file',
-            relativePath: path.relative(config.root, entryPath),
-            modifiedAt: stats.mtimeMs,
-            size: entry.isFile() ? stats.size : null,
-            previewContent,
-          }
-        })
-        .sort((a, b) =>
-          a.type === b.type
-            ? a.name.localeCompare(b.name)
-            : a.type === 'directory'
-              ? -1
-              : 1,
-        )
+  function listBuiltin(relativePath = '') {
+    let rootResult = resolveBuiltin()
+    if (!rootResult.ok) return {ok: false, code: rootResult.code, entries: []}
 
-      return {ok: true, entries, truncated}
-    } catch (err) {
-      return {ok: false, code: 'read-failed', entries: []}
-    }
+    return listDirectory(
+      rootResult.root,
+      relativePath,
+      'builtin',
+      validateReadOnlyRelativeTarget,
+    )
   }
 
   function open(relativePath) {
@@ -256,6 +334,35 @@ exports.create = function (setting, dialog) {
         ok: true,
         content: file.content,
         path: target.path,
+        source: 'user',
+      }
+    } catch (err) {
+      return {ok: false, code: 'read-failed'}
+    }
+  }
+
+  function openBuiltin(relativePath) {
+    let rootResult = resolveBuiltin()
+    if (!rootResult.ok) return {ok: false, code: rootResult.code}
+    if (typeof relativePath !== 'string' || !isSgfFile(relativePath)) {
+      return {ok: false, code: 'invalid-file'}
+    }
+
+    let target = validateReadOnlyRelativeTarget(
+      rootResult.root,
+      relativePath,
+      (stats) => stats.isFile(),
+    )
+    if (!target.ok) return {ok: false, code: 'invalid-file'}
+
+    try {
+      let file = readBoundedFile(target.path, MAX_OPEN_BYTES, rootResult.root)
+      if (file == null) return {ok: false, code: 'invalid-file'}
+      return {
+        ok: true,
+        content: file.content,
+        path: target.path,
+        source: 'builtin',
       }
     } catch (err) {
       return {ok: false, code: 'read-failed'}
@@ -279,7 +386,8 @@ exports.create = function (setting, dialog) {
     return {ok: true, root: validation.root, tsumegoRoot: tsumego.path}
   }
 
-  return {getConfig, chooseRoot, list, open}
+  return {getConfig, chooseRoot, list, open, listBuiltin, openBuiltin}
 }
 
 exports.validateRoot = validateRoot
+exports.resolveBuiltinRoot = resolveBuiltinRoot

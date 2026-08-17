@@ -38,6 +38,7 @@ describe('analyze-sgf packaging', () => {
   it('ships analyze-sgf resources without bundling KataGo', () => {
     assert.deepStrictEqual(packageJson.build.extraResources, [
       {from: 'build/analyze-sgf', to: 'analyze-sgf'},
+      {from: 'resources/library', to: 'library'},
     ])
     assert.strictEqual(
       packageJson.devDependencies['analyze-sgf'],

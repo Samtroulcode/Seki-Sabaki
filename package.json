@@ -100,6 +100,7 @@
       "!src/{components,modules}${/*}",
       "src/modules/sgfanalysis*.js",
       "!engines",
+      "!resources${/*}",
       "!node_modules",
       "node_modules/@primer/octicons/build/svg/*",
       "node_modules/@sabaki/deadstones/wasm/*",
@@ -116,6 +117,10 @@
       {
         "from": "build/analyze-sgf",
         "to": "analyze-sgf"
+      },
+      {
+        "from": "resources/library",
+        "to": "library"
       }
     ]
   },
