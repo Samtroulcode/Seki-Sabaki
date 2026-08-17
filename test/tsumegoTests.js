@@ -1055,13 +1055,15 @@ describe('classifyMove at later decision points', () => {
     )
   })
 
-  it('supports non-move nodes between the opponent response and the decision point', () => {
-    // B[gl] Correct -> W[hm] -> C[setup] -> B[hl] and B[xx] Wrong Answer
-    let setupId
+  it('supports non-move nodes between the opponent response and the variations', () => {
+    // B[gl] Correct -> W[hm] -> C[setup] -> B[hl] and B[xx] Wrong Answer:
+    // the comment-only node does not define a position, so the decision point
+    // is W[hm], and classifyMove still finds the variations through C[setup].
+    let w1
     let tree = gametree.new().mutate((draft) => {
       let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
-      let w1 = draft.appendNode(b1, {W: ['hm']})
-      setupId = draft.appendNode(w1, {C: ['setup']})
+      w1 = draft.appendNode(b1, {W: ['hm']})
+      let setupId = draft.appendNode(w1, {C: ['setup']})
       draft.appendNode(setupId, {B: ['hl']})
       draft.appendNode(setupId, {B: ['xx'], C: ['Wrong Answer']})
     })
@@ -1070,7 +1072,7 @@ describe('classifyMove at later decision points', () => {
     let adv = advanceSolution(tree, problem, problem.firstMove)
     assert(adv != null)
     assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
-    assert.strictEqual(adv.decisionPointId, setupId)
+    assert.strictEqual(adv.decisionPointId, w1)
 
     assert.strictEqual(
       classifyMove(
@@ -1161,6 +1163,88 @@ describe('classifyMove at later decision points', () => {
     )
   })
 
+  it('walks up descriptive prefixes to the real decision point', () => {
+    // W[hm] -> N[正解图] -> B[hl] (canonical) and W[hm] -> N[失败图] -> B[xx]:
+    // the label prefixes do not define a position, so the decision point is
+    // the W[hm] move and the alternative variation stays visible.
+    let w1
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      w1 = draft.appendNode(b1, {W: ['hm']})
+      let correctPrefix = draft.appendNode(w1, {N: ['正解图']})
+      draft.appendNode(correctPrefix, {B: ['hl']})
+      let wrongPrefix = draft.appendNode(w1, {N: ['失败图']})
+      draft.appendNode(wrongPrefix, {B: ['xx']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+    assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
+    assert.strictEqual(adv.decisionPointId, w1)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('keeps a setup node as the decision point', () => {
+    // W[hm] -> AB[dd] -> B[hl] and B[xx]: the setup node defines a new
+    // position, so it stays the decision point instead of walking up to W[hm].
+    let setupId
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      setupId = draft.appendNode(w1, {AB: ['dd']})
+      draft.appendNode(setupId, {B: ['hl']})
+      draft.appendNode(setupId, {B: ['xx']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+    assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
+    assert.strictEqual(adv.decisionPointId, setupId)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
   it('does not accept the first move again at a later decision point', () => {
     // The initial-position shortcut must not fire once the solver moved on:
     // 'gl' is not a variation from the current decision point.
@@ -1247,15 +1331,15 @@ describe('advanceSolution', () => {
   })
 
   it('traverses non-move nodes around the opponent response', () => {
-    let nm2
+    let w1
     let tree = gametree.new().mutate((draft) => {
       let b1 = draft.appendNode(draft.root.id, {
         B: ['gl'],
         C: ['Correct Answer'],
       })
       let nm1 = draft.appendNode(b1, {C: ['setup']})
-      let w1 = draft.appendNode(nm1, {W: ['hm']})
-      nm2 = draft.appendNode(w1, {C: ['setup']})
+      w1 = draft.appendNode(nm1, {W: ['hm']})
+      let nm2 = draft.appendNode(w1, {C: ['setup']})
       draft.appendNode(nm2, {B: ['hl']})
     })
     let problem = analyzeProblem(tree)
@@ -1266,7 +1350,9 @@ describe('advanceSolution', () => {
     assert.strictEqual(result.automaticMoves.length, 1)
     assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
     assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
-    assert.strictEqual(result.decisionPointId, nm2)
+    // A comment-only node does not define a position, so the decision point
+    // walks up to the W[hm] move.
+    assert.strictEqual(result.decisionPointId, w1)
   })
 
   it('reports solved when the solution ends immediately after the correct move', () => {

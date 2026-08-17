@@ -519,9 +519,11 @@ export function classifyMove(
 // - `automaticMoves`: the opponent's responses on the canonical line (nodes);
 // - `nextPlayerMove`: the player's next expected move (node), or `null` when
 //   the problem is solved;
-// - `decisionPointId`: the node id of the position the player's next move
-//   branches from (the parent of `nextPlayerMove`, which may be a non-move
-//   node), or `null` when the problem is solved;
+// - `decisionPointId`: the node id of the board position the player's next
+//   move branches from: the parent of `nextPlayerMove`, walking up past
+//   purely descriptive nodes (labels, comments) that do not define a position
+//   and never past a node that defines one (a move, setup stones, or a PL);
+//   `null` when the problem is solved;
 // - `solved`: whether the canonical line ended before another player move.
 //
 // Non-move nodes between moves are traversed; sibling variations are never
@@ -552,12 +554,17 @@ export function advanceSolution(tree, problem, correctMoveNode) {
 
       if (getMoveColor(node) === problem.playerToMove) {
         // Stop just before the player's next move. The decision point is the
-        // node the player's variations branch from: the parent of the next
-        // move, which may be a non-move node.
+        // board position the player's variations branch from: the parent of
+        // the next move, walking up past purely descriptive nodes (labels,
+        // comments) that do not define a position, so alternative variations
+        // under sibling prefixes stay visible. The walk never passes a node
+        // that defines a position (a move, setup stones, or a PL).
+        let decisionPoint = getStartPosition(tree, node)
         return {
           automaticMoves,
           nextPlayerMove: node,
-          decisionPointId: node.parentId,
+          decisionPointId:
+            decisionPoint != null ? decisionPoint.id : node.parentId,
           solved: false,
         }
       }
