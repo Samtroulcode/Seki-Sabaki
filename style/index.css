@@ -931,6 +931,17 @@
   color: #888;
   font-size: 0.85rem;
 }
+.tsumego-entry-check {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  filter: invert(62%) sepia(38%) saturate(600%) hue-rotate(90deg)
+    brightness(92%) contrast(88%);
+}
+.tsumego-entry-progress {
+  color: #888;
+  font-size: 0.8rem;
+}
 .tsumego-problem-ready {
   width: fit-content;
   padding: 0.45rem 0.7rem;

@@ -143,6 +143,43 @@ describe('built-in library', () => {
     )
   })
 
+  it('counts SGF problems recursively without reading contents', () => {
+    let builtinRoot = join(directory, 'builtin')
+    mkdirSync(join(builtinRoot, 'easy'), {recursive: true})
+    mkdirSync(join(builtinRoot, 'easy', 'nested'), {recursive: true})
+    writeFileSync(join(builtinRoot, 'easy', '001.sgf'), '(;GM[1]SZ[9])')
+    writeFileSync(join(builtinRoot, 'easy', '002.sgf'), '(;GM[1]SZ[9])')
+    writeFileSync(
+      join(builtinRoot, 'easy', 'nested', '003.sgf'),
+      '(;GM[1]SZ[9])',
+    )
+    writeFileSync(join(builtinRoot, 'easy', 'notes.txt'), 'not an sgf')
+    let api = makeApi(builtinRoot)
+
+    assert.deepStrictEqual(api.countProblems('builtin', 'easy'), {
+      ok: true,
+      count: 3,
+    })
+    assert.deepStrictEqual(api.countProblems('builtin', 'easy/nested'), {
+      ok: true,
+      count: 1,
+    })
+    assert.deepStrictEqual(api.countProblems('builtin', ''), {
+      ok: true,
+      count: 3,
+    })
+    assert.deepStrictEqual(api.countProblems('user', 'easy'), {
+      ok: false,
+      code: 'not-configured',
+      count: 0,
+    })
+    assert.deepStrictEqual(api.countProblems('cloud', 'easy'), {
+      ok: false,
+      code: 'invalid-source',
+      count: 0,
+    })
+  })
+
   it('reads a built-in SGF and marks it as built-in', () => {
     let builtinRoot = join(directory, 'builtin')
     mkdirSync(join(builtinRoot, 'games'), {recursive: true})

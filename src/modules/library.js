@@ -25,3 +25,7 @@ export async function openBuiltinLibraryFile(relativePath) {
 export async function getBuiltinCollectionMetadata(relativePath) {
   return window.sabaki.library.getBuiltinCollectionMetadata(relativePath)
 }
+
+export async function countLibraryProblems(source, relativePath = '') {
+  return window.sabaki.library.countProblems(source, relativePath)
+}

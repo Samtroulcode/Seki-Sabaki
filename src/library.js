@@ -6,6 +6,8 @@ const MAX_DIRECTORY_ENTRIES = 256
 const MAX_PREVIEW_BYTES = 512 * 1024
 const MAX_PREVIEW_TOTAL_BYTES = 4 * 1024 * 1024
 const MAX_OPEN_BYTES = 16 * 1024 * 1024
+const MAX_COUNT_DEPTH = 32
+const MAX_COUNT_TOTAL = 100000
 
 const COLLECTION_MANIFEST_FILENAME = 'collection.json'
 const MAX_MANIFEST_BYTES = 64 * 1024
@@ -329,6 +331,33 @@ function listDirectory(root, relativePath, source, validateTarget) {
   }
 }
 
+// Counts SGF files under a directory, recursively, without reading any file
+// content — only the directory structure is walked. Symlinks are skipped so a
+// cycle cannot recurse forever; depth and total caps bound pathological trees.
+function countSgfFilesRecursively(directoryPath, depth = 0) {
+  if (depth > MAX_COUNT_DEPTH) return 0
+  let count = 0
+  let entries
+  try {
+    entries = fs.readdirSync(directoryPath, {withFileTypes: true})
+  } catch (err) {
+    return 0
+  }
+  for (let entry of entries) {
+    if (entry.isSymbolicLink()) continue
+    if (entry.isDirectory()) {
+      count += countSgfFilesRecursively(
+        path.join(directoryPath, entry.name),
+        depth + 1,
+      )
+    } else if (entry.isFile() && isSgfFile(entry.name)) {
+      count += 1
+    }
+    if (count > MAX_COUNT_TOTAL) return MAX_COUNT_TOTAL
+  }
+  return count
+}
+
 exports.create = function (setting, dialog, options = {}) {
   function resolveBuiltin() {
     let builtin = options.builtin
@@ -439,6 +468,33 @@ exports.create = function (setting, dialog, options = {}) {
     return readCollectionManifest(rootResult.root, directory.path)
   }
 
+  // Counts SGF problems under a directory (recursively) for progress
+  // statistics. Never reads file contents.
+  function countProblems(source, relativePath = '') {
+    let rootResult
+    let validateTarget
+    if (source === 'builtin') {
+      rootResult = resolveBuiltin()
+      validateTarget = validateReadOnlyRelativeTarget
+    } else if (source === 'user') {
+      let config = getConfig()
+      if (!config.configured)
+        return {ok: false, code: 'not-configured', count: 0}
+      rootResult = {ok: true, root: config.root}
+      validateTarget = validateRelativeTarget
+    } else {
+      return {ok: false, code: 'invalid-source', count: 0}
+    }
+    if (!rootResult.ok) return {ok: false, code: rootResult.code, count: 0}
+
+    let directory = validateTarget(rootResult.root, relativePath, (stats) =>
+      stats.isDirectory(),
+    )
+    if (!directory.ok) return {...directory, count: 0}
+
+    return {ok: true, count: countSgfFilesRecursively(directory.path)}
+  }
+
   async function chooseRoot(window) {
     let result = await dialog.showOpenDialog(window, {
       properties: ['openDirectory'],
@@ -464,6 +520,7 @@ exports.create = function (setting, dialog, options = {}) {
     listBuiltin,
     openBuiltin,
     getBuiltinCollectionMetadata,
+    countProblems,
   }
 }
 

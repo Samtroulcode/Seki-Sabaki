@@ -6,6 +6,7 @@ import * as gametree from '../modules/gametree.js'
 import {analyzeProblem} from '../modules/tsumego.js'
 import * as sgfFileFormat from '../modules/fileformats/sgf.js'
 import {
+  countLibraryProblems,
   getBuiltinCollectionMetadata,
   getLibraryConfig,
   listBuiltinLibraryEntries,
@@ -14,6 +15,11 @@ import {
   openLibraryFile,
   chooseLibraryRoot,
 } from '../modules/library.js'
+import {
+  buildProgressKey,
+  getTsumegoProgress,
+  markTsumegoProblemCompleted,
+} from '../modules/tsumegoprogress.js'
 import TsumegoSolver from './TsumegoSolver.js'
 
 const t = i18n.context('TsumegoPanel')
@@ -37,6 +43,8 @@ export default class TsumegoPanel extends Component {
       content: null,
       gameTree: null,
       problem: null,
+      progress: {},
+      dirTotals: {},
     }
     this.refreshId = 0
     this.problemLoadId = 0
@@ -44,6 +52,7 @@ export default class TsumegoPanel extends Component {
 
   componentDidMount() {
     this.refresh()
+    this.loadProgress()
   }
 
   getRootPath(source = this.state.source) {
@@ -57,6 +66,65 @@ export default class TsumegoPanel extends Component {
     return currentPath.startsWith(`${root}/`)
       ? currentPath.slice(root.length + 1)
       : currentPath
+  }
+
+  // Loads persisted progress into module state. A read failure must not block
+  // the workspace, so it degrades to an empty progress.
+  async loadProgress() {
+    try {
+      let result = await getTsumegoProgress()
+      if (result?.problems) this.setState({progress: result.problems})
+    } catch (err) {
+      // Non-blocking: keep the empty progress.
+    }
+  }
+
+  // Computes recursive problem totals for the current folder and each
+  // directory entry, without reading any SGF content.
+  async loadTotals(source, currentPath, entries) {
+    let paths = [
+      currentPath,
+      ...entries
+        .filter((entry) => entry.type === 'directory')
+        .map((entry) => entry.relativePath),
+    ]
+    let totals = {}
+    await Promise.all(
+      paths.map(async (relativePath) => {
+        try {
+          let result = await countLibraryProblems(source, relativePath)
+          if (result?.ok === true) totals[relativePath] = result.count
+        } catch (err) {
+          // Leave this folder without a total.
+        }
+      }),
+    )
+    return totals
+  }
+
+  handleProblemSolved() {
+    let {source, relativePath} = this.state
+    let key = buildProgressKey(source, relativePath)
+    if (key == null) return
+    let completedAt = new Date().toISOString()
+    this.setState((prev) => ({
+      progress: {...prev.progress, [key]: {completed: true, completedAt}},
+    }))
+    markTsumegoProblemCompleted(source, relativePath).catch(() => {})
+  }
+
+  isProblemCompleted(source, relativePath) {
+    let key = buildProgressKey(source, relativePath)
+    return key != null && this.state.progress[key]?.completed === true
+  }
+
+  countSolvedForFolder(source, folderPath) {
+    let prefix = `${source}:${folderPath}/`
+    let count = 0
+    for (let key of Object.keys(this.state.progress)) {
+      if (key.startsWith(prefix)) count += 1
+    }
+    return count
   }
 
   async refresh(
@@ -115,6 +183,10 @@ export default class TsumegoPanel extends Component {
         busy: false,
         error: null,
       })
+
+      let totals = await this.loadTotals(source, currentPath, entries)
+      if (refreshId !== this.refreshId) return
+      this.setState({dirTotals: totals})
     } catch (err) {
       if (refreshId !== this.refreshId) return
       this.setState({
@@ -312,7 +384,6 @@ export default class TsumegoPanel extends Component {
       this.state
     let displayPath = this.getDisplayPath()
     let configured = config?.configured === true
-    let files = entries.filter((entry) => entry.type === 'file')
     let sortedEntries = sortEntries(entries)
 
     return h(
@@ -436,17 +507,40 @@ export default class TsumegoPanel extends Component {
                         alt: '',
                         'aria-hidden': 'true',
                       }),
+                      entry.type === 'file' &&
+                        this.isProblemCompleted(source, entry.relativePath) &&
+                        h('img', {
+                          class: 'tsumego-entry-check',
+                          src: './node_modules/@primer/octicons/build/svg/check-16.svg',
+                          alt: '',
+                          'aria-hidden': 'true',
+                        }),
                       h('span', {class: 'tsumego-entry-name'}, entry.name),
                       entry.type === 'file' &&
                         h('span', {class: 'tsumego-entry-meta'}, t('Problem')),
+                      entry.type === 'directory' &&
+                        this.state.dirTotals[entry.relativePath] != null &&
+                        h(
+                          'span',
+                          {class: 'tsumego-entry-progress'},
+                          `${this.countSolvedForFolder(
+                            source,
+                            entry.relativePath,
+                          )} / ${this.state.dirTotals[entry.relativePath]} ${t(
+                            'solved',
+                          )}`,
+                        ),
                     ),
                   ),
                 ),
-            files.length > 0 &&
+            this.state.dirTotals[currentPath] != null &&
               h(
                 'p',
                 {class: 'tsumego-problem-count'},
-                `${files.length} ${t('problems')}`,
+                `${this.countSolvedForFolder(
+                  source,
+                  currentPath,
+                )} / ${this.state.dirTotals[currentPath]} ${t('solved')}`,
               ),
           ),
     )
@@ -468,6 +562,7 @@ export default class TsumegoPanel extends Component {
       onBack: () => this.handleBack(),
       onPrevious: () => this.handleAdjacentProblem(-1),
       onNext: () => this.handleAdjacentProblem(1),
+      onSolved: () => this.handleProblemSolved(),
     })
   }
 }

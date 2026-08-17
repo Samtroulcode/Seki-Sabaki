@@ -1,5 +1,12 @@
 const {expect} = require('@playwright/test')
-const {mkdirSync, mkdtempSync, rmSync, writeFileSync} = require('fs')
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} = require('fs')
 const {tmpdir} = require('os')
 const path = require('path')
 const {test} = require('./fixtures/electron-app')
@@ -144,6 +151,135 @@ test.describe('Tsumego workspace', () => {
       rmSync(root, {recursive: true, force: true})
     }
   })
+
+  test('records progress only after the auto-reply completes', async ({
+    page,
+    electronApp,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-progress-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '001.sgf'),
+      '(;GM[1]SZ[9]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))',
+    )
+    let progressPath = path.join(
+      await electronApp.evaluate(({app}) => app.getPath('userData')),
+      'tsumego-progress.json',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+
+      // The correct move triggers an auto-reply; progress must not be written
+      // before the sequence finishes.
+      await dispatchVertex(page, 2, 2)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
+      expect(existsSync(progressPath)).toBe(false)
+
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      let entry = await waitForProgressEntry(
+        electronApp,
+        'user:Tsumego/User Set/001.sgf',
+      )
+      expect(entry).toBeTruthy()
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('shows solved checkmarks and counters without reloading', async ({
+    page,
+    electronApp,
+  }) => {
+    let progressPath = path.join(
+      await electronApp.evaluate(({app}) => app.getPath('userData')),
+      'tsumego-progress.json',
+    )
+
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page.locator('.tsumego-entry-directory').first().click()
+    await expect(page.locator('.tsumego-problem-count')).toContainText(
+      '0 / 140 solved',
+    )
+    expect(await page.locator('.tsumego-entry-check').count()).toBe(0)
+
+    await openGggEasy01(page)
+    await solveGggEasy01(page)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+    // Back to the collection: the counter and checkmark update from local
+    // state, without reloading the workspace.
+    await page.getByRole('button', {name: /Collection/}).click()
+    await expect(page.locator('.tsumego-problem-count')).toContainText(
+      '1 / 140 solved',
+    )
+    await expect(page.locator('.tsumego-entry-check')).toHaveCount(1)
+    await expect(
+      page
+        .locator('.tsumego-entry-file')
+        .filter({hasText: 'ggg-easy-01.sgf'})
+        .locator('.tsumego-entry-check'),
+    ).toBeVisible()
+    await expect.poll(() => existsSync(progressPath)).toBe(true)
+  })
+
+  test('retrying a solved problem does not rewrite progress', async ({
+    page,
+    electronApp,
+  }) => {
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page.locator('.tsumego-entry-directory').first().click()
+    await openGggEasy01(page)
+    await solveGggEasy01(page)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+    let completedAt = (
+      await waitForProgressEntry(
+        electronApp,
+        'builtin:tsumego/easy/ggg-easy-01.sgf',
+      )
+    ).completedAt
+
+    await page.getByRole('button', {name: 'Retry Problem', exact: true}).click()
+    await expect(page.locator('.tsumego-solver-graph')).toHaveCount(0)
+
+    let after = await waitForProgressEntry(
+      electronApp,
+      'builtin:tsumego/easy/ggg-easy-01.sgf',
+    )
+    expect(after.completedAt).toBe(completedAt)
+  })
+
+  test('cancelling the auto-reply sequence never records progress', async ({
+    page,
+    electronApp,
+  }) => {
+    let progressPath = path.join(
+      await electronApp.evaluate(({app}) => app.getPath('userData')),
+      'tsumego-progress.json',
+    )
+
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page.locator('.tsumego-entry-directory').first().click()
+    await openGggEasy01(page)
+    await dispatchVertex(page, 17, 18)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
+
+    // Leave the problem while the auto-reply is still pending.
+    await page.getByRole('button', {name: /Collection/}).click()
+    await expect(page.locator('.tsumego-browser')).toBeVisible()
+    expect(existsSync(progressPath)).toBe(false)
+  })
 })
 
 async function dispatchVertex(page, x, y) {
@@ -165,4 +301,46 @@ async function clickBoardVertex(page, x, y, size) {
     )
     .boundingBox()
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+}
+
+async function openGggEasy01(page) {
+  await page
+    .locator('.tsumego-entry-file')
+    .filter({hasText: 'ggg-easy-01.sgf'})
+    .click()
+  await expect(page.locator('.tsumego-solver')).toBeVisible()
+}
+
+async function solveGggEasy01(page) {
+  await dispatchVertex(page, 17, 18)
+  await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
+  await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+  await dispatchVertex(page, 13, 18)
+  await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+}
+
+async function progressPath(electronApp) {
+  return path.join(
+    await electronApp.evaluate(({app}) => app.getPath('userData')),
+    'tsumego-progress.json',
+  )
+}
+
+// Polls until the persisted progress contains the given key, since the
+// markCompleted IPC write is asynchronous.
+async function waitForProgressEntry(electronApp, key) {
+  let filePath = await progressPath(electronApp)
+  await expect
+    .poll(() => {
+      if (!existsSync(filePath)) return null
+      try {
+        return (
+          JSON.parse(readFileSync(filePath, 'utf8')).problems?.[key] ?? null
+        )
+      } catch (err) {
+        return null
+      }
+    })
+    .toBeTruthy()
+  return JSON.parse(readFileSync(filePath, 'utf8')).problems[key]
 }

@@ -21,6 +21,7 @@ const {setupSgfAnalysisIpcHandlers} = require('./sgfanalysis')
 const {openExternalUrl} = require('./shell')
 const recentFiles = require('./recentfiles')
 const library = require('./library')
+const tsumegoProgress = require('./tsumegoprogress')
 
 let windows = []
 let openfile = null
@@ -445,6 +446,22 @@ function setupIpcHandlers() {
     if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
     return libraryApi.getBuiltinCollectionMetadata(relativePath)
   })
+  ipcMain.handle('library:countProblems', (e, source, relativePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.countProblems(source, relativePath)
+  })
+
+  let tsumegoProgressStore = tsumegoProgress.createTsumegoProgressStore({
+    userDataDirectory: setting.userDataDirectory,
+  })
+  tsumegoProgressStore.load()
+  tsumegoProgress.setupTsumegoProgressIpcHandlers(
+    ipcMain,
+    tsumegoProgressStore,
+    {
+      isTrusted: (event) => isTrustedRendererEvent(event),
+    },
+  )
   ipcMain.on('setting:getPathsSync', (e) => {
     try {
       e.returnValue = {

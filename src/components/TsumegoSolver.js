@@ -71,15 +71,15 @@ export default class TsumegoSolver extends Component {
     }
 
     sound.playPachi()
+    let waiting = advanced.automaticMoves.length > 0
     let phase = advanced.solved ? 'solved' : 'solving'
     let nextState = {
       displayNodeId: result.node.id,
       decisionPointId: advanced.decisionPointId,
       expectedMoveNodeId: advanced.nextPlayerMove?.id || null,
-      feedback: advanced.solved ? t('Solved') || 'Solved' : null,
-      phase: advanced.automaticMoves.length > 0 ? 'waiting' : phase,
-      showGameGraph:
-        advanced.automaticMoves.length > 0 ? false : advanced.solved,
+      feedback: advanced.solved && !waiting ? t('Solved') || 'Solved' : null,
+      phase: waiting ? 'waiting' : phase,
+      showGameGraph: waiting ? false : advanced.solved,
       explorationBoard: null,
       explorationPlayer: null,
     }
@@ -89,7 +89,11 @@ export default class TsumegoSolver extends Component {
         ? this.state.retrySnapshot
         : {...nextState, retrySnapshot: undefined},
     })
-    if (advanced.automaticMoves.length > 0) this.startAutoSequence(advanced)
+    if (waiting) {
+      this.startAutoSequence(advanced)
+    } else if (advanced.solved) {
+      this.props.onSolved?.()
+    }
   }
 
   startAutoSequence(advanced) {
@@ -106,6 +110,7 @@ export default class TsumegoSolver extends Component {
           phase: advanced.solved ? 'solved' : 'solving',
           showGameGraph: advanced.solved,
         })
+        if (advanced.solved) this.props.onSolved?.()
         return
       }
 

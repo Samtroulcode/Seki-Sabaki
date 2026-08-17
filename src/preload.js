@@ -159,6 +159,14 @@ window.sabaki = {
       ipcRenderer.invoke('library:openBuiltin', relativePath),
     getBuiltinCollectionMetadata: (relativePath) =>
       ipcRenderer.invoke('library:getBuiltinCollectionMetadata', relativePath),
+    countProblems: (source, relativePath) =>
+      ipcRenderer.invoke('library:countProblems', source, relativePath),
+  },
+
+  tsumegoProgress: {
+    getAll: () => ipcRenderer.invoke('tsumegoProgress:getAll'),
+    markCompleted: (source, relativePath) =>
+      ipcRenderer.invoke('tsumegoProgress:markCompleted', source, relativePath),
   },
 
   // Menu
