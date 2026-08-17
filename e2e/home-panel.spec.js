@@ -170,30 +170,79 @@ test.describe('Home panel navigation', () => {
     )
   })
 
-  test('shows and reopens recently opened SGF games', async ({page}) => {
-    let filename = path.join(process.cwd(), 'test/sgf/pro_game.sgf')
+  test('shows the configured User Library in the Home mini-library', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-home-library-e2e-'))
+    let games = path.join(root, 'Games')
+    mkdirSync(games)
+    writeFileSync(path.join(root, 'study.sgf'), '(;GM[1]SZ[9];B[aa])')
+    writeFileSync(path.join(root, 'game.sgf'), '(;GM[1]SZ[9];W[bb])')
 
-    await page.evaluate(
-      async (filePath) => window.__sabaki.openFileInNewBoardTab(filePath),
-      filename,
-    )
-    await expect(page.locator('#goban')).toBeVisible()
+    try {
+      // Leave Home first so the mini-library mounts after the root is set.
+      await page.getByRole('button', {name: /Online play/}).click()
+      await expect(page.locator('.ogs-panel')).toBeVisible()
 
-    await page.getByTitle('Home').click()
-    await expect(page.locator('.home-library-pane')).toContainText(
-      'pro_game.sgf',
-    )
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByTitle('Home').click()
+
+      let pane = page.locator('.home-library-pane')
+      await expect(pane).toContainText('My Library')
+      await expect(pane).toContainText('Games')
+      await expect(pane).toContainText('study.sgf')
+      await expect(pane).toContainText('game.sgf')
+      await expect(pane.locator('.home-library-entry-directory')).toHaveCount(1)
+      await expect(pane.locator('.home-library-entry-file')).toHaveCount(2)
+      await expect(
+        pane
+          .locator('.home-library-entry-directory .home-library-entry-icon')
+          .first(),
+      ).toHaveAttribute('src', /file-directory-16\.svg/)
+      await expect(
+        pane
+          .locator('.home-library-entry-file .home-library-entry-icon')
+          .first(),
+      ).toHaveAttribute('src', /file-16\.svg/)
+      await expect(pane.locator('.ogs-mini-goban')).toHaveCount(0)
+
+      // A folder click hands off to the Library workspace.
+      await pane.locator('.home-library-entry-directory').click()
+      await expect(page.locator('#library-dashboard')).toBeVisible()
+
+      // A file click opens the SGF in a board tab.
+      await page.getByTitle('Home').click()
+      await page.locator('.home-library-entry-file').first().click()
+      await expect(page.locator('#goban')).toBeVisible()
+      await expect(
+        page.locator(
+          '.app-board-tab-button[title="game.sgf"][aria-current="page"]',
+        ),
+      ).toHaveAttribute('aria-current', 'page')
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('falls back to the built-in Library when no User Library is configured', async ({
+    page,
+  }) => {
+    let pane = page.locator('.home-library-pane')
+    await expect(pane).toContainText('Pro Games')
+    await expect(pane).toContainText('Go Seigen SGF Pack')
     await expect(
-      page.locator('.home-library-entry .ogs-mini-goban'),
-    ).toBeVisible()
+      pane
+        .locator('.home-library-entry-directory .home-library-entry-icon')
+        .first(),
+    ).toHaveAttribute('src', /file-directory-16\.svg/)
+    await expect(pane.locator('.ogs-mini-goban')).toHaveCount(0)
 
-    await page.locator('.home-library-entry').first().click()
-    await expect(page.locator('#goban')).toBeVisible()
-    await expect(
-      page.locator(
-        '.app-board-tab-button[title="pro_game.sgf"][aria-current="page"]',
-      ),
-    ).toHaveAttribute('aria-current', 'page')
+    await pane.getByRole('button', {name: 'Open Library'}).click()
+    await expect(page.locator('#library-dashboard')).toBeVisible()
   })
 
   test('browses a configured Library folder', async ({page}) => {

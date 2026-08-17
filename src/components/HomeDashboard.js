@@ -5,8 +5,8 @@ import {selectBestReview} from '../ogs/review-sanitize.js'
 import sabaki from '../modules/sabaki.js'
 import onlineStore from '../modules/onlinestore.js'
 import HomeBoardPreview from './HomeBoardPreview.js'
+import HomeLibraryPane from './HomeLibraryPane.js'
 import HomeOnlinePanel from './HomeOnlinePanel.js'
-import RecentlyOpenedGames from './RecentlyOpenedGames.js'
 import {
   getHistoryPreview,
   OgsGameHistoryColumn,
@@ -277,7 +277,7 @@ export default class HomeDashboard extends Component {
                     ),
                   ),
                 ),
-                h(RecentlyOpenedGames),
+                h(HomeLibraryPane),
               ),
             ),
             h(

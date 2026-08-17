@@ -440,44 +440,52 @@
   gap: 0.6rem;
   min-width: 0;
 }
+.home-library-source {
+  margin-top: -0.35rem;
+  color: #aaa;
+  font-size: 0.8rem;
+}
 .home-library-list {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 .home-library-entry {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 0.6rem;
-  padding: 0.45rem;
+  gap: 0.55rem;
+  padding: 0.4rem 0.5rem;
   width: 100%;
   overflow: hidden;
   background: #181818;
   color: #ddd;
   text-align: left;
 }
-.home-library-entry .ogs-mini-goban {
-  flex: 0 0 3.6rem;
-  width: 3.6rem;
+.home-library-entry:hover,
+.home-library-entry:focus {
+  background: #202124;
 }
-.home-library-entry-info {
-  display: grid;
+.home-library-entry-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+.home-library-entry-directory .home-library-entry-icon {
+  filter: invert(77%) sepia(52%) saturate(551%) hue-rotate(359deg)
+    brightness(91%) contrast(88%);
+}
+.home-library-entry-name {
   min-width: 0;
-  gap: 0.2rem;
-}
-.home-library-entry-info strong,
-.home-library-entry-info span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.home-library-entry-info span {
-  color: #aaa;
-  font-size: 0.8rem;
-}
 .home-library-empty {
   color: #aaa;
   font-size: 0.9rem;
+}
+.home-library-open {
+  justify-self: start;
 }
 .home-online-pane {
   display: grid;
