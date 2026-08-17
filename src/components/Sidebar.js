@@ -190,6 +190,7 @@ export default class Sidebar extends Component {
               nodeSize: graphNodeSize,
 
               onNodeClick: this.handleGraphNodeClick,
+              onWheelNavigation: (step) => sabaki.goStep(step),
             }),
           ),
 

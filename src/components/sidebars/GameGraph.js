@@ -154,46 +154,76 @@ class GameGraph extends Component {
       viewportPosition: [0, 0],
       matrixDict: this.getMatrixDict(props.gameTree),
     }
+    this.residueDeltaY = 0
 
     this.handleNodeClick = this.handleNodeClick.bind(this)
     this.handleGraphMouseDown = this.handleGraphMouseDown.bind(this)
+    this.handleGraphMouseUp = this.handleGraphMouseUp.bind(this)
+    this.handleWheel = this.handleWheel.bind(this)
+    this.handleDocumentMouseMove = this.handleDocumentMouseMove.bind(this)
+    this.handleDocumentMouseUp = this.handleDocumentMouseUp.bind(this)
+    this.handleWindowResize = this.handleWindowResize.bind(this)
   }
 
   componentDidMount() {
-    document.addEventListener('mousemove', (evt) => {
-      if (!this.svgElement) return
-
-      let {clientX: x, clientY: y, movementX, movementY} = evt
-      let {
-        cameraPosition: [cx, cy],
-        viewportPosition: [vx, vy],
-      } = this.state
-
-      if (this.mouseDown === 0) {
-        this.drag = true
-      } else {
-        movementX = movementY = 0
-        this.drag = false
-      }
-
-      this.mousePosition = [x - vx, y - vy]
-
-      if (this.drag) {
-        evt.preventDefault()
-        this.setState({cameraPosition: [cx - movementX, cy - movementY]})
-      }
-    })
-
-    document.addEventListener('mouseup', () => {
-      this.mouseDown = null
-    })
-
-    window.addEventListener('resize', () => {
-      clearTimeout(this.remeasureId)
-      this.remeasureId = setTimeout(() => this.remeasure(), 500)
-    })
-
+    document.addEventListener('mousemove', this.handleDocumentMouseMove)
+    document.addEventListener('mouseup', this.handleDocumentMouseUp)
+    window.addEventListener('resize', this.handleWindowResize)
+    window.addEventListener('scroll', this.handleWindowResize, true)
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(this.handleWindowResize)
+      this.resizeObserver.observe(this.element)
+    }
     this.remeasure()
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('mousemove', this.handleDocumentMouseMove)
+    document.removeEventListener('mouseup', this.handleDocumentMouseUp)
+    window.removeEventListener('resize', this.handleWindowResize)
+    window.removeEventListener('scroll', this.handleWindowResize, true)
+    this.resizeObserver?.disconnect()
+    if (this.remeasureFrame != null) cancelAnimationFrame(this.remeasureFrame)
+  }
+
+  handleDocumentMouseMove(evt) {
+    if (!this.svgElement) return
+
+    let {clientX: x, clientY: y, movementX, movementY} = evt
+    let {
+      cameraPosition: [cx, cy],
+    } = this.state
+    let rect = this.element.getBoundingClientRect()
+
+    if (this.mouseDown === 0) {
+      this.drag = true
+    } else {
+      movementX = movementY = 0
+      this.drag = false
+    }
+
+    this.mousePosition = [x - rect.left, y - rect.top]
+
+    if (this.drag) {
+      evt.preventDefault()
+      this.setState({cameraPosition: [cx - movementX, cy - movementY]})
+    }
+  }
+
+  handleDocumentMouseUp() {
+    this.mouseDown = null
+  }
+
+  handleWindowResize() {
+    if (this.remeasureFrame != null) return
+    let schedule =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback) => setTimeout(callback, 0)
+    this.remeasureFrame = schedule(() => {
+      this.remeasureFrame = null
+      this.remeasure()
+    })
   }
 
   shouldComponentUpdate({showGameGraph, height}) {
@@ -261,7 +291,7 @@ class GameGraph extends Component {
   }
 
   remeasure() {
-    if (!this.props.showGameGraph) return
+    if (!this.props.showGameGraph || this.element == null) return
 
     let {left, top, width, height} = this.element.getBoundingClientRect()
     this.setState({
@@ -278,6 +308,20 @@ class GameGraph extends Component {
     this.mouseDown = null
   }
 
+  handleWheel(evt) {
+    let {onWheelNavigation} = this.props
+    if (onWheelNavigation == null) return
+
+    evt.preventDefault()
+    evt.stopPropagation()
+    this.residueDeltaY += evt.deltaY
+    let sensitivity = setting.get('game.navigation_sensitivity')
+    if (Math.abs(this.residueDeltaY) < sensitivity) return
+
+    onWheelNavigation(Math.sign(this.residueDeltaY))
+    this.residueDeltaY = 0
+  }
+
   handleNodeClick(evt) {
     if (this.drag) {
       this.drag = false
@@ -289,7 +333,8 @@ class GameGraph extends Component {
       matrixDict: [matrix],
       cameraPosition: [cx, cy],
     } = this.state
-    let [mx, my] = this.mousePosition
+    let rect = this.element.getBoundingClientRect()
+    let [mx, my] = [evt.clientX - rect.left, evt.clientY - rect.top]
     let [nearestX, nearestY] = [mx + cx, my + cy].map((z) =>
       Math.round(z / gridSize),
     )
@@ -458,6 +503,7 @@ class GameGraph extends Component {
       {
         ref: (el) => (this.element = el),
         id: 'graph',
+        onWheel: this.handleWheel,
       },
 
       h(

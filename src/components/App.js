@@ -328,7 +328,7 @@ class App extends Component {
   // User Interface
 
   handleWheel(evt) {
-    if (evt.target.closest('#main main, #graph, #winrategraph') == null) {
+    if (evt.target.closest('#main main, #winrategraph') == null) {
       return
     }
 

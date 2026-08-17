@@ -4,6 +4,11 @@ import {stringifyVertex} from '@sabaki/sgf'
 import i18n from '../i18n.js'
 import * as gametree from '../modules/gametree.js'
 import {advanceSolution, resolveMove} from '../modules/tsumego.js'
+import {
+  applyExplorationMove,
+  cloneExplorationBoard,
+  getExplorationPlayer,
+} from '../modules/tsumegoexploration.js'
 import GameGraph from './sidebars/GameGraph.js'
 import Goban from './Goban.js'
 
@@ -16,18 +21,25 @@ export default class TsumegoSolver extends Component {
   }
 
   getInitialState({problem}) {
-    return {
+    let initial = {
+      phase: 'solving',
       displayNodeId: problem.startNodeId,
       decisionPointId: problem.startNodeId,
       expectedMoveNodeId: problem.firstMove.id,
       feedback: null,
-      solved: false,
       showGameGraph: false,
+      explorationBoard: null,
+      explorationPlayer: null,
     }
+    return {...initial, retrySnapshot: {...initial}}
   }
 
   handleVertexClick = (evt) => {
-    if (this.state.solved || evt.vertex == null) return
+    if (evt.vertex == null) return
+    if (this.state.phase !== 'solving') {
+      this.handleExplorationVertex(evt.vertex)
+      return
+    }
 
     let {gameTree, problem} = this.props
     let expectedMoveNode = gameTree.get(this.state.expectedMoveNodeId)
@@ -39,33 +51,107 @@ export default class TsumegoSolver extends Component {
       expectedMoveNode,
     )
     if (result.status !== 'correct' || result.node == null) {
-      this.setState({feedback: t('Incorrect'), solved: false})
+      this.startFailedExploration(evt.vertex)
       return
     }
 
     let advanced = advanceSolution(gameTree, problem, result.node)
     if (advanced == null) {
-      this.setState({feedback: t('Incorrect'), solved: false})
+      this.startFailedExploration(evt.vertex)
       return
     }
 
-    this.setState({
+    let phase = advanced.solved ? 'solved' : 'solving'
+    let nextState = {
       displayNodeId: advanced.positionNodeId,
       decisionPointId: advanced.decisionPointId,
       expectedMoveNodeId: advanced.nextPlayerMove?.id || null,
       feedback: advanced.solved ? t('Solved') : null,
-      solved: advanced.solved,
+      phase,
       showGameGraph: advanced.solved,
+      explorationBoard: null,
+      explorationPlayer: null,
+    }
+    this.setState({
+      ...nextState,
+      retrySnapshot: advanced.solved
+        ? this.state.retrySnapshot
+        : {...nextState, retrySnapshot: undefined},
     })
   }
 
   handleGraphNodeClick = (evt) => {
     if (evt.button !== 0 || evt.treePosition == null) return
-    this.setState({displayNodeId: evt.treePosition})
+    this.setState({
+      displayNodeId: evt.treePosition,
+      explorationBoard: null,
+      explorationPlayer: null,
+    })
+  }
+
+  handleGraphWheel = (step) => {
+    let next = this.props.gameTree.navigate(this.state.displayNodeId, step, {})
+    if (next == null) return
+    this.setState({
+      displayNodeId: next.id,
+      explorationBoard: null,
+      explorationPlayer: null,
+    })
+  }
+
+  handleExplorationVertex(vertex) {
+    let {gameTree, problem} = this.props
+    let board =
+      this.state.explorationBoard ||
+      cloneExplorationBoard(
+        gametree.getBoard(gameTree, this.state.displayNodeId),
+      )
+    let node = gameTree.get(this.state.displayNodeId)
+    let sign =
+      this.state.explorationPlayer ??
+      getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+    let nextBoard = applyExplorationMove(board, sign, vertex)
+    if (nextBoard == null) return
+    this.setState({
+      explorationBoard: nextBoard,
+      explorationPlayer: -sign,
+      feedback: null,
+    })
+  }
+
+  startFailedExploration(vertex) {
+    let {gameTree, problem} = this.props
+    let board = cloneExplorationBoard(
+      gametree.getBoard(gameTree, this.state.displayNodeId),
+    )
+    let node = gameTree.get(this.state.displayNodeId)
+    let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+    let nextBoard = applyExplorationMove(board, sign, vertex) || board
+    let retrySnapshot = {
+      phase: 'solving',
+      displayNodeId: this.state.displayNodeId,
+      decisionPointId: this.state.decisionPointId,
+      expectedMoveNodeId: this.state.expectedMoveNodeId,
+      feedback: null,
+      showGameGraph: false,
+      explorationBoard: null,
+      explorationPlayer: null,
+    }
+    this.setState({
+      phase: 'failed',
+      feedback: t('Incorrect'),
+      explorationBoard: nextBoard,
+      explorationPlayer: -sign,
+      retrySnapshot,
+    })
   }
 
   handleRetry = () => {
-    this.setState(this.getInitialState(this.props))
+    if (this.state.phase === 'failed') {
+      this.setState(this.state.retrySnapshot)
+    } else {
+      this.setState(this.getInitialState(this.props))
+    }
   }
 
   render() {
@@ -80,8 +166,10 @@ export default class TsumegoSolver extends Component {
       onPrevious,
       onNext,
     } = this.props
-    let {displayNodeId, feedback, solved, showGameGraph} = this.state
-    let board = gametree.getBoard(gameTree, displayNodeId)
+    let {displayNodeId, phase, feedback, showGameGraph, explorationBoard} =
+      this.state
+    let solved = phase === 'solved'
+    let board = explorationBoard || gametree.getBoard(gameTree, displayNodeId)
     let currentNode = gameTree.get(displayNodeId)
     let currentComment = currentNode?.data?.C?.[0] || ''
     let filename = splitRelativePath(relativePath).pop() || ''
@@ -155,6 +243,7 @@ export default class TsumegoSolver extends Component {
                 gridSize: graphGridSize,
                 nodeSize: graphNodeSize,
                 onNodeClick: this.handleGraphNodeClick,
+                onWheelNavigation: this.handleGraphWheel,
               }),
             ),
           ),
@@ -178,8 +267,12 @@ export default class TsumegoSolver extends Component {
           },
           `${t('Next')} ›`,
         ),
-        solved &&
-          h('button', {type: 'button', onClick: this.handleRetry}, t('Retry')),
+        (phase === 'failed' || solved) &&
+          h(
+            'button',
+            {type: 'button', onClick: this.handleRetry},
+            solved ? t('Retry Problem') : t('Retry'),
+          ),
       ),
     )
   }

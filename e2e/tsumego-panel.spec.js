@@ -55,13 +55,18 @@ test.describe('Tsumego workspace', () => {
     let globalTreePosition = await page.evaluate(
       () => window.__sabaki.state.treePosition,
     )
-    await dispatchVertex(page, 0, 0)
+    await clickBoardVertex(page, 0, 0, 19)
     await expect(page.locator('.tsumego-solver-feedback')).toContainText(
       'Incorrect',
     )
     expect(await page.evaluate(() => window.__sabaki.state.treePosition)).toBe(
       globalTreePosition,
     )
+    await expect(
+      page.getByRole('button', {name: 'Retry', exact: true}),
+    ).toBeVisible()
+    await page.getByRole('button', {name: 'Retry', exact: true}).click()
+    await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
 
     await dispatchVertex(page, 17, 18)
     await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
@@ -69,6 +74,24 @@ test.describe('Tsumego workspace', () => {
     await expect(page.locator('.tsumego-solver-feedback')).toContainText(
       'Solved',
     )
+    await expect(page.locator('.tsumego-solver-graph')).toBeVisible()
+    let wheelResult = await page
+      .locator('.tsumego-solver-graph #graph')
+      .evaluate((element) => {
+        let event = new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaY: 40,
+        })
+        element.dispatchEvent(event)
+        return event.defaultPrevented
+      })
+    expect(wheelResult).toBe(true)
+    expect(await page.evaluate(() => window.__sabaki.state.treePosition)).toBe(
+      globalTreePosition,
+    )
+    await page.getByRole('button', {name: 'Retry Problem', exact: true}).click()
+    await expect(page.locator('.tsumego-solver-graph')).toHaveCount(0)
   })
 
   test('browses a configured User Library independently', async ({page}) => {
@@ -109,4 +132,13 @@ async function dispatchVertex(page, x, y) {
       element.dispatchEvent(new MouseEvent('mousedown', options))
       element.dispatchEvent(new MouseEvent('mouseup', options))
     })
+}
+
+async function clickBoardVertex(page, x, y, size) {
+  let box = await page
+    .locator(
+      `.tsumego-solver-board .shudan-vertex[data-x="${x}"][data-y="${y}"]`,
+    )
+    .boundingBox()
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
 }
