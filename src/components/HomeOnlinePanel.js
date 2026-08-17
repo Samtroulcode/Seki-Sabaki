@@ -116,7 +116,7 @@ export default class HomeOnlinePanel extends Component {
     if (!authenticated) {
       return h(
         'section',
-        {class: 'home-online-panel'},
+        {class: 'home-pane home-online-pane'},
         h(LoginForm, {
           username: onlineState.username,
           busy: onlineState.busy,
@@ -130,122 +130,112 @@ export default class HomeOnlinePanel extends Component {
 
     return h(
       'section',
-      {class: 'home-online-panel'},
+      {class: 'home-pane home-online-pane'},
       h(
         'div',
-        {class: 'home-online-heading'},
+        {class: 'home-online-account'},
+        onlineState.user?.iconUrl != null
+          ? h('img', {
+              class: 'ogs-avatar home-online-avatar',
+              src: onlineState.user.iconUrl,
+              alt: '',
+            })
+          : h(
+              'span',
+              {class: 'ogs-avatar home-online-avatar-fallback'},
+              getInitial(onlineState.user?.username || onlineState.username),
+            ),
         h(
           'div',
-          {class: 'home-online-account'},
-          onlineState.user?.iconUrl != null
-            ? h('img', {
-                class: 'ogs-avatar home-online-avatar',
-                src: onlineState.user.iconUrl,
-                alt: '',
-              })
-            : h(
-                'span',
-                {class: 'ogs-avatar home-online-avatar-fallback'},
-                getInitial(onlineState.user?.username || onlineState.username),
-              ),
+          {},
           h(
-            'div',
-            {},
-            h(
-              'strong',
-              {class: 'home-online-username'},
-              onlineState.user?.username || onlineState.username,
-            ),
-            onlineState.user?.rank != null &&
-              h('span', {class: 'home-online-rank'}, onlineState.user.rank),
+            'strong',
+            {class: 'home-online-username'},
+            onlineState.user?.username || onlineState.username,
           ),
+          onlineState.user?.rank != null &&
+            h('span', {class: 'home-online-rank'}, onlineState.user.rank),
         ),
-        h('h2', {}, t('Play online')),
-        h('p', {}, t('Find an OGS opponent with a ready-to-play clock.')),
       ),
+      h('span', {class: 'home-online-label'}, t('Board size')),
       h(
         'div',
-        {class: 'home-online-content'},
-        h('span', {class: 'home-online-label'}, t('Board size')),
-        h(
-          'div',
-          {
-            class: 'home-online-sizes',
-            role: 'group',
-            'aria-label': t('Board size'),
-          },
-          boardSizes.map((size) =>
-            h(
-              'button',
-              {
-                key: size,
-                type: 'button',
-                class: boardSize === size ? 'selected' : '',
-                'aria-pressed': boardSize === size,
-                onClick: () => this.handleBoardSizeChange(size),
-              },
-              `${size}x${size}`,
-            ),
-          ),
-        ),
-        h(
-          'div',
-          {class: 'home-online-preview', 'aria-hidden': 'true'},
-          h(HomeBoardPreview, {width: boardSize}),
-        ),
-        h(
-          'div',
-          {class: 'home-online-settings'},
-          h('span', {class: 'home-online-label'}, t('Clock')),
-          h(
-            'div',
-            {
-              class: 'home-online-modes',
-              role: 'group',
-              'aria-label': t('Clock'),
-            },
-            clockModes.map((mode) =>
-              h(
-                'button',
-                {
-                  key: mode.id,
-                  type: 'button',
-                  class: clockMode === mode.id ? 'selected' : '',
-                  'aria-pressed': clockMode === mode.id,
-                  onClick: () => this.handleClockModeChange(mode.id),
-                },
-                t(mode.label),
-              ),
-            ),
-          ),
-          h('span', {class: 'home-online-label'}, t('Time setting')),
-          h(
-            'div',
-            {class: 'home-online-presets'},
-            presets.map((preset) =>
-              h(
-                'button',
-                {
-                  key: preset[0],
-                  type: 'button',
-                  class: selectedPreset?.[0] === preset[0] ? 'selected' : '',
-                  'aria-pressed': selectedPreset?.[0] === preset[0],
-                  onClick: () => this.setState({presetId: preset[0]}),
-                },
-                preset[1],
-              ),
-            ),
-          ),
+        {
+          class: 'home-online-sizes',
+          role: 'group',
+          'aria-label': t('Board size'),
+        },
+        boardSizes.map((size) =>
           h(
             'button',
             {
+              key: size,
               type: 'button',
-              class: 'home-online-start',
-              disabled: automatchActive || !authenticated,
-              onClick: this.handleStartClick,
+              class: boardSize === size ? 'selected' : '',
+              'aria-pressed': boardSize === size,
+              onClick: () => this.handleBoardSizeChange(size),
             },
-            authenticated ? t('Find opponent') : t('Connect to OGS first'),
+            `${size}x${size}`,
           ),
+        ),
+      ),
+      h(
+        'div',
+        {class: 'home-online-preview', 'aria-hidden': 'true'},
+        h(HomeBoardPreview, {width: boardSize}),
+      ),
+      h(
+        'div',
+        {class: 'home-online-settings'},
+        h('span', {class: 'home-online-label'}, t('Clock')),
+        h(
+          'div',
+          {
+            class: 'home-online-modes',
+            role: 'group',
+            'aria-label': t('Clock'),
+          },
+          clockModes.map((mode) =>
+            h(
+              'button',
+              {
+                key: mode.id,
+                type: 'button',
+                class: clockMode === mode.id ? 'selected' : '',
+                'aria-pressed': clockMode === mode.id,
+                onClick: () => this.handleClockModeChange(mode.id),
+              },
+              t(mode.label),
+            ),
+          ),
+        ),
+        h('span', {class: 'home-online-label'}, t('Time setting')),
+        h(
+          'div',
+          {class: 'home-online-presets'},
+          presets.map((preset) =>
+            h(
+              'button',
+              {
+                key: preset[0],
+                type: 'button',
+                class: selectedPreset?.[0] === preset[0] ? 'selected' : '',
+                'aria-pressed': selectedPreset?.[0] === preset[0],
+                onClick: () => this.setState({presetId: preset[0]}),
+              },
+              preset[1],
+            ),
+          ),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'home-online-start',
+            disabled: automatchActive || !authenticated,
+            onClick: this.handleStartClick,
+          },
+          authenticated ? t('Find opponent') : t('Connect to OGS first'),
         ),
       ),
     )

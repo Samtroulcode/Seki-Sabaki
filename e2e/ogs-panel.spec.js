@@ -644,15 +644,15 @@ test.describe('OGS mock panel', () => {
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    await expect(page.locator('.home-ogs-history-card')).toContainText(
+    await expect(page.locator('.home-recent-games-pane')).toContainText(
       'History Fixture',
     )
-    let compactCardHeights = await page
-      .locator('.home-ogs-history-card .ogs-history-card')
-      .evaluateAll((cards) =>
-        cards.map((card) => card.getBoundingClientRect().height),
+    let compactEntryHeights = await page
+      .locator('.home-recent-games-pane .ogs-history-column-entry')
+      .evaluateAll((entries) =>
+        entries.map((entry) => entry.getBoundingClientRect().height),
       )
-    expect(Math.max(...compactCardHeights)).toBeLessThan(240)
+    expect(Math.max(...compactEntryHeights)).toBeLessThan(240)
 
     await page.getByRole('button', {name: 'View all OGS history'}).click()
 

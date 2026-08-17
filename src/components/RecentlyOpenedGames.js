@@ -12,6 +12,8 @@ import {MiniGoban} from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeDashboard')
 
+// Compact "Library" pane shown inside the Local card. For now it reuses the
+// recently opened games data as a stand-in for a full library browser.
 export default class RecentlyOpenedGames extends Component {
   constructor(props) {
     super(props)
@@ -55,59 +57,51 @@ export default class RecentlyOpenedGames extends Component {
 
     return h(
       'section',
-      {class: 'home-section home-recent-local-games'},
-      h(
-        'div',
-        {class: 'home-section-heading'},
-        h('h2', {}, t('Recently opened games')),
-        h('p', {}, t('Your latest local SGF games.')),
-      ),
-      h(
-        'article',
-        {class: 'home-card home-recent-local-games-card'},
-        busy
-          ? h('p', {class: 'home-empty-state'}, t('Loading recent games…'))
-          : entries.length === 0
-            ? h(
-                'p',
-                {class: 'home-empty-state'},
-                t('No recently opened games.'),
-              )
-            : h(
-                'div',
-                {class: 'home-recent-local-games-list'},
-                entries.slice(0, 4).map((entry) =>
+      {class: 'home-pane home-library-pane'},
+      h('h3', {}, t('Library')),
+      busy
+        ? h('p', {class: 'home-library-empty'}, t('Loading recent games…'))
+        : entries.length === 0
+          ? h(
+              'p',
+              {class: 'home-library-empty'},
+              t('No recently opened games.'),
+            )
+          : h(
+              'div',
+              {class: 'home-library-list'},
+              entries.slice(0, 3).map((entry) =>
+                h(
+                  'button',
+                  {
+                    key: entry.id,
+                    type: 'button',
+                    class: 'home-library-entry',
+                    onClick: () => this.handleOpen(entry),
+                  },
+                  h(MiniGoban, {
+                    board: entry.preview,
+                    preview: entry.preview,
+                    status: entry.preview == null ? 'error' : 'idle',
+                  }),
                   h(
-                    'button',
-                    {
-                      key: entry.id,
-                      type: 'button',
-                      class: 'home-recent-local-game',
-                      onClick: () => this.handleOpen(entry),
-                    },
-                    h(MiniGoban, {
-                      board: entry.preview,
-                      preview: entry.preview,
-                      status: entry.preview == null ? 'error' : 'idle',
-                    }),
-                    h(
-                      'span',
-                      {class: 'home-recent-local-game-info'},
-                      h('strong', {}, entry.filename),
-                      entry.preview?.result != null &&
-                        h('span', {}, entry.preview.result),
-                    ),
+                    'span',
+                    {class: 'home-library-entry-info'},
+                    h('strong', {}, entry.filename),
+                    entry.preview?.result != null &&
+                      h('span', {}, entry.preview.result),
                   ),
                 ),
               ),
-        h(
-          'button',
-          {
-            type: 'button',
-            onClick: () => sabaki.openWorkspaceTab('library'),
-          },
-          t('Open Library'),
-        ),
+            ),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'home-library-open',
+          onClick: () => sabaki.openWorkspaceTab('library'),
+        },
+        t('Open Library'),
       ),
     )
   }

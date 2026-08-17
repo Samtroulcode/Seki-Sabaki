@@ -103,6 +103,145 @@ export function OgsGameHistoryPanel({
   )
 }
 
+// Compact vertical column of recent OGS games, used on the Home dashboard.
+// Each entry is a single row: mini board, opponent, result, and review
+// actions. Keeps the two distinct review workflows (OGS AI review vs local
+// Seki analysis) as separate compact actions.
+export function OgsGameHistoryColumn({
+  games = [],
+  busy = false,
+  error = null,
+  authenticated = false,
+  emptyText = t('No recent games loaded yet.'),
+  onRefresh,
+  onOpenGame,
+  onAnalyzeOgs,
+  onAnalyzeSeki,
+  onOpenOgs,
+}) {
+  let currentUserId = onlineStore.getState().user?.id ?? null
+
+  return h(
+    'div',
+    {class: 'ogs-history-column'},
+    h(
+      'div',
+      {class: 'ogs-history-column-toolbar'},
+      authenticated
+        ? h(
+            'button',
+            {type: 'button', disabled: busy, onClick: onRefresh},
+            busy ? t('Loading...') : t('Refresh'),
+          )
+        : onOpenOgs != null &&
+            h('button', {type: 'button', onClick: onOpenOgs}, t('Connect OGS')),
+    ),
+    error != null && h('p', {class: 'ogs-error'}, error),
+    !authenticated
+      ? h('p', {class: 'ogs-empty'}, t('Connect OGS to see your history.'))
+      : games.length === 0
+        ? h('p', {class: 'ogs-empty'}, busy ? t('Loading...') : emptyText)
+        : h(
+            'div',
+            {class: 'ogs-history-column-list'},
+            games.map((game) =>
+              h(OgsGameHistoryColumnEntry, {
+                key: game.id,
+                game,
+                currentUserId,
+                onOpenGame,
+                onAnalyzeOgs,
+                onAnalyzeSeki,
+              }),
+            ),
+          ),
+  )
+}
+
+class OgsGameHistoryColumnEntry extends Component {
+  constructor(props) {
+    super(props)
+    this.state = {preview: null}
+    this.handlePreview = (preview) => this.setState({preview})
+  }
+
+  render() {
+    let {game, currentUserId, onOpenGame, onAnalyzeOgs, onAnalyzeSeki} =
+      this.props
+    let displayGame = {...game, winnerColor: this.state.preview?.winnerColor}
+    let outcome = getGameOutcome(displayGame, currentUserId)
+    let opponent = getOpponentName(game, currentUserId)
+
+    return h(
+      'article',
+      {
+        class: `ogs-history-column-entry ${outcome.status}`,
+        role: 'button',
+        tabIndex: 0,
+        onClick: () => onOpenGame?.(game.id),
+        onKeyDown: (evt) => {
+          if (evt.key === 'Enter' || evt.key === ' ') {
+            evt.preventDefault()
+            onOpenGame?.(game.id)
+          }
+        },
+      },
+      h(LazyMiniGoban, {game, onPreview: this.handlePreview}),
+      h(
+        'div',
+        {class: 'ogs-history-column-body'},
+        h('strong', {}, opponent || game.name || `#${game.id}`),
+        h(
+          'span',
+          {class: 'ogs-history-column-result'},
+          resultStone(displayGame),
+          game.result || t('Result unknown'),
+          winnerLabel(displayGame) != null &&
+            h('span', {}, ` · ${winnerLabel(displayGame)}`),
+        ),
+        h(
+          'div',
+          {class: 'ogs-history-column-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: (evt) => {
+                evt.stopPropagation()
+                onAnalyzeOgs?.(game.id)
+              },
+              onKeyDown: (evt) => evt.stopPropagation(),
+            },
+            t('Analyze OGS'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: (evt) => {
+                evt.stopPropagation()
+                onAnalyzeSeki?.(game.id)
+              },
+              onKeyDown: (evt) => evt.stopPropagation(),
+            },
+            t('Analyze Seki'),
+          ),
+        ),
+      ),
+    )
+  }
+}
+
+function getOpponentName(game, currentUserId) {
+  let players = [game.black, game.white].filter(Boolean)
+  if (currentUserId == null) return null
+  let opponent = players.find(
+    (player) =>
+      player.id != null && Number(player.id) !== Number(currentUserId),
+  )
+  return opponent?.username || null
+}
+
 class OgsGameHistoryCard extends Component {
   constructor(props) {
     super(props)

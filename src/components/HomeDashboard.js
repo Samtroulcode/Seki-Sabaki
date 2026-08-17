@@ -9,7 +9,7 @@ import HomeOnlinePanel from './HomeOnlinePanel.js'
 import RecentlyOpenedGames from './RecentlyOpenedGames.js'
 import {
   getHistoryPreview,
-  OgsGameHistoryPanel,
+  OgsGameHistoryColumn,
 } from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeDashboard')
@@ -218,56 +218,107 @@ export default class HomeDashboard extends Component {
           {class: 'home-main-content'},
           h(
             'div',
-            {class: 'home-primary-grid'},
+            {class: 'home-cards-grid'},
             h(
               'section',
-              {class: 'home-create-board'},
-              h('h2', {}, t('New board')),
+              {class: 'home-card home-card-local'},
+              h('div', {class: 'home-card-heading'}, h('h2', {}, t('Local'))),
               h(
                 'div',
-                {class: 'home-board-preview'},
+                {class: 'home-card-body'},
                 h(
-                  'div',
-                  {class: 'home-board-preview-goban', 'aria-hidden': 'true'},
-                  h(HomeBoardPreview, {
-                    width: previewDimensions[0],
-                    height: previewDimensions[1],
-                  }),
-                ),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    class: 'home-create-board-button',
-                    onClick: this.handleNewGameButtonClick,
-                  },
-                  h('strong', {}, t('New board')),
-                  h('span', {}, t('Start a fresh game')),
-                ),
-              ),
-              h(
-                'div',
-                {
-                  class: 'home-board-sizes',
-                  role: 'group',
-                  'aria-label': t('Board size'),
-                },
-                [9, 13, 19].map((size) =>
+                  'section',
+                  {class: 'home-pane home-new-board-pane'},
+                  h('h3', {}, t('New board')),
                   h(
-                    'button',
-                    {
-                      key: size,
-                      type: 'button',
-                      class: selectedBoardSize === size ? 'selected' : '',
-                      'aria-pressed': selectedBoardSize === size,
-                      onClick: () => this.handleBoardSizeChange(size),
-                    },
-                    `${size}x${size}`,
+                    'div',
+                    {class: 'home-board-preview'},
+                    h(
+                      'div',
+                      {
+                        class: 'home-board-preview-goban',
+                        'aria-hidden': 'true',
+                      },
+                      h(HomeBoardPreview, {
+                        width: previewDimensions[0],
+                        height: previewDimensions[1],
+                      }),
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        class: 'home-create-board-button',
+                        onClick: this.handleNewGameButtonClick,
+                      },
+                      h('strong', {}, t('New board')),
+                      h('span', {}, t('Start a fresh game')),
+                    ),
                   ),
+                  h(
+                    'div',
+                    {
+                      class: 'home-board-sizes',
+                      role: 'group',
+                      'aria-label': t('Board size'),
+                    },
+                    [9, 13, 19].map((size) =>
+                      h(
+                        'button',
+                        {
+                          key: size,
+                          type: 'button',
+                          class: selectedBoardSize === size ? 'selected' : '',
+                          'aria-pressed': selectedBoardSize === size,
+                          onClick: () => this.handleBoardSizeChange(size),
+                        },
+                        `${size}x${size}`,
+                      ),
+                    ),
+                  ),
+                ),
+                h(RecentlyOpenedGames),
+              ),
+            ),
+            h(
+              'section',
+              {class: 'home-card home-card-online'},
+              h('div', {class: 'home-card-heading'}, h('h2', {}, t('Online'))),
+              h(
+                'div',
+                {class: 'home-card-body'},
+                h(HomeOnlinePanel),
+                h(
+                  'section',
+                  {class: 'home-pane home-recent-games-pane'},
+                  h('h3', {}, t('Recent games')),
+                  h(OgsGameHistoryColumn, {
+                    games: ogsHistoryPreview,
+                    busy: onlineState.gameHistoryBusy,
+                    error: onlineState.gameHistoryError,
+                    authenticated: ogsAuthenticated,
+                    emptyText: t('No recent OGS games loaded yet.'),
+                    onRefresh: this.handleOgsHistoryRefresh,
+                    onOpenGame: this.handleOgsHistoryGameClick,
+                    onAnalyzeOgs: this.handleAnalyzeOgs,
+                    onAnalyzeSeki: this.handleAnalyzeSeki,
+                    onOpenOgs: ogsAuthenticated
+                      ? this.handleOgsButtonClick
+                      : null,
+                  }),
+                  ogsAuthenticated &&
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        class: 'home-recent-games-all',
+                        onClick: this.handleOgsHistoryButtonClick,
+                      },
+                      t('View all OGS history'),
+                    ),
                 ),
               ),
             ),
-            h(HomeOnlinePanel),
           ),
           (hasOnlineGame || hasBoardTabs) &&
             h(
@@ -281,50 +332,6 @@ export default class HomeDashboard extends Component {
                 ? t('Continue game #') + String(onlineGameId)
                 : t('Resume current board'),
             ),
-          h(
-            'div',
-            {class: 'home-recent-games-grid'},
-            h(RecentlyOpenedGames),
-            h(
-              'section',
-              {class: 'home-section home-recent-games'},
-              h(
-                'div',
-                {class: 'home-section-heading'},
-                h('h2', {}, t('Recent OGS games')),
-                h('p', {}, t('Your latest games, ready to review.')),
-              ),
-              h(
-                'article',
-                {
-                  class: `home-card home-ogs-history-card ${
-                    ogsAuthenticated ? '' : 'is-disabled'
-                  }`,
-                },
-                h(OgsGameHistoryPanel, {
-                  games: ogsHistoryPreview,
-                  busy: onlineState.gameHistoryBusy,
-                  error: onlineState.gameHistoryError,
-                  authenticated: ogsAuthenticated,
-                  compact: true,
-                  emptyText: t('No recent OGS games loaded yet.'),
-                  onRefresh: this.handleOgsHistoryRefresh,
-                  onOpenGame: this.handleOgsHistoryGameClick,
-                  onAnalyzeOgs: this.handleAnalyzeOgs,
-                  onAnalyzeSeki: this.handleAnalyzeSeki,
-                  onOpenOgs: ogsAuthenticated
-                    ? this.handleOgsButtonClick
-                    : null,
-                }),
-                ogsAuthenticated &&
-                  h(
-                    'button',
-                    {type: 'button', onClick: this.handleOgsHistoryButtonClick},
-                    t('View all OGS history'),
-                  ),
-              ),
-            ),
-          ),
         ),
       ),
     )

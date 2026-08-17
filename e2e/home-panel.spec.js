@@ -18,7 +18,7 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('.home-sidebar')).toHaveCount(0)
     await expect(page.locator('#home')).toContainText('Connect account')
     await expect(page.locator('#home')).not.toContainText('Status')
-    await expect(page.locator('#home')).toContainText('Recent OGS games')
+    await expect(page.locator('#home')).toContainText('Recent games')
     await expect(page.locator('#home')).toContainText(
       'Connect OGS to see your history.',
     )
@@ -180,14 +180,14 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('#goban')).toBeVisible()
 
     await page.getByTitle('Home').click()
-    await expect(page.locator('.home-recent-local-games')).toContainText(
+    await expect(page.locator('.home-library-pane')).toContainText(
       'pro_game.sgf',
     )
     await expect(
-      page.locator('.home-recent-local-game .ogs-mini-goban'),
+      page.locator('.home-library-entry .ogs-mini-goban'),
     ).toBeVisible()
 
-    await page.locator('.home-recent-local-game').first().click()
+    await page.locator('.home-library-entry').first().click()
     await expect(page.locator('#goban')).toBeVisible()
     await expect(
       page.locator(
