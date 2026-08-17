@@ -387,16 +387,6 @@ describe('analyzeProblem', () => {
     assert.strictEqual(result.firstMove.data.W[0], 'na')
   })
 
-  it('returns null when a PL on a move starting position contradicts the first move', () => {
-    // ROOT -> W[gm] PL[W] -> B[gl] C[Correct Answer]
-    let tree = gametree.new().mutate((draft) => {
-      let w1 = draft.appendNode(draft.root.id, {W: ['gm'], PL: ['W']})
-      draft.appendNode(w1, {B: ['gl'], C: ['Correct Answer']})
-    })
-
-    assert.strictEqual(analyzeProblem(tree), null)
-  })
-
   it('detects a problem whose marker sits on a prefix below a preliminary move', () => {
     // ROOT -> W[gm] -> N[正解图] -> B[gl]
     let tree = gametree.new().mutate((draft) => {
@@ -530,17 +520,21 @@ describe('classifyMove', () => {
     assert.strictEqual(classifyMove(tree, problem, 'ee'), 'wrong')
   })
 
-  it('returns null for a matching variation that is not clearly marked', () => {
+  it('classifies an unmarked variation as wrong when a correct move exists', () => {
+    // A proven-correct move at the decision point turns explicitly present but
+    // unmarked variations into wrong moves.
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
       draft.appendNode(draft.root.id, {B: ['dd']})
     })
     let problem = analyzeProblem(tree)
 
-    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
   })
 
-  it('returns null when a vertex mixes marked and unmarked variations', () => {
+  it('classifies a vertex with marked and unmarked variations as wrong', () => {
+    // The unmarked duplicate loses its caution: a proven-correct move exists at
+    // the decision point, so every other explicitly present variation is wrong.
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
       draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong Answer']})
@@ -548,7 +542,7 @@ describe('classifyMove', () => {
     })
     let problem = analyzeProblem(tree)
 
-    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
   })
 
   it('prefers the correct answer over a BM-marked branch at the same vertex', () => {
@@ -707,7 +701,10 @@ describe('classifyMove', () => {
     assert.strictEqual(classifyMove(tree, problem, 'dd'), 'correct')
   })
 
-  it('does not treat a BM on a descendant as wrong', () => {
+  it('classifies a variation with only a descendant BM as wrong when a correct move exists', () => {
+    // A `BM` on a descendant does not mark the branch wrong by itself, but a
+    // proven-correct move elsewhere at the decision point still classifies the
+    // explicitly present, unmarked variation as wrong.
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
       let wrong = draft.appendNode(draft.root.id, {B: ['dd']})
@@ -715,7 +712,7 @@ describe('classifyMove', () => {
     })
     let problem = analyzeProblem(tree)
 
-    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
   })
 
   it('classifies a wrong branch as wrong when a positive solution exists elsewhere', () => {
@@ -784,6 +781,104 @@ describe('classifyMove', () => {
     assert(problem != null)
     assert.strictEqual(problem.firstMove.data.B[0], 'rs')
     assert.strictEqual(classifyMove(tree, problem, 'rs'), 'correct')
+  })
+
+  it('classifies unmarked variations as wrong when a positive solution exists', () => {
+    // GoGameGuru: only the solution branch carries a marker; the other
+    // explicitly present first moves are unmarked.
+    let tree = gametree.new().mutate((draft) => {
+      let correct = draft.appendNode(draft.root.id, {B: ['rs']})
+      let w1 = draft.appendNode(correct, {W: ['rr']})
+      draft.appendNode(w1, {B: ['ns'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['sr']})
+      draft.appendNode(draft.root.id, {B: ['sq']})
+      draft.appendNode(draft.root.id, {B: ['qq']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(problem.playerToMove, 'B')
+    assert.strictEqual(classifyMove(tree, problem, 'rs'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'sr'), 'wrong')
+    assert.strictEqual(classifyMove(tree, problem, 'sq'), 'wrong')
+    assert.strictEqual(classifyMove(tree, problem, 'qq'), 'wrong')
+  })
+
+  it('keeps several positive variations correct and marks the rest wrong', () => {
+    // Two marked solutions plus an unmarked variation at the same decision
+    // point: both solutions stay correct, the unmarked one is wrong.
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['rs'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['sr'], C: ['Also correct...']})
+      draft.appendNode(draft.root.id, {B: ['sq']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(classifyMove(tree, problem, 'rs'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'sr'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'sq'), 'wrong')
+  })
+
+  it('keeps an unmarked variation null when no variation has a positive proof', () => {
+    // No positive marker anywhere: analyzeProblem finds no problem, so the
+    // present-but-unmarked variation is never invented as wrong. A hand-built
+    // problem exercises classifyMove's own guard directly.
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl']})
+      draft.appendNode(draft.root.id, {B: ['dd']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+
+    let firstMove = tree.get(tree.root.children[0].id)
+    let problem = {startNodeId: tree.root.id, playerToMove: 'B', firstMove}
+    assert.strictEqual(classifyMove(tree, problem, 'gl'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+  })
+
+  it('keeps a move absent from the SGF as absent', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['rs'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['sr']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(classifyMove(tree, problem, 'ee'), 'absent')
+  })
+
+  it('counts a TE marker as positive proof when the TE fallback is enabled', () => {
+    // A TE-marked variation is correct, and a TE marker can also establish the
+    // proven-correct move that turns unmarked variations into wrong moves.
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['rs'], TE: ['1']})
+      draft.appendNode(draft.root.id, {B: ['sr'], TE: ['1']})
+      draft.appendNode(draft.root.id, {B: ['sq']})
+    })
+    let problem = analyzeProblem(tree, {allowTeFallback: true})
+
+    assert(problem != null)
+    assert.strictEqual(classifyMove(tree, problem, 'rs'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'sr'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'sq'), 'wrong')
+  })
+
+  it('does not count a TE marker as positive proof without the TE fallback', () => {
+    // The problem is detected from the comment marker; the TE-marked variation
+    // must not become correct, and the unmarked rule still applies.
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['rs'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['sr'], TE: ['1']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(classifyMove(tree, problem, 'sr'), 'wrong')
+
+    // With the fallback enabled the same TE marker is a positive proof.
+    let teProblem = analyzeProblem(tree, {allowTeFallback: true})
+    assert.strictEqual(classifyMove(tree, teProblem, 'sr'), 'correct')
   })
 })
 

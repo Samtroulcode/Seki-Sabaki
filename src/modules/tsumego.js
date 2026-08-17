@@ -22,6 +22,14 @@
 // it, the problem is considered unreliable and `analyzeProblem` returns
 // `null`. If no reliable marker is found, `analyzeProblem` returns `null`
 // rather than guessing.
+//
+// Move classification is conservative by default: without a proven-correct
+// move at the decision point, an explicitly present variation is only `wrong`
+// when it carries a negative marker. GoGameGuru collections only mark the
+// solution (`C[Correct]`) and leave failed tries unmarked, so when at least
+// one first-move variation at the decision point carries a reliable positive
+// proof, every other explicitly present variation without one is classified
+// `wrong`; variations absent from the SGF stay `absent`.
 
 import {parseVertex} from '@sabaki/sgf'
 
@@ -252,14 +260,17 @@ function getMarkedMoveCandidate(tree, node, depth) {
 // on result markers anywhere in the branch's subtree and on the non-move
 // prefix between the starting position and the branch's first move. A `BM` on
 // the branch's first move marks it wrong (the existing BM convention).
-// Positive markers win over negative ones when both are present.
-function getBranchResult(node, tree, startNode) {
+// Positive markers win over negative ones when both are present. `allowTe`
+// counts `TE` markers as positive proof, mirroring analyzeProblem's TE
+// fallback gate: `TE` is only trusted when the caller opted into it.
+function getBranchResult(node, tree, startNode, allowTe = false) {
   let hasPositive = false
   let hasNegative = hasBmMarker(node)
   let stack = [node]
   while (stack.length) {
     let current = stack.pop()
     if (hasPositiveResultMarker(current)) hasPositive = true
+    if (allowTe && hasTeMarker(current)) hasPositive = true
     if (hasNegativeResultMarker(current)) hasNegative = true
     for (let child of current.children) stack.push(child)
   }
@@ -270,6 +281,7 @@ function getBranchResult(node, tree, startNode) {
   let current = node.parentId != null ? tree.get(node.parentId) : null
   while (current != null && current.id !== startNode.id && !hasMove(current)) {
     if (hasPositiveResultMarker(current)) hasPositive = true
+    if (allowTe && hasTeMarker(current)) hasPositive = true
     if (hasNegativeResultMarker(current)) hasNegative = true
     current = current.parentId != null ? tree.get(current.parentId) : null
   }
@@ -279,9 +291,11 @@ function getBranchResult(node, tree, startNode) {
   return null
 }
 
-// Returns `{startNodeId, playerToMove, firstMove}` or `null` when no reliable
-// solution marker is found. `firstMove` is a live reference into the tree's
-// node objects; callers must not mutate it.
+// Returns `{startNodeId, playerToMove, firstMove, allowTeFallback}` or `null`
+// when no reliable solution marker is found. `firstMove` is a live reference
+// into the tree's node objects; callers must not mutate it. `allowTeFallback`
+// echoes the option so `classifyMove` can apply the same TE gate when reading
+// branch results.
 //
 // `options.allowTeFallback` gates the `TE` (tesuji) property as a secondary
 // solution marker. `TE` is a generic move annotation in normal game records, so
@@ -364,7 +378,7 @@ export function analyzeProblem(tree, options = {}) {
     plNode = plNode.parentId != null ? tree.get(plNode.parentId) : null
   }
 
-  return {startNodeId, playerToMove, firstMove: best.node}
+  return {startNodeId, playerToMove, firstMove: best.node, allowTeFallback}
 }
 
 // Classifies a move played by the user from the starting position detected by
@@ -377,20 +391,26 @@ export function analyzeProblem(tree, options = {}) {
 // Returns:
 // - `'correct'` when the move matches the first correct move, or when a
 //   matching variation carries a positive result marker anywhere in its branch
-//   (a comment containing "correct", or a node name containing 正解);
+//   (a comment containing "correct", a node name containing 正解, or — when the
+//   problem was detected with the TE fallback — a `TE` property);
 // - `'wrong'` when every matching variation carries a negative result marker
 //   (a comment containing "wrong", a node name containing 失败, or a `BM`
 //   property on the variation's first move — the same `BM` → 'bad' convention
-//   used in gametree.js);
+//   used in gametree.js), or when at least one first-move variation at the
+//   decision point carries a reliable positive proof and the played variation
+//   is explicitly present without one (GoGameGuru collections only mark the
+//   solution);
 // - `'absent'` when no variation from the starting position contains the move
 //   for the player's color;
-// - `null` when the move matches a variation that is present but not clearly
-//   marked as correct or wrong (never invented as wrong), or when the input is
-//   invalid (e.g. a pass or a malformed vertex).
+// - `null` when the played variation is present but not clearly marked and no
+//   proven-correct move exists at the decision point (never invented as
+//   wrong), or when the input is invalid (e.g. a pass or a malformed vertex).
 //
 // Only the next moves from the starting position are considered: each branch is
 // walked down to its first move node, never past a move, so non-move nodes
-// between the starting position and a variation move are handled.
+// between the starting position and a variation move are handled. Moves that
+// are not explicitly present as variations from the decision point stay
+// `'absent'` and are never reclassified.
 export function classifyMove(tree, problem, vertexString) {
   if (problem == null || problem.firstMove == null) return null
   if (typeof vertexString !== 'string') return null
@@ -437,10 +457,29 @@ export function classifyMove(tree, problem, vertexString) {
   // the non-move prefix between the starting position and the branch's first
   // move, so a marker carried by a descendant (e.g. W[ba] C[Wrong.]) or by a
   // prefix label (e.g. N[失败图] before W[md]) still classifies the branch's
-  // first move. A variation that is present but not clearly marked as bad must
-  // not be invented as wrong; fail cleanly instead of guessing.
-  let results = matching.map((node) => getBranchResult(node, tree, startNode))
+  // first move. `allowTeFallback` on the problem echoes analyzeProblem's TE
+  // gate so `TE` markers count as positive proof only when the caller opted
+  // into the fallback.
+  let allowTe = problem.allowTeFallback === true
+  let results = matching.map((node) =>
+    getBranchResult(node, tree, startNode, allowTe),
+  )
   if (results.some((result) => result === 'correct')) return 'correct'
+
+  // GoGameGuru-style collections only mark the solution (C[Correct]) and leave
+  // the failed tries unmarked. At the solver's decision point, when at least
+  // one explicitly present first-move variation carries a reliable positive
+  // proof, every other variation that is explicitly present without one is
+  // wrong. Variations absent from the SGF are never affected by this rule.
+  let hasSolution = candidates.some(
+    (node) =>
+      getMoveColor(node) === problem.playerToMove &&
+      getBranchResult(node, tree, startNode, allowTe) === 'correct',
+  )
+  if (hasSolution) return 'wrong'
+
+  // No proven-correct move at the decision point: keep the cautious behavior
+  // and never invent a present-but-unmarked variation as wrong.
   if (results.every((result) => result === 'wrong')) return 'wrong'
   return null
 }
