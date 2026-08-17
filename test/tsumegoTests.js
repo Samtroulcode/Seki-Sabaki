@@ -1,7 +1,7 @@
 import assert from 'assert'
 
 import * as gametree from '../src/modules/gametree.js'
-import {analyzeProblem} from '../src/modules/tsumego.js'
+import {analyzeProblem, classifyMove} from '../src/modules/tsumego.js'
 
 // Build a tree from a list of moves. Each entry is `[color, vertex, comment]`
 // where `comment` is optional. The first entry is appended to the root.
@@ -188,5 +188,251 @@ describe('analyzeProblem', () => {
     assert(result != null)
     assert.strictEqual(result.firstMove.data.W[0], 'gl')
     assert.strictEqual(result.playerToMove, 'W')
+  })
+})
+
+describe('classifyMove', () => {
+  it('classifies the first correct move as correct', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'gl'), 'correct')
+  })
+
+  it('classifies the first correct move after a preliminary move', () => {
+    // ROOT -> W[gm] -> B[gl] C[Correct Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let setup = draft.appendNode(draft.root.id, {W: ['gm']})
+      draft.appendNode(setup, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'gl'), 'correct')
+  })
+
+  it('classifies a documented Wrong Answer as wrong', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('matches Wrong Answer case-insensitively', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['wrong ANSWER']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('reads Wrong Answer from any value of a multi-value comment', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['first', 'Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('classifies a BM-marked variation as wrong', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], BM: ['1']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('classifies a move absent from the SGF as absent', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'ee'), 'absent')
+  })
+
+  it('does not accept the right intersection with the wrong color', () => {
+    // The intersection is documented, but only for White; the user plays as
+    // Black (playerToMove), so the move must not be accepted as that variation.
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {W: ['dd'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'absent')
+  })
+
+  it('ignores a wrong-color variation at the correct intersection', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {W: ['gl'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'gl'), 'correct')
+  })
+
+  it('finds a variation through an intermediate node without a move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      let setup = draft.appendNode(draft.root.id, {C: ['setup']})
+      draft.appendNode(setup, {B: ['dd'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('finds variations that branch at an intermediate node without a move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      let setup = draft.appendNode(draft.root.id, {C: ['setup']})
+      draft.appendNode(setup, {B: ['dd'], C: ['Wrong Answer']})
+      draft.appendNode(setup, {B: ['ee'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'ee'), 'wrong')
+  })
+
+  it('returns null for a matching variation that is not clearly marked', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+  })
+
+  it('returns null when a vertex mixes marked and unmarked variations', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd']}, {disableMerging: true})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+  })
+
+  it('prefers the correct answer over a BM-marked branch at the same vertex', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(
+        draft.root.id,
+        {B: ['gl'], BM: ['1']},
+        {disableMerging: true},
+      )
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'gl'), 'correct')
+  })
+
+  it('returns null for an invalid vertex', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'blah'), null)
+    assert.strictEqual(classifyMove(tree, problem, 'd'), null)
+    assert.strictEqual(classifyMove(tree, problem, 'a1'), null)
+  })
+
+  it('returns null for a pass', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, ''), null)
+  })
+
+  it('returns null when problem is null', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+
+    assert.strictEqual(classifyMove(tree, null, 'gl'), null)
+  })
+
+  it('returns null when the tree no longer contains the starting position', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+    let otherTree = gametree.new()
+
+    assert.strictEqual(classifyMove(otherTree, problem, 'gl'), null)
+    assert.strictEqual(classifyMove(otherTree, problem, 'dd'), null)
+  })
+
+  it('does not return correct when the tree lacks the first correct move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    // A tree whose root is the starting position but which has no variations.
+    let otherTree = gametree.new({
+      root: {
+        id: problem.startNodeId,
+        data: {},
+        parentId: null,
+        children: [],
+      },
+    })
+
+    assert.strictEqual(classifyMove(otherTree, problem, 'gl'), 'absent')
+  })
+
+  it('returns null for a non-string vertex', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, null), null)
+    assert.strictEqual(classifyMove(tree, problem, undefined), null)
+  })
+
+  it('does not match a move that is not a first move from the starting position', () => {
+    // The move exists deeper in the tree, but only the next moves from the
+    // starting position are candidates.
+    let tree = gametree.new().mutate((draft) => {
+      let correct = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(correct, {W: ['dd']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'absent')
+  })
+
+  it('does not throw on a candidate with an empty move property', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: []}, {disableMerging: true})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'absent')
   })
 })

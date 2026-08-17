@@ -1,8 +1,10 @@
-// Tsumego problem detection.
+// Tsumego problem detection and move classification.
 //
-// This is the first business brick of the future Tsumego module: given an
-// already-parsed SGF GameTree, determine where the problem actually starts and
-// which side must play. It only reads the tree and never mutates it.
+// This is the business layer of the future Tsumego module. `analyzeProblem`
+// determines where a problem starts and which side must play from an
+// already-parsed SGF GameTree; `classifyMove` classifies a move played by the
+// user from that starting position. Both functions only read the tree and never
+// mutate it.
 //
 // Solution markers are read from node comments (`C`) containing "Correct
 // Answer". The first correct move is the shallowest such node that carries a
@@ -12,10 +14,29 @@
 // unreliable and `analyzeProblem` returns `null`. If no reliable marker is
 // found, `analyzeProblem` returns `null` rather than guessing.
 
+import {parseVertex} from '@sabaki/sgf'
+
 const CORRECT_ANSWER_RE = /\bcorrect answer\b/i
+const WRONG_ANSWER_RE = /\bwrong answer\b/i
 
 function hasMove(node) {
   return node.data.B != null || node.data.W != null
+}
+
+function getMoveColor(node) {
+  // A malformed node carrying both `B` and `W` is treated as a Black move,
+  // mirroring analyzeProblem's color extraction.
+  return node.data.B != null ? 'B' : 'W'
+}
+
+function getMoveVertex(node) {
+  let values = node.data[getMoveColor(node)]
+  if (!Array.isArray(values) || values.length === 0) return null
+  return parseVertex(values[0])
+}
+
+function sameVertex(a, b) {
+  return a != null && b != null && a[0] === b[0] && a[1] === b[1]
 }
 
 function hasCorrectAnswerMarker(node) {
@@ -24,8 +45,20 @@ function hasCorrectAnswerMarker(node) {
   return values.some((value) => CORRECT_ANSWER_RE.test(value))
 }
 
+function hasWrongAnswerMarker(node) {
+  let values = node.data.C
+  if (!Array.isArray(values)) return false
+  return values.some((value) => WRONG_ANSWER_RE.test(value))
+}
+
 function hasTeMarker(node) {
   return Array.isArray(node.data.TE) && node.data.TE.length > 0
+}
+
+function hasBmMarker(node) {
+  // Mirrors the `BM` → 'bad' convention in gametree.js: presence is what
+  // matters, never the value.
+  return node.data.BM != null
 }
 
 // Returns `{startNodeId, playerToMove, firstMove}` or `null` when no reliable
@@ -92,4 +125,76 @@ export function analyzeProblem(tree, options = {}) {
   }
 
   return {startNodeId, playerToMove, firstMove: best.node}
+}
+
+// Classifies a move played by the user from the starting position detected by
+// `analyzeProblem`. `problem` must be a valid (non-null) result of
+// `analyzeProblem`, and `vertexString` is the played intersection as an SGF
+// coordinate string (e.g. 'gl'), parsed with `parseVertex` from `@sabaki/sgf`.
+// The user is assumed to play as `problem.playerToMove`; variations of the
+// other color never match.
+//
+// Returns:
+// - `'correct'` when the move matches the first correct move;
+// - `'wrong'` when the move matches a variation explicitly marked as bad (a
+//   comment containing "Wrong Answer", or a `BM` property — the same `BM` →
+//   'bad' convention used in gametree.js);
+// - `'absent'` when no variation from the starting position contains the move
+//   for the player's color;
+// - `null` when the move matches a variation that is present but not clearly
+//   marked as correct or wrong (never invented as wrong), or when the input is
+//   invalid (e.g. a pass or a malformed vertex).
+//
+// Only the next moves from the starting position are considered: each branch is
+// walked down to its first move node, never past a move, so non-move nodes
+// between the starting position and a variation move are handled.
+export function classifyMove(tree, problem, vertexString) {
+  if (problem == null || problem.firstMove == null) return null
+  if (typeof vertexString !== 'string') return null
+
+  let vertex = parseVertex(vertexString)
+  // `parseVertex` yields [-1, -1] for invalid input and for a pass (`B[]`), so
+  // a pass is never a tsumego solution and cannot be distinguished from garbage.
+  if (vertex[0] < 0 || vertex[1] < 0) return null
+
+  let startNode = tree.get(problem.startNodeId)
+  if (startNode == null) return null
+
+  // The first correct move defines the expected answer. The tree must still
+  // contain it so a stale problem cannot produce a false 'correct'. The color
+  // check is defensive: `playerToMove` is derived from the first move's color.
+  let firstMoveColor = getMoveColor(problem.firstMove)
+  if (
+    firstMoveColor === problem.playerToMove &&
+    sameVertex(getMoveVertex(problem.firstMove), vertex) &&
+    tree.get(problem.firstMove.id) != null
+  ) {
+    return 'correct'
+  }
+
+  // Collect the first move node of each branch from the starting position,
+  // never traversing past a move. Branches may split at non-move nodes, so this
+  // is a DFS rather than a linear walk.
+  let candidates = []
+  let stack = [...startNode.children]
+  while (stack.length) {
+    let node = stack.pop()
+    if (hasMove(node)) candidates.push(node)
+    else for (let child of node.children) stack.push(child)
+  }
+
+  let matching = candidates.filter(
+    (node) =>
+      getMoveColor(node) === problem.playerToMove &&
+      sameVertex(getMoveVertex(node), vertex),
+  )
+  if (matching.length === 0) return 'absent'
+
+  // A variation that is present but not clearly marked as bad must not be
+  // invented as wrong; fail cleanly instead of guessing.
+  let markedWrong = matching.filter(
+    (node) => hasWrongAnswerMarker(node) || hasBmMarker(node),
+  )
+  if (markedWrong.length === matching.length) return 'wrong'
+  return null
 }
