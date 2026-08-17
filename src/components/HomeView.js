@@ -5,6 +5,7 @@ import HomeDashboard from './HomeDashboard.js'
 import HomePlaceholder from './HomePlaceholder.js'
 import LibraryPanel from './LibraryPanel.js'
 import OgsPanel from './sidebars/OgsPanel.js'
+import TsumegoPanel from './TsumegoPanel.js'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
@@ -16,7 +17,7 @@ export default class HomeView extends Component {
     super(props)
 
     this.handleNavigate = (homeSection) => {
-      if (['ogs', 'analysis', 'library'].includes(homeSection)) {
+      if (['ogs', 'analysis', 'library', 'tsumego'].includes(homeSection)) {
         sabaki.openWorkspaceTab(homeSection)
       } else {
         sabaki.setState({activeWorkspace: 'home', homeSection})
@@ -47,6 +48,8 @@ function renderHomeSection(activeSection, props, onNavigate) {
       return h(AnalysisPanel)
     case 'library':
       return h(LibraryPanel)
+    case 'tsumego':
+      return h(TsumegoPanel)
     case 'engines':
       return h(HomePlaceholder, {
         id: 'home-engines',

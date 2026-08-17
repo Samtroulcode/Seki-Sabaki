@@ -236,7 +236,9 @@ function WorkspaceTab({tab, selected, onClick, onClose}) {
       ? t('OGS')
       : tab.type === 'analysis'
         ? t('Analysis')
-        : t('Library')
+        : tab.type === 'library'
+          ? t('Library')
+          : t('Tsumego')
 
   return h(
     'div',

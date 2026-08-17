@@ -355,6 +355,11 @@ function HomeNavigation({onNavigate, onOpenFile}) {
       icon: 'book-16.svg',
       onClick: () => onNavigate('library'),
     }),
+    h(HomeNavButton, {
+      label: t('Tsumego'),
+      icon: 'mortar-board-16.svg',
+      onClick: () => onNavigate('tsumego'),
+    }),
   )
 }
 

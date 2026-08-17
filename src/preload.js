@@ -153,6 +153,12 @@ window.sabaki = {
     chooseRoot: () => ipcRenderer.invoke('library:chooseRoot'),
     list: (relativePath) => ipcRenderer.invoke('library:list', relativePath),
     open: (relativePath) => ipcRenderer.invoke('library:open', relativePath),
+    listBuiltin: (relativePath) =>
+      ipcRenderer.invoke('library:listBuiltin', relativePath),
+    openBuiltin: (relativePath) =>
+      ipcRenderer.invoke('library:openBuiltin', relativePath),
+    getBuiltinCollectionMetadata: (relativePath) =>
+      ipcRenderer.invoke('library:getBuiltinCollectionMetadata', relativePath),
   },
 
   // Menu

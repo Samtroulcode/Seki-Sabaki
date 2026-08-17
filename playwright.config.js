@@ -95,6 +95,11 @@ module.exports = defineConfig({
       dependencies: ['smoke'],
     },
     {
+      name: 'tsumego-panel',
+      testMatch: /tsumego-panel\.spec\.js/,
+      dependencies: ['smoke'],
+    },
+    {
       name: 'board-tabs',
       testMatch: /board-tabs\.spec\.js/,
       dependencies: ['smoke'],

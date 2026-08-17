@@ -131,6 +131,9 @@
 #apptabs .app-workspace-tab.type-analysis.selected {
   box-shadow: inset 0 -3px 0 #b06cff;
 }
+#apptabs .app-workspace-tab.type-tsumego.selected {
+  box-shadow: inset 0 -3px 0 #d6a84f;
+}
 #apptabs .app-activity-tab {
   gap: 0.5rem;
   max-width: 18rem;
@@ -783,6 +786,161 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tsumego-panel {
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 2rem;
+  box-sizing: border-box;
+  overflow: auto;
+  background: #181818;
+  color: #d0d0d0;
+}
+.tsumego-panel h1,
+.tsumego-panel h2,
+.tsumego-panel p {
+  margin: 0;
+}
+.tsumego-panel h1 {
+  color: white;
+  font-size: 1.8rem;
+}
+.tsumego-panel h2 {
+  color: white;
+  font-size: 1.2rem;
+}
+.tsumego-browser,
+.tsumego-problem-view {
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+}
+.tsumego-source-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+.tsumego-source-tabs button,
+.tsumego-setup-card button,
+.tsumego-browser-toolbar button,
+.tsumego-problem-toolbar button {
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-source-tabs button:hover,
+.tsumego-source-tabs button:focus,
+.tsumego-source-tabs button.selected,
+.tsumego-setup-card button:hover,
+.tsumego-setup-card button:focus,
+.tsumego-browser-toolbar button:hover,
+.tsumego-browser-toolbar button:focus,
+.tsumego-problem-toolbar button:hover,
+.tsumego-problem-toolbar button:focus {
+  background: #006fca;
+}
+.tsumego-setup-card,
+.tsumego-browser-card,
+.tsumego-problem-view {
+  display: grid;
+  align-content: start;
+  gap: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1.25rem;
+  background: #111;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+}
+.tsumego-browser-card {
+  min-height: 0;
+}
+.tsumego-browser-toolbar,
+.tsumego-problem-toolbar {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.tsumego-browser-toolbar > div {
+  min-width: 0;
+}
+.tsumego-source-label,
+.tsumego-breadcrumb,
+.tsumego-panel-status,
+.tsumego-empty,
+.tsumego-problem-filename {
+  color: #aaa;
+}
+.tsumego-collection-metadata {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid #d6a84f;
+  background: rgba(214, 168, 79, 0.1);
+  color: #e6d19a;
+}
+.tsumego-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 13rem));
+  align-content: start;
+  gap: 0.75rem;
+}
+.tsumego-entry {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  min-height: 7rem;
+  padding: 0.8rem;
+  background: #181818;
+  border: 1px solid #292a2d;
+  border-radius: 6px;
+  color: #ddd;
+  text-align: center;
+}
+.tsumego-entry:hover,
+.tsumego-entry:focus {
+  background: #202124;
+  border-color: #0082f0;
+}
+.tsumego-entry-icon {
+  color: #d6a84f;
+  font-size: 2rem;
+}
+.tsumego-entry-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tsumego-entry-meta,
+.tsumego-problem-count {
+  color: #888;
+  font-size: 0.85rem;
+}
+.tsumego-problem-ready {
+  width: fit-content;
+  padding: 0.45rem 0.7rem;
+  background: rgba(70, 167, 88, 0.15);
+  border: 1px solid #46a758;
+  border-radius: 4px;
+  color: #8ed49a;
+}
+.tsumego-player-to-move {
+  color: white;
+  font-size: 1.1rem;
+}
+.tsumego-initial-comment {
+  max-width: 60rem;
+  padding: 0.8rem;
+  white-space: pre-wrap;
+  background: #181818;
+  border-left: 3px solid #0082f0;
+  color: #ddd;
 }
 .home-matchmaking-toast {
   position: fixed;

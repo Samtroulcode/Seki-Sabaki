@@ -433,6 +433,18 @@ function setupIpcHandlers() {
     if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
     return libraryApi.open(relativePath)
   })
+  ipcMain.handle('library:listBuiltin', (e, relativePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.listBuiltin(relativePath)
+  })
+  ipcMain.handle('library:openBuiltin', (e, relativePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.openBuiltin(relativePath)
+  })
+  ipcMain.handle('library:getBuiltinCollectionMetadata', (e, relativePath) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.getBuiltinCollectionMetadata(relativePath)
+  })
   ipcMain.on('setting:getPathsSync', (e) => {
     try {
       e.returnValue = {

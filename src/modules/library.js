@@ -13,3 +13,15 @@ export async function listLibraryEntries(relativePath = '') {
 export async function openLibraryFile(relativePath) {
   return window.sabaki.library.open(relativePath)
 }
+
+export async function listBuiltinLibraryEntries(relativePath = '') {
+  return window.sabaki.library.listBuiltin(relativePath)
+}
+
+export async function openBuiltinLibraryFile(relativePath) {
+  return window.sabaki.library.openBuiltin(relativePath)
+}
+
+export async function getBuiltinCollectionMetadata(relativePath) {
+  return window.sabaki.library.getBuiltinCollectionMetadata(relativePath)
+}

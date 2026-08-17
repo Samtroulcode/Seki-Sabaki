@@ -618,7 +618,7 @@ class Sabaki extends EventEmitter {
   }
 
   openWorkspaceTab(type) {
-    if (!['ogs', 'analysis', 'library'].includes(type)) return false
+    if (!['ogs', 'analysis', 'library', 'tsumego'].includes(type)) return false
 
     let tab = this.state.workspaceTabs.find(
       (candidate) => candidate.type === type,

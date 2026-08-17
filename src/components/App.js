@@ -20,6 +20,7 @@ import BusyScreen from './BusyScreen.js'
 import InfoOverlay from './InfoOverlay.js'
 import MatchmakingToast from './MatchmakingToast.js'
 import LibraryPanel from './LibraryPanel.js'
+import TsumegoPanel from './TsumegoPanel.js'
 import AnalysisPanel from './sidebars/AnalysisPanel.js'
 import OgsPanel from './sidebars/OgsPanel.js'
 
@@ -522,6 +523,8 @@ function renderWorkspace(state) {
       return h(HomeView, {...state, homeSection: 'library'})
     case 'analysis':
       return h(HomeView, {...state, homeSection: 'analysis'})
+    case 'tsumego':
+      return h(HomeView, {...state, homeSection: 'tsumego'})
     case 'board':
       return h(MainView, state)
     case 'online-game':
@@ -540,6 +543,7 @@ function renderWorkspaceTab(state) {
   if (tab?.type === 'ogs') return h(OgsPanel)
   if (tab?.type === 'analysis') return h(AnalysisPanel)
   if (tab?.type === 'library') return h(LibraryPanel)
+  if (tab?.type === 'tsumego') return h(TsumegoPanel)
   return h(HomeView, {...state, homeSection: 'dashboard'})
 }
 
