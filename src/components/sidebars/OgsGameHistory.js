@@ -170,7 +170,9 @@ class OgsGameHistoryColumnEntry extends Component {
       this.props
     let displayGame = {...game, winnerColor: this.state.preview?.winnerColor}
     let outcome = getGameOutcome(displayGame, currentUserId)
-    let opponent = getOpponentName(game, currentUserId)
+    let opponent = getOpponent(game, currentUserId)
+    let userColor = getUserColor(game, currentUserId)
+    let opponentName = opponent?.username || game.name || `#${game.id}`
 
     return h(
       'article',
@@ -190,14 +192,36 @@ class OgsGameHistoryColumnEntry extends Component {
       h(
         'div',
         {class: 'ogs-history-column-body'},
-        h('strong', {}, opponent || game.name || `#${game.id}`),
+        h(
+          'strong',
+          {class: 'ogs-history-column-opponent', title: opponentName},
+          opponentName,
+          opponent?.rank != null &&
+            h(
+              'span',
+              {class: 'ogs-history-column-rank'},
+              ` · ${opponent.rank}`,
+            ),
+        ),
+        userColor != null &&
+          h(
+            'span',
+            {class: 'ogs-history-column-color'},
+            userColor === 'B' ? t('You played Black') : t('You played White'),
+          ),
         h(
           'span',
           {class: 'ogs-history-column-result'},
           resultStone(displayGame),
-          game.result || t('Result unknown'),
-          winnerLabel(displayGame) != null &&
-            h('span', {}, ` · ${winnerLabel(displayGame)}`),
+          getOutcomeLabel(displayGame, currentUserId, t) ||
+            game.result ||
+            t('Result unknown'),
+        ),
+        h(
+          'span',
+          {class: 'ogs-history-column-meta'},
+          formatBoard(game.board, t),
+          game.ended ? ` · ${formatEndDate(game.ended)}` : '',
         ),
         h(
           'div',
@@ -232,14 +256,70 @@ class OgsGameHistoryColumnEntry extends Component {
   }
 }
 
-function getOpponentName(game, currentUserId) {
+function getOpponent(game, currentUserId) {
   let players = [game.black, game.white].filter(Boolean)
   if (currentUserId == null) return null
-  let opponent = players.find(
-    (player) =>
-      player.id != null && Number(player.id) !== Number(currentUserId),
+  return (
+    players.find(
+      (player) =>
+        player.id != null && Number(player.id) !== Number(currentUserId),
+    ) || null
   )
-  return opponent?.username || null
+}
+
+function getOpponentName(game, currentUserId) {
+  return getOpponent(game, currentUserId)?.username || null
+}
+
+function getUserColor(game, currentUserId) {
+  if (currentUserId == null) return null
+  if (
+    game.black?.id != null &&
+    Number(game.black.id) === Number(currentUserId)
+  ) {
+    return 'B'
+  }
+  if (
+    game.white?.id != null &&
+    Number(game.white.id) === Number(currentUserId)
+  ) {
+    return 'W'
+  }
+  return null
+}
+
+function getOutcomeLabel(game, currentUserId, t) {
+  let userColor = getUserColor(game, currentUserId)
+  let winnerColor = getWinnerColor(game)
+  if (userColor == null || winnerColor == null) return null
+
+  let won = userColor === winnerColor
+  let detail = getResultDetail(game.result)
+  if (detail == null) return null
+  if (detail === 'resignation') {
+    return won ? t('Won by resignation') : t('Lost by resignation')
+  }
+  if (detail === 'time') return won ? t('Won by time') : t('Lost by time')
+  return won
+    ? `${t('Won by')} ${detail} ${t('points')}`
+    : `${t('Lost by')} ${detail} ${t('points')}`
+}
+
+function getResultDetail(result) {
+  if (typeof result !== 'string') return null
+  let rest = result.trim().slice(1)
+  if (rest.startsWith('+')) rest = rest.slice(1)
+  if (rest === 'R') return 'resignation'
+  if (rest === 'T') return 'time'
+  if (rest === '') return null
+  return rest
+}
+
+function formatEndDate(ended) {
+  if (typeof ended !== 'string' || ended === '') return null
+  let date = new Date(ended)
+  if (Number.isNaN(date.getTime())) return ended.slice(0, 10)
+  return date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})
 }
 
 class OgsGameHistoryCard extends Component {
