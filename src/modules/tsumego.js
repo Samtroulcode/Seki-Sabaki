@@ -1,10 +1,11 @@
-// Tsumego problem detection and move classification.
+// Tsumego problem detection, move classification, and solution advancement.
 //
 // This is the business layer of the future Tsumego module. `analyzeProblem`
 // determines where a problem starts and which side must play from an
 // already-parsed SGF GameTree; `classifyMove` classifies a move played by the
-// user from that starting position. Both functions only read the tree and never
-// mutate it.
+// user from that starting position; `advanceSolution` walks the canonical
+// solution line after a correct move. All functions only read the tree and
+// never mutate it.
 //
 // Solution markers are read from node comments (`C`) containing "Correct
 // Answer". The first correct move is the shallowest such node that carries a
@@ -20,7 +21,7 @@ const CORRECT_ANSWER_RE = /\bcorrect answer\b/i
 const WRONG_ANSWER_RE = /\bwrong answer\b/i
 
 function hasMove(node) {
-  return node.data.B != null || node.data.W != null
+  return node.data != null && (node.data.B != null || node.data.W != null)
 }
 
 function getMoveColor(node) {
@@ -30,8 +31,10 @@ function getMoveColor(node) {
 }
 
 function getMoveVertex(node) {
+  if (node.data == null) return null
   let values = node.data[getMoveColor(node)]
   if (!Array.isArray(values) || values.length === 0) return null
+  if (typeof values[0] !== 'string') return null
   return parseVertex(values[0])
 }
 
@@ -197,4 +200,57 @@ export function classifyMove(tree, problem, vertexString) {
   )
   if (markedWrong.length === matching.length) return 'wrong'
   return null
+}
+
+// Advances the solution after a move the user just played that was recognized
+// as correct. `correctMoveNode` is the node of that move — in V1, the first
+// correct move from `analyzeProblem` (the call site enforces this via
+// `classifyMove`). Walks the canonical continuation, the SGF main line (first
+// child) of the correct branch, playing the opponent's responses automatically
+// and stopping just before the player's next move.
+//
+// Returns `{automaticMoves, nextPlayerMove, solved}`:
+// - `automaticMoves`: the opponent's responses on the canonical line (nodes);
+// - `nextPlayerMove`: the player's next expected move (node), or `null` when
+//   the problem is solved;
+// - `solved`: whether the canonical line ended before another player move.
+//
+// Non-move nodes between moves are traversed; sibling variations are never
+// followed. Color alternation within the continuation is not validated:
+// consecutive moves of the same color are accepted as-is. Returns `null` when
+// the input is incoherent (invalid problem, a non-move node, a node missing
+// from the tree, a move of the wrong color, or a pass/malformed move in the
+// continuation).
+export function advanceSolution(tree, problem, correctMoveNode) {
+  if (problem == null || correctMoveNode == null) return null
+  if (!hasMove(correctMoveNode)) return null
+
+  // Walk from the tree's own node so a stale reference cannot leak stale
+  // children into the walk.
+  let node = tree.get(correctMoveNode.id)
+  if (node == null || node.data == null) return null
+  if (getMoveColor(node) !== problem.playerToMove) return null
+
+  let automaticMoves = []
+  while (node.children.length > 0) {
+    node = node.children[0]
+
+    if (hasMove(node)) {
+      // A pass or malformed move in the continuation is incoherent for a
+      // tsumego solution.
+      let vertex = getMoveVertex(node)
+      if (vertex == null || vertex[0] < 0 || vertex[1] < 0) return null
+
+      if (getMoveColor(node) === problem.playerToMove) {
+        // Stop just before the player's next move.
+        return {automaticMoves, nextPlayerMove: node, solved: false}
+      }
+
+      // The opponent's move is played automatically.
+      automaticMoves.push(node)
+    }
+  }
+
+  // The canonical line ended before another player move.
+  return {automaticMoves, nextPlayerMove: null, solved: true}
 }

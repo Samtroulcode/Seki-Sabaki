@@ -1,7 +1,11 @@
 import assert from 'assert'
 
 import * as gametree from '../src/modules/gametree.js'
-import {analyzeProblem, classifyMove} from '../src/modules/tsumego.js'
+import {
+  advanceSolution,
+  analyzeProblem,
+  classifyMove,
+} from '../src/modules/tsumego.js'
 
 // Build a tree from a list of moves. Each entry is `[color, vertex, comment]`
 // where `comment` is optional. The first entry is appended to the root.
@@ -434,5 +438,291 @@ describe('classifyMove', () => {
     let problem = analyzeProblem(tree)
 
     assert.strictEqual(classifyMove(tree, problem, 'dd'), 'absent')
+  })
+})
+
+describe('advanceSolution', () => {
+  it('advances B correct -> W automatic -> next B expected', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, false)
+    assert.strictEqual(result.automaticMoves.length, 1)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
+  })
+
+  it('advances through the documented longer solution line step by step', () => {
+    // B[gl] -> W[hm] -> B[hl] -> W[im] -> B[il]
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      let b2 = draft.appendNode(w1, {B: ['hl']})
+      let w2 = draft.appendNode(b2, {W: ['im']})
+      draft.appendNode(w2, {B: ['il']})
+    })
+    let problem = analyzeProblem(tree)
+
+    // Each call stops just before the player's next move, so the full line is
+    // walked by feeding the returned next move back in.
+    let first = advanceSolution(tree, problem, problem.firstMove)
+    assert(first != null)
+    assert.strictEqual(first.solved, false)
+    assert.strictEqual(first.automaticMoves.length, 1)
+    assert.strictEqual(first.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(first.nextPlayerMove.data.B[0], 'hl')
+
+    let second = advanceSolution(tree, problem, first.nextPlayerMove)
+    assert(second != null)
+    assert.strictEqual(second.solved, false)
+    assert.strictEqual(second.automaticMoves.length, 1)
+    assert.strictEqual(second.automaticMoves[0].data.W[0], 'im')
+    assert.strictEqual(second.nextPlayerMove.data.B[0], 'il')
+
+    let third = advanceSolution(tree, problem, second.nextPlayerMove)
+    assert(third != null)
+    assert.strictEqual(third.solved, true)
+    assert.deepStrictEqual(third.automaticMoves, [])
+    assert.strictEqual(third.nextPlayerMove, null)
+  })
+
+  it('traverses non-move nodes around the opponent response', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      let nm1 = draft.appendNode(b1, {C: ['setup']})
+      let w1 = draft.appendNode(nm1, {W: ['hm']})
+      let nm2 = draft.appendNode(w1, {C: ['setup']})
+      draft.appendNode(nm2, {B: ['hl']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, false)
+    assert.strictEqual(result.automaticMoves.length, 1)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
+  })
+
+  it('reports solved when the solution ends immediately after the correct move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, true)
+    assert.deepStrictEqual(result.automaticMoves, [])
+    assert.strictEqual(result.nextPlayerMove, null)
+  })
+
+  it('reports solved after a last opponent response', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(b1, {W: ['hm']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, true)
+    assert.strictEqual(result.automaticMoves.length, 1)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(result.nextPlayerMove, null)
+  })
+
+  it('reports solved when the line ends on a trailing non-move node', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {C: ['setup']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, true)
+    assert.strictEqual(result.automaticMoves.length, 1)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(result.nextPlayerMove, null)
+  })
+
+  it('never follows a sibling branch instead of the canonical continuation', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+      let sibling = draft.appendNode(b1, {W: ['xx']})
+      draft.appendNode(sibling, {B: ['yy']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, false)
+    assert.strictEqual(result.automaticMoves.length, 1)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
+  })
+
+  it('returns null for a null problem or node', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(advanceSolution(tree, null, problem.firstMove), null)
+    assert.strictEqual(advanceSolution(tree, problem, null), null)
+  })
+
+  it('returns null when the node is not a move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(b1, {C: ['setup']})
+    })
+    let problem = analyzeProblem(tree)
+    let setupNode = tree.get(problem.firstMove.children[0].id)
+
+    assert.strictEqual(advanceSolution(tree, problem, setupNode), null)
+  })
+
+  it('returns null when the node has no data', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+    let dataLessNode = {
+      id: problem.firstMove.id,
+      data: null,
+      parentId: null,
+      children: [],
+    }
+
+    assert.strictEqual(advanceSolution(tree, problem, dataLessNode), null)
+  })
+
+  it('walks the tree node, not a stale passed-in reference', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+    })
+    let problem = analyzeProblem(tree)
+
+    // The passed node carries valid move data but stale (empty) children; the
+    // walk must re-fetch the tree's own node and follow its children.
+    let staleNode = {
+      id: problem.firstMove.id,
+      data: {B: ['gl']},
+      parentId: null,
+      children: [],
+    }
+
+    let result = advanceSolution(tree, problem, staleNode)
+    assert(result != null)
+    assert.strictEqual(result.solved, false)
+    assert.strictEqual(result.automaticMoves.length, 1)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
+    assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
+  })
+
+  it('returns null when the node is missing from the tree', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+    })
+    let problem = analyzeProblem(tree)
+    let otherTree = gametree.new()
+
+    assert.strictEqual(
+      advanceSolution(otherTree, problem, problem.firstMove),
+      null,
+    )
+  })
+
+  it('returns null when the node has the wrong color', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(b1, {W: ['hm']})
+    })
+    let problem = analyzeProblem(tree)
+    let opponentNode = tree.get(problem.firstMove.children[0].id)
+
+    assert.strictEqual(advanceSolution(tree, problem, opponentNode), null)
+  })
+
+  it('returns null when the continuation contains a pass', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(b1, {W: ['']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(advanceSolution(tree, problem, problem.firstMove), null)
+  })
+
+  it('returns null when the continuation contains a non-string move value', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(b1, {W: [null]})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(advanceSolution(tree, problem, problem.firstMove), null)
+  })
+
+  it('treats a node with both B and W as Black', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {
+        B: ['gl'],
+        C: ['Correct Answer'],
+      })
+      draft.appendNode(b1, {B: ['hm'], W: ['xx']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = advanceSolution(tree, problem, problem.firstMove)
+    assert(result != null)
+    assert.strictEqual(result.solved, false)
+    assert.strictEqual(result.nextPlayerMove.data.B[0], 'hm')
   })
 })
