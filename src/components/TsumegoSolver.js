@@ -4,6 +4,7 @@ import {stringifyVertex} from '@sabaki/sgf'
 import i18n from '../i18n.js'
 import * as gametree from '../modules/gametree.js'
 import {advanceSolution, resolveMove} from '../modules/tsumego.js'
+import * as sound from '../modules/sound.js'
 import {
   applyExplorationMove,
   cloneExplorationBoard,
@@ -13,11 +14,18 @@ import GameGraph from './sidebars/GameGraph.js'
 import Goban from './Goban.js'
 
 const t = i18n.context('TsumegoSolver')
+const AUTO_REPLY_DELAY = 1000
 
 export default class TsumegoSolver extends Component {
   constructor(props) {
     super(props)
     this.state = this.getInitialState(props)
+    this.autoSequenceId = 0
+    this.autoTimer = null
+  }
+
+  componentWillUnmount() {
+    this.cancelAutoSequence()
   }
 
   getInitialState({problem}) {
@@ -36,6 +44,7 @@ export default class TsumegoSolver extends Component {
 
   handleVertexClick = (evt) => {
     if (evt.vertex == null) return
+    if (this.state.phase === 'waiting') return
     if (this.state.phase !== 'solving') {
       this.handleExplorationVertex(evt.vertex)
       return
@@ -61,14 +70,16 @@ export default class TsumegoSolver extends Component {
       return
     }
 
+    sound.playPachi()
     let phase = advanced.solved ? 'solved' : 'solving'
     let nextState = {
-      displayNodeId: advanced.positionNodeId,
+      displayNodeId: result.node.id,
       decisionPointId: advanced.decisionPointId,
       expectedMoveNodeId: advanced.nextPlayerMove?.id || null,
-      feedback: advanced.solved ? t('Solved') : null,
-      phase,
-      showGameGraph: advanced.solved,
+      feedback: advanced.solved ? t('Solved') || 'Solved' : null,
+      phase: advanced.automaticMoves.length > 0 ? 'waiting' : phase,
+      showGameGraph:
+        advanced.automaticMoves.length > 0 ? false : advanced.solved,
       explorationBoard: null,
       explorationPlayer: null,
     }
@@ -78,10 +89,48 @@ export default class TsumegoSolver extends Component {
         ? this.state.retrySnapshot
         : {...nextState, retrySnapshot: undefined},
     })
+    if (advanced.automaticMoves.length > 0) this.startAutoSequence(advanced)
+  }
+
+  startAutoSequence(advanced) {
+    this.cancelAutoSequence()
+    let sequenceId = this.autoSequenceId
+    let playNext = (index) => {
+      if (sequenceId !== this.autoSequenceId) return
+      if (index >= advanced.automaticMoves.length) {
+        this.setState({
+          displayNodeId: advanced.positionNodeId,
+          decisionPointId: advanced.decisionPointId,
+          expectedMoveNodeId: advanced.nextPlayerMove?.id || null,
+          feedback: advanced.solved ? t('Solved') || 'Solved' : null,
+          phase: advanced.solved ? 'solved' : 'solving',
+          showGameGraph: advanced.solved,
+        })
+        return
+      }
+
+      this.autoTimer = setTimeout(() => {
+        this.autoTimer = null
+        if (sequenceId !== this.autoSequenceId) return
+        let move = advanced.automaticMoves[index]
+        sound.playPachi()
+        this.setState({displayNodeId: move.id}, () => playNext(index + 1))
+      }, AUTO_REPLY_DELAY)
+    }
+    playNext(0)
+  }
+
+  cancelAutoSequence() {
+    if (this.autoTimer != null) {
+      clearTimeout(this.autoTimer)
+      this.autoTimer = null
+    }
+    this.autoSequenceId += 1
   }
 
   handleGraphNodeClick = (evt) => {
     if (evt.button !== 0 || evt.treePosition == null) return
+    this.cancelAutoSequence()
     this.setState({
       displayNodeId: evt.treePosition,
       explorationBoard: null,
@@ -90,6 +139,7 @@ export default class TsumegoSolver extends Component {
   }
 
   handleGraphWheel = (step) => {
+    this.cancelAutoSequence()
     let next = this.props.gameTree.navigate(this.state.displayNodeId, step, {})
     if (next == null) return
     this.setState({
@@ -112,6 +162,7 @@ export default class TsumegoSolver extends Component {
       getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
     let nextBoard = applyExplorationMove(board, sign, vertex)
     if (nextBoard == null) return
+    sound.playPachi()
     this.setState({
       explorationBoard: nextBoard,
       explorationPlayer: -sign,
@@ -126,7 +177,9 @@ export default class TsumegoSolver extends Component {
     )
     let node = gameTree.get(this.state.displayNodeId)
     let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
-    let nextBoard = applyExplorationMove(board, sign, vertex) || board
+    let movedBoard = applyExplorationMove(board, sign, vertex)
+    let nextBoard = movedBoard || board
+    if (movedBoard != null) sound.playPachi()
     let retrySnapshot = {
       phase: 'solving',
       displayNodeId: this.state.displayNodeId,
@@ -141,12 +194,13 @@ export default class TsumegoSolver extends Component {
       phase: 'failed',
       feedback: t('Incorrect'),
       explorationBoard: nextBoard,
-      explorationPlayer: -sign,
+      explorationPlayer: movedBoard == null ? sign : -sign,
       retrySnapshot,
     })
   }
 
   handleRetry = () => {
+    this.cancelAutoSequence()
     if (this.state.phase === 'failed') {
       this.setState(this.state.retrySnapshot)
     } else {
@@ -154,18 +208,24 @@ export default class TsumegoSolver extends Component {
     }
   }
 
+  handleBack = () => {
+    this.cancelAutoSequence()
+    this.props.onBack()
+  }
+
+  handlePrevious = () => {
+    this.cancelAutoSequence()
+    this.props.onPrevious()
+  }
+
+  handleNext = () => {
+    this.cancelAutoSequence()
+    this.props.onNext()
+  }
+
   render() {
-    let {
-      gameTree,
-      problem,
-      problemIndex,
-      problemCount,
-      relativePath,
-      source,
-      onBack,
-      onPrevious,
-      onNext,
-    } = this.props
+    let {gameTree, problem, problemIndex, problemCount, relativePath, source} =
+      this.props
     let {displayNodeId, phase, feedback, showGameGraph, explorationBoard} =
       this.state
     let solved = phase === 'solved'
@@ -179,7 +239,7 @@ export default class TsumegoSolver extends Component {
 
     return h(
       'div',
-      {class: 'tsumego-solver'},
+      {class: `tsumego-solver phase-${phase}`},
       h(
         'div',
         {class: 'tsumego-solver-board'},
@@ -251,10 +311,18 @@ export default class TsumegoSolver extends Component {
       h(
         'div',
         {class: 'tsumego-solver-navigation'},
-        h('button', {type: 'button', onClick: onBack}, `‹ ${t('Collection')}`),
         h(
           'button',
-          {type: 'button', disabled: problemIndex <= 0, onClick: onPrevious},
+          {type: 'button', onClick: this.handleBack},
+          `‹ ${t('Collection')}`,
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            disabled: problemIndex <= 0,
+            onClick: this.handlePrevious,
+          },
           `‹ ${t('Previous')}`,
         ),
         h('span', {}, `${problemIndex + 1} / ${problemCount}`),
@@ -263,7 +331,7 @@ export default class TsumegoSolver extends Component {
           {
             type: 'button',
             disabled: problemIndex >= problemCount - 1,
-            onClick: onNext,
+            onClick: this.handleNext,
           },
           `${t('Next')} ›`,
         ),

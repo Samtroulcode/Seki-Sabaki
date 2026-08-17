@@ -51,6 +51,13 @@ test.describe('Tsumego workspace', () => {
     expect(Math.abs(gobanBox.width - gobanBox.height)).toBeLessThan(
       Math.max(gobanBox.width, gobanBox.height) * 0.1,
     )
+    await page.evaluate(() => {
+      window.__tsumegoAudioPlays = 0
+      Audio.prototype.play = () => {
+        window.__tsumegoAudioPlays += 1
+        return Promise.resolve()
+      }
+    })
 
     let globalTreePosition = await page.evaluate(
       () => window.__sabaki.state.treePosition,
@@ -59,6 +66,9 @@ test.describe('Tsumego workspace', () => {
     await expect(page.locator('.tsumego-solver-feedback')).toContainText(
       'Incorrect',
     )
+    await expect
+      .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
+      .toBeGreaterThan(0)
     expect(await page.evaluate(() => window.__sabaki.state.treePosition)).toBe(
       globalTreePosition,
     )
@@ -68,7 +78,21 @@ test.describe('Tsumego workspace', () => {
     await page.getByRole('button', {name: 'Retry', exact: true}).click()
     await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
 
+    let autoReplyStartedAt = await page.evaluate(() => performance.now())
     await dispatchVertex(page, 17, 18)
+    await expect
+      .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
+      .toBeGreaterThan(1)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+    let autoReplyElapsed = await page.evaluate(
+      (startedAt) => performance.now() - startedAt,
+      autoReplyStartedAt,
+    )
+    expect(autoReplyElapsed).toBeGreaterThanOrEqual(850)
+    await expect
+      .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
+      .toBeGreaterThan(2)
     await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
     await dispatchVertex(page, 13, 18)
     await expect(page.locator('.tsumego-solver-feedback')).toContainText(
