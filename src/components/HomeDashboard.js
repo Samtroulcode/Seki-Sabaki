@@ -7,6 +7,7 @@ import onlineStore from '../modules/onlinestore.js'
 import HomeBoardPreview from './HomeBoardPreview.js'
 import HomeLibraryPane from './HomeLibraryPane.js'
 import HomeOnlinePanel from './HomeOnlinePanel.js'
+import HomeTsumegoCard from './HomeTsumegoCard.js'
 import {
   getHistoryPreview,
   OgsGameHistoryColumn,
@@ -320,6 +321,7 @@ export default class HomeDashboard extends Component {
               ),
             ),
           ),
+          h(HomeTsumegoCard),
           (hasOnlineGame || hasBoardTabs) &&
             h(
               'button',

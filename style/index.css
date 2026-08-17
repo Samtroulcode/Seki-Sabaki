@@ -359,6 +359,82 @@
   color: white;
   font-size: 1.02rem;
 }
+.home-card-tsumego {
+  grid-column: 1 / -1;
+}
+.home-tsumego-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: center;
+  min-width: 0;
+}
+.home-tsumego-goban {
+  width: min(100%, 13rem);
+}
+.home-tsumego-goban .ogs-mini-goban {
+  width: 100%;
+}
+.home-tsumego-info {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.home-tsumego-title {
+  color: white;
+  font-size: 1.05rem;
+}
+.home-tsumego-source,
+.home-tsumego-problem,
+.home-tsumego-turn,
+.home-tsumego-solved,
+.home-tsumego-percent {
+  color: #ccc;
+  font-size: 0.85rem;
+}
+.home-tsumego-complete {
+  color: #8cdcda;
+  font-size: 0.85rem;
+}
+.home-tsumego-progress {
+  height: 0.6rem;
+  max-width: 24rem;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  background: #292a2d;
+  border-radius: 3px;
+}
+.home-tsumego-progress-bar {
+  height: 100%;
+  background: #006fca;
+  border-radius: 3px;
+}
+.home-tsumego-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+.home-tsumego-actions button {
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.home-tsumego-actions .home-tsumego-continue {
+  background: #006fca;
+  color: white;
+}
+.home-tsumego-status,
+.home-tsumego-empty {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+.home-tsumego-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+}
 .home-new-board-pane {
   justify-items: center;
   gap: 0.85rem;
@@ -1300,6 +1376,11 @@
 
   .ogs-history-column-entry {
     grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  .home-tsumego-body {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 }
 

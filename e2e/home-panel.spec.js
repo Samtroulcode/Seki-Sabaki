@@ -393,4 +393,193 @@ test.describe('Home panel navigation', () => {
       rmSync(root, {recursive: true, force: true})
     }
   })
+
+  test('Continue Tsumego falls back to builtin easy when nothing is remembered', async ({
+    page,
+  }) => {
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toBeVisible()
+    await expect(card).toContainText('GoGameGuru — Easy')
+    await expect(card).toContainText('Built-in')
+    await expect(card).toContainText('Problem 1 / 140')
+    await expect(card).toContainText('0 / 140 solved')
+    await expect(card).toContainText('0%')
+    await expect(card.getByRole('button', {name: 'Continue'})).toBeVisible()
+    await expect(
+      card.getByRole('button', {name: 'Browse Tsumego'}),
+    ).toBeVisible()
+  })
+
+  test('Continue Tsumego uses the remembered builtin collection', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.sabaki.setting.set('tsumego.last_collection', {
+        source: 'builtin',
+        relativePath: 'tsumego/hard',
+      })
+    })
+    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByTitle('Home').click()
+
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('GoGameGuru — Hard')
+    await expect(card).toContainText('Built-in')
+  })
+
+  test('Continue Tsumego uses the remembered user collection when configured', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-home-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '001.sgf'),
+      '(;GM[1]SZ[9]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))',
+    )
+
+    try {
+      await page.evaluate(async (libraryRoot) => {
+        window.sabaki.setting.set('library.root', libraryRoot)
+        window.sabaki.setting.set('tsumego.last_collection', {
+          source: 'user',
+          relativePath: 'Tsumego/User Set',
+        })
+      }, root)
+      await page.getByRole('button', {name: /Online play/}).click()
+      await expect(page.locator('.ogs-panel')).toBeVisible()
+      await page.getByTitle('Home').click()
+
+      let card = page.locator('.home-card-tsumego')
+      await expect(card).toContainText('User Set')
+      await expect(card).toContainText('My Library')
+      await expect(card).toContainText('Problem 1 / 1')
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('Continue Tsumego falls back to easy when the remembered collection is stale', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.sabaki.setting.set('tsumego.last_collection', {
+        source: 'builtin',
+        relativePath: 'tsumego/does-not-exist',
+      })
+    })
+    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByTitle('Home').click()
+
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('GoGameGuru — Easy')
+  })
+
+  test('Continue Tsumego picks the first unfinished problem', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.sabaki.tsumegoProgress.getAll = async () => ({
+        version: 1,
+        problems: {
+          'builtin:tsumego/easy/ggg-easy-01.sgf': {
+            completed: true,
+            completedAt: 'x',
+          },
+          'builtin:tsumego/easy/ggg-easy-02.sgf': {
+            completed: true,
+            completedAt: 'x',
+          },
+        },
+      })
+    })
+    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByTitle('Home').click()
+
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('Problem 3 / 140')
+    await expect(card).toContainText('2 / 140 solved')
+  })
+
+  test('Continue Tsumego marks a complete collection and shows Review', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      let problems = {}
+      for (let i = 1; i <= 140; i++) {
+        let name = `ggg-easy-${String(i).padStart(2, '0')}.sgf`
+        problems[`builtin:tsumego/easy/${name}`] = {
+          completed: true,
+          completedAt: 'x',
+        }
+      }
+      window.sabaki.tsumegoProgress.getAll = async () => ({
+        version: 1,
+        problems,
+      })
+    })
+    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByTitle('Home').click()
+
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('Collection complete')
+    await expect(card).toContainText('140 / 140 solved')
+    await expect(card).toContainText('100%')
+    await expect(card.getByRole('button', {name: 'Review'})).toBeVisible()
+  })
+
+  test('Continue Tsumego preview shows the initial position, not the solution', async ({
+    page,
+  }) => {
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('GoGameGuru — Easy')
+    // ggg-easy-01 has 16 setup stones at the start position; the solved line
+    // would add more. Asserting the initial count proves the preview is built
+    // from problem.startNodeId, not the final SGF node.
+    await expect(
+      card.locator('.home-tsumego-goban .ogs-mini-stone'),
+    ).toHaveCount(16)
+    await expect(card).toContainText('Black to play')
+  })
+
+  test('Continue Tsumego opens the displayed problem', async ({page}) => {
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('GoGameGuru — Easy')
+    await card.getByRole('button', {name: 'Continue'}).click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
+  })
+
+  test('Continue Tsumego Browse opens the collection', async ({page}) => {
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('GoGameGuru — Easy')
+    await card.getByRole('button', {name: 'Browse Tsumego'}).click()
+    await expect(page.locator('#tsumego-dashboard')).toBeVisible()
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
+  })
+
+  test('Continue Tsumego shows a clean error when no Tsumego is available', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.sabaki.library.listBuiltin = async () => ({
+        ok: false,
+        code: 'read-failed',
+        entries: [],
+      })
+    })
+    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByTitle('Home').click()
+
+    let card = page.locator('.home-card-tsumego')
+    await expect(card).toContainText('No Tsumego available')
+    await expect(
+      card.getByRole('button', {name: 'Browse Tsumego'}),
+    ).toBeVisible()
+  })
 })
