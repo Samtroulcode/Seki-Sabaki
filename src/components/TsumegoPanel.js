@@ -20,6 +20,7 @@ import {
   getTsumegoProgress,
   markTsumegoProblemCompleted,
 } from '../modules/tsumegoprogress.js'
+import {setLastTsumegoCollection} from '../modules/tsumegocollection.js'
 import TsumegoSolver from './TsumegoSolver.js'
 
 const t = i18n.context('TsumegoPanel')
@@ -28,9 +29,12 @@ const naturalCompare = natsort({insensitive: true})
 export default class TsumegoPanel extends Component {
   constructor(props) {
     super(props)
+    let request = props.request
+    let source = request?.source === 'user' ? 'user' : 'builtin'
+    let currentPath = request?.relativePath || this.getRootPath(source)
     this.state = {
-      source: 'builtin',
-      currentPath: 'tsumego',
+      source,
+      currentPath,
       config: null,
       entries: [],
       collectionMetadata: null,
@@ -48,11 +52,25 @@ export default class TsumegoPanel extends Component {
     }
     this.refreshId = 0
     this.problemLoadId = 0
+    this.pendingProblemPath = request?.problemPath || null
   }
 
   componentDidMount() {
-    this.refresh()
     this.loadProgress()
+    let request = this.props.request
+    if (request?.source != null) {
+      this.applyRequest(request)
+    } else {
+      this.refresh()
+    }
+  }
+
+  componentDidUpdate(previousProps) {
+    let nextId = this.props.request?.requestId ?? null
+    let previousId = previousProps.request?.requestId ?? null
+    if (nextId != null && nextId !== previousId) {
+      this.applyRequest(this.props.request)
+    }
   }
 
   getRootPath(source = this.state.source) {
@@ -100,6 +118,59 @@ export default class TsumegoPanel extends Component {
       }),
     )
     return totals
+  }
+
+  // Applies a targeted navigation request (collection and/or problem). Falls
+  // back to the source root when the request is invalid, so a bad request
+  // never crashes the workspace.
+  async applyRequest(request) {
+    let source = request.source === 'user' ? 'user' : 'builtin'
+    let relativePath = normalizeRelativePath(request.relativePath || '')
+    let parts = splitRelativePath(relativePath)
+    if (
+      parts.length === 0 ||
+      parts.some((part) => part === '..' || part === '.')
+    ) {
+      relativePath = this.getRootPath(source)
+    }
+
+    this.setState({
+      source,
+      currentPath: relativePath,
+      view: 'browser',
+      problemIndex: null,
+      problemCount: 0,
+      relativePath: null,
+      content: null,
+      gameTree: null,
+      problem: null,
+    })
+    await this.refresh(source, relativePath)
+
+    if (request.problemPath != null) {
+      await this.openProblemByPath(request.problemPath)
+    }
+  }
+
+  // Opens a problem by its relative path using the existing problem workflow.
+  async openProblemByPath(problemPath) {
+    let entry = this.state.entries.find(
+      (candidate) => candidate.relativePath === problemPath,
+    )
+    if (entry == null || entry.type !== 'file') return
+    await this.handleProblemClick(entry)
+  }
+
+  // Persists the currently displayed collection (a folder containing SGF
+  // problems) as the last opened Tsumego collection. The root and folders
+  // without any SGF file are not remembered.
+  rememberCollection(source, currentPath, entries) {
+    let root = this.getRootPath(source)
+    let normalizedPath = normalizeRelativePath(currentPath)
+    if (normalizedPath === root) return
+    let hasSgf = entries.some((entry) => entry.type === 'file')
+    if (!hasSgf) return
+    setLastTsumegoCollection({source, relativePath: normalizedPath})
   }
 
   handleProblemSolved() {
@@ -183,6 +254,7 @@ export default class TsumegoPanel extends Component {
         busy: false,
         error: null,
       })
+      this.rememberCollection(source, currentPath, entries)
 
       let totals = await this.loadTotals(source, currentPath, entries)
       if (refreshId !== this.refreshId) return

@@ -638,6 +638,26 @@ class Sabaki extends EventEmitter {
       )
     }
 
+    if (type === 'tsumego') {
+      // Targeted navigation request consumed by TsumegoPanel. Each request
+      // carries an incrementing requestId so a repeated (identical) request is
+      // still applied as new. A null request resets to the default view.
+      let request = options.tsumegoRequest
+      tab = {
+        ...tab,
+        tsumegoRequest:
+          request == null
+            ? null
+            : {
+                ...request,
+                requestId: (tab.tsumegoRequest?.requestId ?? 0) + 1,
+              },
+      }
+      this.state.workspaceTabs = this.state.workspaceTabs.map((candidate) =>
+        candidate.id === tab.id ? tab : candidate,
+      )
+    }
+
     this.setState({
       activeWorkspace: 'workspace-tab',
       activeWorkspaceTabId: tab.id,

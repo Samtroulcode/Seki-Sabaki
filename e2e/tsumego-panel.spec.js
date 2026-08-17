@@ -280,6 +280,125 @@ test.describe('Tsumego workspace', () => {
     await expect(page.locator('.tsumego-browser')).toBeVisible()
     expect(existsSync(progressPath)).toBe(false)
   })
+
+  test('remembers the last opened built-in collection', async ({page}) => {
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await expect(page.locator('#tsumego-dashboard')).toBeVisible()
+
+    // The root alone is not remembered.
+    expect(
+      await page.evaluate(() =>
+        window.sabaki.setting.get('tsumego.last_collection'),
+      ),
+    ).toBeNull()
+
+    await page.locator('.tsumego-entry-directory').first().click()
+    await expect(page.locator('.tsumego-entry-file').first()).toBeVisible()
+    expect(
+      await page.evaluate(() =>
+        window.sabaki.setting.get('tsumego.last_collection'),
+      ),
+    ).toEqual({source: 'builtin', relativePath: 'tsumego/easy'})
+  })
+
+  test('remembers the last opened user collection', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '001.sgf'),
+      '(;GM[1]SZ[9]C[Correct];B[aa])',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await expect(page.locator('.tsumego-entry-file')).toContainText('001.sgf')
+      expect(
+        await page.evaluate(() =>
+          window.sabaki.setting.get('tsumego.last_collection'),
+        ),
+      ).toEqual({source: 'user', relativePath: 'Tsumego/User Set'})
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('opens a collection from a targeted request', async ({page}) => {
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {source: 'builtin', relativePath: 'tsumego/easy'},
+      })
+    })
+    await expect(page.locator('#tsumego-dashboard')).toBeVisible()
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
+    await expect(page.locator('.tsumego-entry-file').first()).toBeVisible()
+  })
+
+  test('opens a problem from a targeted request', async ({page}) => {
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {
+          source: 'builtin',
+          relativePath: 'tsumego/easy',
+          problemPath: 'tsumego/easy/ggg-easy-01.sgf',
+        },
+      })
+    })
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+  })
+
+  test('reuses the existing Tsumego workspace for a request', async ({
+    page,
+  }) => {
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
+
+    await page.getByTitle('Home').click()
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {source: 'builtin', relativePath: 'tsumego/easy'},
+      })
+    })
+    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
+  })
+
+  test('applies a new request on an existing workspace', async ({page}) => {
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {source: 'builtin', relativePath: 'tsumego/easy'},
+      })
+    })
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
+
+    await page.getByTitle('Home').click()
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {source: 'builtin', relativePath: 'tsumego/hard'},
+      })
+    })
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText('hard')
+  })
+
+  test('handles an invalid request without crashing', async ({page}) => {
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {source: 'cloud', relativePath: '../../etc'},
+      })
+    })
+    await expect(page.locator('#tsumego-dashboard')).toBeVisible()
+    // Falls back to the built-in root.
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText(
+      'Collections',
+    )
+  })
 })
 
 async function dispatchVertex(page, x, y) {

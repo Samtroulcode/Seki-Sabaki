@@ -229,6 +229,7 @@ let defaults = {
   'view.winrategraph_maxheight': 250,
   'view.winrategraph_invert': false,
   'infooverlay.duration': 2000,
+  'tsumego.last_collection': null,
   'window.height': 604,
   'window.minheight': 440,
   'window.minwidth': 526,
