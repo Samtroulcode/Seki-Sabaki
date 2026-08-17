@@ -7,6 +7,18 @@ const MAX_PREVIEW_BYTES = 512 * 1024
 const MAX_PREVIEW_TOTAL_BYTES = 4 * 1024 * 1024
 const MAX_OPEN_BYTES = 16 * 1024 * 1024
 
+const COLLECTION_MANIFEST_FILENAME = 'collection.json'
+const MAX_MANIFEST_BYTES = 64 * 1024
+const COLLECTION_MANIFEST_FIELDS = [
+  'id',
+  'title',
+  'author',
+  'license',
+  'source',
+  'description',
+]
+const COLLECTION_TYPES = ['tsumego', 'games']
+
 function canonicalizeRoot(root) {
   if (typeof root !== 'string' || root === '' || root.includes('\0')) {
     return {ok: false, code: 'invalid-root'}
@@ -183,6 +195,49 @@ function readBoundedFile(filePath, maxBytes, root = null) {
   } finally {
     if (descriptor != null) fs.closeSync(descriptor)
   }
+}
+
+// Parses the optional collection.json manifest of a built-in collection
+// folder. Only the recognized fields are returned; unknown fields (including
+// `readOnly`, which is deliberately never honored: built-in collections are
+// always read-only by nature) are ignored. Paths in the manifest are never
+// interpreted as filesystem paths.
+function parseCollectionMetadata(content) {
+  let parsed
+  try {
+    parsed = JSON.parse(content)
+  } catch (err) {
+    return {ok: false, code: 'invalid-json', metadata: null}
+  }
+
+  if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {ok: false, code: 'invalid-manifest', metadata: null}
+  }
+
+  if ('type' in parsed && !COLLECTION_TYPES.includes(parsed.type)) {
+    return {ok: false, code: 'invalid-type', metadata: null}
+  }
+
+  let metadata = {}
+  for (let field of COLLECTION_MANIFEST_FIELDS) {
+    let value = parsed[field]
+    if (typeof value === 'string' && value !== '') metadata[field] = value
+  }
+  if (COLLECTION_TYPES.includes(parsed.type)) metadata.type = parsed.type
+
+  return {ok: true, metadata}
+}
+
+// Reads the manifest of a built-in collection folder, or reports its absence.
+function readCollectionManifest(root, directoryPath) {
+  let manifestPath = path.join(directoryPath, COLLECTION_MANIFEST_FILENAME)
+  if (!fs.existsSync(manifestPath)) return {ok: true, metadata: null}
+
+  let file = readBoundedFile(manifestPath, MAX_MANIFEST_BYTES, root)
+  if (file == null) {
+    return {ok: false, code: 'manifest-unreadable', metadata: null}
+  }
+  return parseCollectionMetadata(file.content)
 }
 
 // Resolves the read-only built-in library root. In a packaged build it lives
@@ -369,6 +424,21 @@ exports.create = function (setting, dialog, options = {}) {
     }
   }
 
+  function getBuiltinCollectionMetadata(relativePath) {
+    let rootResult = resolveBuiltin()
+    if (!rootResult.ok)
+      return {ok: false, code: rootResult.code, metadata: null}
+
+    let directory = validateReadOnlyRelativeTarget(
+      rootResult.root,
+      relativePath,
+      (stats) => stats.isDirectory(),
+    )
+    if (!directory.ok) return {...directory, metadata: null}
+
+    return readCollectionManifest(rootResult.root, directory.path)
+  }
+
   async function chooseRoot(window) {
     let result = await dialog.showOpenDialog(window, {
       properties: ['openDirectory'],
@@ -386,8 +456,17 @@ exports.create = function (setting, dialog, options = {}) {
     return {ok: true, root: validation.root, tsumegoRoot: tsumego.path}
   }
 
-  return {getConfig, chooseRoot, list, open, listBuiltin, openBuiltin}
+  return {
+    getConfig,
+    chooseRoot,
+    list,
+    open,
+    listBuiltin,
+    openBuiltin,
+    getBuiltinCollectionMetadata,
+  }
 }
 
 exports.validateRoot = validateRoot
 exports.resolveBuiltinRoot = resolveBuiltinRoot
+exports.parseCollectionMetadata = parseCollectionMetadata
