@@ -106,8 +106,8 @@ describe('analyzeProblem', () => {
     assert.strictEqual(result.playerToMove, 'B')
   })
 
-  it('does not match a comment that does not contain the phrase', () => {
-    let tree = buildTree([['B', 'gl', 'This is a wrong answer']])
+  it('does not treat a comment without a positive marker as a problem', () => {
+    let tree = buildTree([['B', 'gl', 'This is a ko fight']])
 
     assert.strictEqual(analyzeProblem(tree), null)
   })
@@ -192,6 +192,118 @@ describe('analyzeProblem', () => {
     assert(result != null)
     assert.strictEqual(result.firstMove.data.W[0], 'gl')
     assert.strictEqual(result.playerToMove, 'W')
+  })
+
+  it('finds the first solver move when the marker sits several moves later', () => {
+    // GoGameGuru: B[rs] -> W[rr] -> B[ns] C[Correct]
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['rs']})
+      let w1 = draft.appendNode(b1, {W: ['rr']})
+      draft.appendNode(w1, {B: ['ns'], C: ['Correct']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.startNodeId, tree.root.id)
+    assert.strictEqual(result.playerToMove, 'B')
+    assert.strictEqual(result.firstMove.data.B[0], 'rs')
+  })
+
+  it('accepts several correct continuations in the same branch', () => {
+    // GoGameGuru: B[rs] -> W[rr] with B[ns] C[Correct] and B[ps] C[Also correct...]
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['rs']})
+      let w1 = draft.appendNode(b1, {W: ['rr']})
+      draft.appendNode(w1, {B: ['ns'], C: ['Correct']})
+      draft.appendNode(w1, {B: ['ps'], C: ['Also correct...']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'rs')
+  })
+
+  it('reads a positive result from a node name containing 正解', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['ba'], N: ['正解图']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'ba')
+  })
+
+  it('finds the first solver move when the marker sits on a setup node', () => {
+    // B[rs] -> W[rr] -> C[Correct] (marker on a non-move node)
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['rs']})
+      let w1 = draft.appendNode(b1, {W: ['rr']})
+      draft.appendNode(w1, {C: ['Correct']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'rs')
+  })
+
+  it('does not throw on a tree containing a data-less node', () => {
+    let tree = gametree.new({
+      root: {id: 'r', data: null, parentId: null, children: []},
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('does not throw when the starting position has no data', () => {
+    // The marked move's parent (the starting position) is a data-less node.
+    let tree = gametree.new({
+      root: {
+        id: 'r',
+        data: null,
+        parentId: null,
+        children: [
+          {
+            id: 'm',
+            data: {B: ['gl'], C: ['Correct Answer']},
+            parentId: 'r',
+            children: [],
+          },
+        ],
+      },
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.startNodeId, 'r')
+  })
+
+  it('does not treat 不正解 as a positive marker', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], N: ['不正解']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('classifies a branch named 不正解 as wrong', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['dd'], N: ['不正解']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('returns null when the marker sits on a setup node with no solver move', () => {
+    // B[rs] C[Correct]: the last move is Black, so the solver would be White,
+    // but the path carries no White move.
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['rs']})
+      draft.appendNode(b1, {C: ['Correct']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
   })
 })
 
@@ -438,6 +550,65 @@ describe('classifyMove', () => {
     let problem = analyzeProblem(tree)
 
     assert.strictEqual(classifyMove(tree, problem, 'dd'), 'absent')
+  })
+
+  it('classifies a branch as wrong when the marker sits on a descendant', () => {
+    // Cho L&D: B[ca] -> W[ba] C[Wrong.]
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['ba'], C: ['Correct.']})
+      let wrong = draft.appendNode(draft.root.id, {B: ['ca']})
+      draft.appendNode(wrong, {W: ['ba'], C: ['Wrong.']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'ca'), 'wrong')
+  })
+
+  it('classifies a branch from a node name containing 正解 or 失败', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['ba'], N: ['正解图']})
+      draft.appendNode(draft.root.id, {B: ['ca'], N: ['失败图1']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'ba'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'ca'), 'wrong')
+  })
+
+  it('prefers a positive marker over a negative one in the same branch', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      let wrong = draft.appendNode(draft.root.id, {B: ['dd']})
+      draft.appendNode(wrong, {W: ['xx'], C: ['Wrong.']})
+      draft.appendNode(wrong, {W: ['yy'], C: ['Correct.']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'correct')
+  })
+
+  it('treats a comment containing both words as positive', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {
+        B: ['dd'],
+        C: ['Correct me if I am wrong'],
+      })
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'correct')
+  })
+
+  it('does not treat a BM on a descendant as wrong', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct Answer']})
+      let wrong = draft.appendNode(draft.root.id, {B: ['dd']})
+      draft.appendNode(wrong, {W: ['xx'], BM: ['1']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
   })
 })
 
