@@ -10,14 +10,18 @@
 // Result markers are read from node comments (`C`) containing "correct" (e.g.
 // "Correct Answer", "Correct.", "Also correct") or "wrong" (e.g. "Wrong
 // Answer", "Wrong."), and from node names (`N`) containing 正解 (solution) or
-// 失败 (failure). A marker may sit on any descendant of a branch, not only on
-// the branch's first move: the first solver move is the first move of the
-// solver's color on the path from the root to the marked node, and the
-// starting position is that move's parent. The player to move is the color of
-// that first move. A `PL` on the starting position must agree with that color;
-// if it contradicts it, the problem is considered unreliable and
-// `analyzeProblem` returns `null`. If no reliable marker is found,
-// `analyzeProblem` returns `null` rather than guessing.
+// 失败 (failure). A marker may sit on the move node itself, on a descendant
+// after the move, or on a non-move prefix before the branch's first move (a
+// node describing the variation, e.g. N[正解图]). The first solver move is the
+// first move of the solver's color on the path from the root to a marked move
+// node, or the first move reachable from a marked prefix without crossing
+// another move; the starting position is the first position-defining node
+// above the first move (its parent, or the node above a label chain describing
+// the variation). The player to move is the color of that first move. A
+// `PL` on the starting position must agree with that color; if it contradicts
+// it, the problem is considered unreliable and `analyzeProblem` returns
+// `null`. If no reliable marker is found, `analyzeProblem` returns `null`
+// rather than guessing.
 
 import {parseVertex} from '@sabaki/sgf'
 
@@ -139,11 +143,117 @@ function getFirstSolverMove(tree, node, depth) {
   return firstMove
 }
 
+// Returns whether any ancestor of `node` (up to the root) carries a move.
+function hasMoveAncestor(tree, node) {
+  let current = node.parentId != null ? tree.get(node.parentId) : null
+  while (current != null) {
+    if (hasMove(current)) return true
+    current = current.parentId != null ? tree.get(current.parentId) : null
+  }
+  return false
+}
+
+// Returns the first solver move for a marked prefix node: the first move
+// reachable from the prefix without crossing another move, with its depth.
+// Returns `null` when the prefix leads to no move or to several distinct first
+// moves (ambiguous — fail safely rather than guess).
+function getPrefixFirstMove(tree, node, depth) {
+  let firstMoves = []
+  let stack = node.children.map((child) => ({node: child, depth: depth + 1}))
+  while (stack.length) {
+    let {node: current, depth: currentDepth} = stack.pop()
+    if (hasMove(current)) firstMoves.push({node: current, depth: currentDepth})
+    else
+      for (let child of current.children)
+        stack.push({node: child, depth: currentDepth + 1})
+  }
+  if (firstMoves.length === 0) return null
+
+  let distinct = new Set(
+    firstMoves.map(({node: move}) => {
+      let vertex = getMoveVertex(move)
+      // Malformed or pass moves (no valid vertex) are distinct by node id so
+      // several of them under one prefix count as ambiguous.
+      let key =
+        vertex != null && vertex[0] >= 0 && vertex[1] >= 0
+          ? `${getMoveColor(move)}:${vertex}`
+          : `${getMoveColor(move)}:${move.id}`
+      return key
+    }),
+  )
+  if (distinct.size > 1) return null
+
+  // The same first move may be reachable at several depths (e.g. through a
+  // label chain); report the shallowest occurrence.
+  return firstMoves.reduce((a, b) => (b.depth < a.depth ? b : a))
+}
+
+// Returns whether `node` defines a position: a move, setup stones (AB/AW/AE),
+// or a player-to-move property (PL). Pure label/comment nodes (e.g. N[正解图])
+// do not define a position.
+function isPositionNode(node) {
+  if (hasMove(node)) return true
+  if (node.data == null) return false
+  return (
+    node.data.AB != null ||
+    node.data.AW != null ||
+    node.data.AE != null ||
+    node.data.PL != null
+  )
+}
+
+// Returns the start position for a first move `node`: the first ancestor that
+// defines a position (a move, setup stones, or a PL) or the root, skipping the
+// non-move label chain that describes the variation.
+function getStartPosition(tree, node) {
+  let current = node.parentId != null ? tree.get(node.parentId) : null
+  while (
+    current != null &&
+    !isPositionNode(current) &&
+    current.parentId != null
+  ) {
+    current = tree.get(current.parentId)
+  }
+  return current
+}
+
+// Returns `{node, depth, startNodeId}` for a marked node, or `null` when the
+// node yields no reliable candidate. A marker on a move node (or on a later
+// move of the same color) resolves by walking up; a marker on a non-move
+// prefix above all moves of its branch resolves by walking down to the first
+// move reachable without crossing another move; any other non-move marker
+// annotates a position below a move and resolves by walking up, falling back
+// to walking down when the path up carries no solver move. The starting
+// position is the first position-defining node above the first move.
+function getMarkedMoveCandidate(tree, node, depth) {
+  let firstMove
+  if (hasMove(node)) {
+    firstMove = getFirstSolverMove(tree, node, depth)
+  } else if (node.parentId != null && !hasMoveAncestor(tree, node)) {
+    firstMove = getPrefixFirstMove(tree, node, depth)
+  } else {
+    firstMove = getFirstSolverMove(tree, node, depth)
+    // A non-move marker below a move usually annotates a position (walk up);
+    // when the path up carries no solver move, it may label the variation
+    // below (walk down). Root markers are excluded: a marker on the root
+    // annotates the initial position, not a variation.
+    if (firstMove == null && node.parentId != null) {
+      firstMove = getPrefixFirstMove(tree, node, depth)
+    }
+  }
+  if (firstMove == null) return null
+
+  let startNode = getStartPosition(tree, firstMove.node)
+  if (startNode == null) return null
+  return {...firstMove, startNodeId: startNode.id}
+}
+
 // Returns 'correct' | 'wrong' | null for the branch starting at `node`, based
-// on result markers anywhere in the branch's subtree. A `BM` on the branch's
-// first move marks it wrong (the existing BM convention). Positive markers win
-// over negative ones when both are present.
-function getBranchResult(node) {
+// on result markers anywhere in the branch's subtree and on the non-move
+// prefix between the starting position and the branch's first move. A `BM` on
+// the branch's first move marks it wrong (the existing BM convention).
+// Positive markers win over negative ones when both are present.
+function getBranchResult(node, tree, startNode) {
   let hasPositive = false
   let hasNegative = hasBmMarker(node)
   let stack = [node]
@@ -153,6 +263,17 @@ function getBranchResult(node) {
     if (hasNegativeResultMarker(current)) hasNegative = true
     for (let child of current.children) stack.push(child)
   }
+
+  // A marker on a non-move prefix above the branch's first move (e.g.
+  // N[失败图] before W[md]) is inherited by the branch. Stop at the starting
+  // position or at the first move encountered.
+  let current = node.parentId != null ? tree.get(node.parentId) : null
+  while (current != null && current.id !== startNode.id && !hasMove(current)) {
+    if (hasPositiveResultMarker(current)) hasPositive = true
+    if (hasNegativeResultMarker(current)) hasNegative = true
+    current = current.parentId != null ? tree.get(current.parentId) : null
+  }
+
   if (hasPositive) return 'correct'
   if (hasNegative) return 'wrong'
   return null
@@ -171,9 +292,9 @@ export function analyzeProblem(tree, options = {}) {
   let {allowTeFallback = false} = options || {}
 
   // Single DFS pass tracking depth. Markers may sit on any node, move or not;
-  // the first solver move is derived from the path to the marked node. A first
-  // solver move at the root has no parent, so there is no position to start
-  // from and it is excluded.
+  // the first solver move is derived from the path to the marked node, or by
+  // walking down from a marked non-move prefix. A first solver move at the
+  // root has no position to start from and it is excluded.
   let commentCandidates = []
   let teCandidates = []
 
@@ -200,10 +321,10 @@ export function analyzeProblem(tree, options = {}) {
   // correct") must not create competing candidates.
   let candidates = new Map()
   for (let {node, depth} of pool) {
-    let firstMove = getFirstSolverMove(tree, node, depth)
-    if (firstMove == null || firstMove.node.parentId == null) continue
-    if (!candidates.has(firstMove.node.id)) {
-      candidates.set(firstMove.node.id, firstMove)
+    let candidate = getMarkedMoveCandidate(tree, node, depth)
+    if (candidate == null || candidate.startNodeId == null) continue
+    if (!candidates.has(candidate.node.id)) {
+      candidates.set(candidate.node.id, candidate)
     }
   }
   if (candidates.size === 0) return null
@@ -224,20 +345,23 @@ export function analyzeProblem(tree, options = {}) {
     }
   }
 
-  let startNodeId = best.node.parentId
+  let startNodeId = best.startNodeId
   let playerToMove = getMoveColor(best.node)
 
   // The first correct move's color defines the player to move. A `PL` on the
-  // starting position must agree with it; a contradicting `PL` makes the
-  // problem unreliable, so fail cleanly instead of picking one arbitrarily.
-  let startNode = tree.get(startNodeId)
-  if (
-    startNode != null &&
-    startNode.data != null &&
-    startNode.data.PL != null
-  ) {
-    let pl = startNode.data.PL[0]
-    if ((pl === 'B' || pl === 'W') && pl !== playerToMove) return null
+  // starting position must agree with that color; a contradicting `PL` makes
+  // the problem unreliable, so fail cleanly instead of picking one
+  // arbitrarily. The starting position is the first position-defining node
+  // above the first move (a move, setup stones, or a PL), so the walk never
+  // passes a move and any `PL` it finds sits on the starting position itself.
+  let plNode = best.node.parentId != null ? tree.get(best.node.parentId) : null
+  while (plNode != null) {
+    if (plNode.data != null && plNode.data.PL != null) {
+      let pl = plNode.data.PL[0]
+      if ((pl === 'B' || pl === 'W') && pl !== playerToMove) return null
+    }
+    if (plNode.id === startNodeId) break
+    plNode = plNode.parentId != null ? tree.get(plNode.parentId) : null
   }
 
   return {startNodeId, playerToMove, firstMove: best.node}
@@ -309,11 +433,13 @@ export function classifyMove(tree, problem, vertexString) {
   )
   if (matching.length === 0) return 'absent'
 
-  // A branch's result is determined by markers anywhere in its subtree, so a
-  // marker carried by a descendant (e.g. W[ba] C[Wrong.]) still classifies the
-  // branch's first move. A variation that is present but not clearly marked as
-  // bad must not be invented as wrong; fail cleanly instead of guessing.
-  let results = matching.map((node) => getBranchResult(node))
+  // A branch's result is determined by markers anywhere in its subtree and on
+  // the non-move prefix between the starting position and the branch's first
+  // move, so a marker carried by a descendant (e.g. W[ba] C[Wrong.]) or by a
+  // prefix label (e.g. N[失败图] before W[md]) still classifies the branch's
+  // first move. A variation that is present but not clearly marked as bad must
+  // not be invented as wrong; fail cleanly instead of guessing.
+  let results = matching.map((node) => getBranchResult(node, tree, startNode))
   if (results.some((result) => result === 'correct')) return 'correct'
   if (results.every((result) => result === 'wrong')) return 'wrong'
   return null

@@ -305,6 +305,113 @@ describe('analyzeProblem', () => {
 
     assert.strictEqual(analyzeProblem(tree), null)
   })
+
+  it('detects a problem whose marker sits on a non-move prefix before the first move', () => {
+    // ROOT -> N[正解图] -> W[na] -> B[ob]
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {N: ['正解图']})
+      let w1 = draft.appendNode(prefix, {W: ['na']})
+      draft.appendNode(w1, {B: ['ob']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.startNodeId, tree.root.id)
+    assert.strictEqual(result.playerToMove, 'W')
+    assert.strictEqual(result.firstMove.data.W[0], 'na')
+    assert.strictEqual(classifyMove(tree, result, 'na'), 'correct')
+  })
+
+  it('returns null when a marked prefix leads to several distinct first moves', () => {
+    // ROOT -> N[正解图] -> W[na] and W[md]: ambiguous, fail safely.
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {N: ['正解图']})
+      draft.appendNode(prefix, {W: ['na']})
+      draft.appendNode(prefix, {W: ['md']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('accepts a matching PL on a non-move prefix before the first move', () => {
+    // ROOT -> N[setup] PL[W] -> W[na] C[Correct Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {N: ['setup'], PL: ['W']})
+      draft.appendNode(prefix, {W: ['na'], C: ['Correct Answer']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.playerToMove, 'W')
+  })
+
+  it('returns null when a PL on a non-move prefix contradicts the first move', () => {
+    // ROOT -> N[setup] PL[B] -> W[na] C[Correct Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {N: ['setup'], PL: ['B']})
+      draft.appendNode(prefix, {W: ['na'], C: ['Correct Answer']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('keeps a setup node with stones as the starting position', () => {
+    // ROOT -> W[gm] -> AB[dd] setup -> B[gl] C[Correct Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let w1 = draft.appendNode(draft.root.id, {W: ['gm']})
+      let setup = draft.appendNode(w1, {AB: ['dd']})
+      draft.appendNode(setup, {B: ['gl'], C: ['Correct Answer']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    let startNode = tree.get(result.startNodeId)
+    assert.strictEqual(startNode.data.AB[0], 'dd')
+    assert.strictEqual(result.playerToMove, 'B')
+  })
+
+  it('prefers the shallowest occurrence of a repeated first move under a prefix', () => {
+    // ROOT -> N[正解图] -> W[na] and N[正解图] -> C[x] -> W[na]
+    // ROOT -> C[y] -> W[md] C[Correct Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {N: ['正解图']})
+      draft.appendNode(prefix, {W: ['na']})
+      let label = draft.appendNode(prefix, {C: ['x']})
+      draft.appendNode(label, {W: ['na']})
+      let label2 = draft.appendNode(draft.root.id, {C: ['y']})
+      draft.appendNode(label2, {W: ['md'], C: ['Correct Answer']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.W[0], 'na')
+  })
+
+  it('returns null when a PL on a move starting position contradicts the first move', () => {
+    // ROOT -> W[gm] PL[W] -> B[gl] C[Correct Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let w1 = draft.appendNode(draft.root.id, {W: ['gm'], PL: ['W']})
+      draft.appendNode(w1, {B: ['gl'], C: ['Correct Answer']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('detects a problem whose marker sits on a prefix below a preliminary move', () => {
+    // ROOT -> W[gm] -> N[正解图] -> B[gl]
+    let tree = gametree.new().mutate((draft) => {
+      let w1 = draft.appendNode(draft.root.id, {W: ['gm']})
+      let prefix = draft.appendNode(w1, {N: ['正解图']})
+      draft.appendNode(prefix, {B: ['gl']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    let startNode = tree.get(result.startNodeId)
+    assert.strictEqual(startNode.data.W[0], 'gm')
+    assert.strictEqual(result.playerToMove, 'B')
+    assert.strictEqual(result.firstMove.data.B[0], 'gl')
+  })
 })
 
 describe('classifyMove', () => {
@@ -609,6 +716,74 @@ describe('classifyMove', () => {
     let problem = analyzeProblem(tree)
 
     assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
+  })
+
+  it('classifies a wrong branch as wrong when a positive solution exists elsewhere', () => {
+    // ROOT -> N[正解图] -> W[na] -> B[ob] -> W[md]
+    // ROOT -> W[md] N[失败图]
+    let tree = gametree.new().mutate((draft) => {
+      let correctPrefix = draft.appendNode(draft.root.id, {N: ['正解图']})
+      let w1 = draft.appendNode(correctPrefix, {W: ['na']})
+      let b1 = draft.appendNode(w1, {B: ['ob']})
+      draft.appendNode(b1, {W: ['md']})
+
+      draft.appendNode(draft.root.id, {W: ['md'], N: ['失败图']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(problem.startNodeId, tree.root.id)
+    assert.strictEqual(problem.playerToMove, 'W')
+    assert.strictEqual(problem.firstMove.data.W[0], 'na')
+    assert.strictEqual(classifyMove(tree, problem, 'na'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'md'), 'wrong')
+  })
+
+  it('inherits a negative marker from a non-move prefix before the first move', () => {
+    // ROOT -> N[失败图] -> W[md]
+    // ROOT -> N[正解图] -> W[na]
+    let tree = gametree.new().mutate((draft) => {
+      let wrongPrefix = draft.appendNode(draft.root.id, {N: ['失败图']})
+      draft.appendNode(wrongPrefix, {W: ['md']})
+      let correctPrefix = draft.appendNode(draft.root.id, {N: ['正解图']})
+      draft.appendNode(correctPrefix, {W: ['na']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(classifyMove(tree, problem, 'md'), 'wrong')
+  })
+
+  it('skips a non-move prefix when the marker sits on the first move itself', () => {
+    // ROOT -> N[setup] -> W[na] C[Correct Answer]
+    // ROOT -> W[md] C[Wrong Answer]
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {N: ['setup']})
+      draft.appendNode(prefix, {W: ['na'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {W: ['md'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(problem.startNodeId, tree.root.id)
+    assert.strictEqual(problem.playerToMove, 'W')
+    assert.strictEqual(problem.firstMove.data.W[0], 'na')
+    assert.strictEqual(classifyMove(tree, problem, 'na'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'md'), 'wrong')
+  })
+
+  it('classifies the first solver move as correct when the marker sits several moves later', () => {
+    // GoGameGuru: B[rs] -> W[rr] -> B[ns] C[Correct]
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['rs']})
+      let w1 = draft.appendNode(b1, {W: ['rr']})
+      draft.appendNode(w1, {B: ['ns'], C: ['Correct']})
+    })
+    let problem = analyzeProblem(tree)
+
+    assert(problem != null)
+    assert.strictEqual(problem.firstMove.data.B[0], 'rs')
+    assert.strictEqual(classifyMove(tree, problem, 'rs'), 'correct')
   })
 })
 
