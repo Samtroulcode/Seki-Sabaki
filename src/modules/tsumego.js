@@ -421,40 +421,32 @@ export function analyzeProblem(tree, options = {}) {
 // between the decision point and a variation move are handled. Moves that are
 // not explicitly present as variations from the decision point stay
 // `'absent'` and are never reclassified.
-export function classifyMove(
+export function resolveMove(
   tree,
   problem,
   vertexString,
   decisionPointId,
   expectedMoveNode,
 ) {
-  if (problem == null || problem.firstMove == null) return null
-  if (typeof vertexString !== 'string') return null
+  let emptyResult = {status: null, node: null}
+  if (tree == null || problem == null || problem.firstMove == null)
+    return emptyResult
+  if (typeof vertexString !== 'string') return emptyResult
 
   let vertex = parseVertex(vertexString)
   // `parseVertex` yields [-1, -1] for invalid input and for a pass (`B[]`), so
   // a pass is never a tsumego solution and cannot be distinguished from garbage.
-  if (vertex[0] < 0 || vertex[1] < 0) return null
+  if (vertex[0] < 0 || vertex[1] < 0) return emptyResult
 
   let decisionPoint = tree.get(decisionPointId ?? problem.startNodeId)
-  if (decisionPoint == null) return null
+  if (decisionPoint == null) return emptyResult
 
   // The expected correct move at this decision point: the first correct move
   // at the initial position, or the next player move from `advanceSolution`.
   let expectedMove = expectedMoveNode ?? problem.firstMove
   let expectedMoveId = expectedMove != null ? expectedMove.id : null
-
-  // The expected move defines the correct answer. The tree must still contain
-  // it so a stale problem cannot produce a false 'correct'. The color check is
-  // defensive: `playerToMove` is derived from the first move's color.
-  if (
-    expectedMove != null &&
-    getMoveColor(expectedMove) === problem.playerToMove &&
-    sameVertex(getMoveVertex(expectedMove), vertex) &&
-    tree.get(expectedMove.id) != null
-  ) {
-    return 'correct'
-  }
+  let expectedMoveInTree =
+    expectedMove != null ? tree.get(expectedMove.id) : null
 
   // Collect the first move node of each branch from the decision point, never
   // traversing past a move. Branches may split at non-move nodes, so this is a
@@ -467,12 +459,24 @@ export function classifyMove(
     else for (let child of node.children) stack.push(child)
   }
 
+  // The expected move defines the correct answer only when it is a live first
+  // move candidate at this decision point. This prevents a caller from
+  // accidentally making a move from another branch correct.
+  if (
+    expectedMoveInTree != null &&
+    candidates.some((node) => node.id === expectedMoveInTree.id) &&
+    getMoveColor(expectedMoveInTree) === problem.playerToMove &&
+    sameVertex(getMoveVertex(expectedMoveInTree), vertex)
+  ) {
+    return {status: 'correct', node: expectedMoveInTree}
+  }
+
   let matching = candidates.filter(
     (node) =>
       getMoveColor(node) === problem.playerToMove &&
       sameVertex(getMoveVertex(node), vertex),
   )
-  if (matching.length === 0) return 'absent'
+  if (matching.length === 0) return {status: 'absent', node: null}
 
   // A branch's result is determined by markers anywhere in its subtree and on
   // the non-move prefix between the decision point and the branch's first
@@ -485,7 +489,10 @@ export function classifyMove(
   let results = matching.map((node) =>
     getBranchResult(node, tree, decisionPoint, allowTe),
   )
-  if (results.some((result) => result === 'correct')) return 'correct'
+  let positiveIndex = results.findIndex((result) => result === 'correct')
+  if (positiveIndex >= 0) {
+    return {status: 'correct', node: matching[positiveIndex]}
+  }
 
   // GoGameGuru-style collections only mark the solution (C[Correct]) and leave
   // the failed tries unmarked. At the solver's decision point, when at least
@@ -496,15 +503,33 @@ export function classifyMove(
   let hasSolution = candidates.some(
     (node) =>
       getMoveColor(node) === problem.playerToMove &&
-      (node.id === expectedMoveId ||
+      ((node.id === expectedMoveId && expectedMoveInTree != null) ||
         getBranchResult(node, tree, decisionPoint, allowTe) === 'correct'),
   )
-  if (hasSolution) return 'wrong'
+  if (hasSolution) return {status: 'wrong', node: matching[0]}
 
   // No proven-correct move at the decision point: keep the cautious behavior
   // and never invent a present-but-unmarked variation as wrong.
-  if (results.every((result) => result === 'wrong')) return 'wrong'
-  return null
+  if (results.every((result) => result === 'wrong')) {
+    return {status: 'wrong', node: matching[0]}
+  }
+  return {status: null, node: matching[0]}
+}
+
+export function classifyMove(
+  tree,
+  problem,
+  vertexString,
+  decisionPointId,
+  expectedMoveNode,
+) {
+  return resolveMove(
+    tree,
+    problem,
+    vertexString,
+    decisionPointId,
+    expectedMoveNode,
+  ).status
 }
 
 // Advances the solution after a move the user just played that was recognized
@@ -515,7 +540,8 @@ export function classifyMove(
 // correct branch, playing the opponent's responses automatically and stopping
 // just before the player's next move.
 //
-// Returns `{automaticMoves, nextPlayerMove, decisionPointId, solved}`:
+// Returns `{automaticMoves, nextPlayerMove, decisionPointId, positionNodeId,
+// solved}`:
 // - `automaticMoves`: the opponent's responses on the canonical line (nodes);
 // - `nextPlayerMove`: the player's next expected move (node), or `null` when
 //   the problem is solved;
@@ -524,6 +550,8 @@ export function classifyMove(
 //   purely descriptive nodes (labels, comments) that do not define a position
 //   and never past a node that defines one (a move, setup stones, or a PL);
 //   `null` when the problem is solved;
+// - `positionNodeId`: the last real position reached by the canonical
+//   continuation, including the final position when the problem is solved;
 // - `solved`: whether the canonical line ended before another player move.
 //
 // Non-move nodes between moves are traversed; sibling variations are never
@@ -543,6 +571,7 @@ export function advanceSolution(tree, problem, correctMoveNode) {
   if (getMoveColor(node) !== problem.playerToMove) return null
 
   let automaticMoves = []
+  let positionNodeId = node.id
   while (node.children.length > 0) {
     node = node.children[0]
 
@@ -565,12 +594,17 @@ export function advanceSolution(tree, problem, correctMoveNode) {
           nextPlayerMove: node,
           decisionPointId:
             decisionPoint != null ? decisionPoint.id : node.parentId,
+          positionNodeId:
+            decisionPoint != null ? decisionPoint.id : positionNodeId,
           solved: false,
         }
       }
 
       // The opponent's move is played automatically.
+      positionNodeId = node.id
       automaticMoves.push(node)
+    } else if (isPositionNode(node)) {
+      positionNodeId = node.id
     }
   }
 
@@ -579,6 +613,7 @@ export function advanceSolution(tree, problem, correctMoveNode) {
     automaticMoves,
     nextPlayerMove: null,
     decisionPointId: null,
+    positionNodeId,
     solved: true,
   }
 }

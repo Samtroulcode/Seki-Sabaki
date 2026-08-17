@@ -14,6 +14,7 @@ import {
   openLibraryFile,
   chooseLibraryRoot,
 } from '../modules/library.js'
+import TsumegoSolver from './TsumegoSolver.js'
 
 const t = i18n.context('TsumegoPanel')
 const naturalCompare = natsort({insensitive: true})
@@ -237,6 +238,17 @@ export default class TsumegoPanel extends Component {
     this.setState({view: 'browser', error: null})
   }
 
+  async handleAdjacentProblem(offset) {
+    let problemEntries = this.state.entries
+      .filter((entry) => entry.type === 'file')
+      .sort((a, b) => naturalCompare(a.name, b.name))
+    let currentIndex = problemEntries.findIndex(
+      (entry) => entry.relativePath === this.state.relativePath,
+    )
+    let nextEntry = problemEntries[currentIndex + offset]
+    if (nextEntry != null) await this.handleProblemClick(nextEntry)
+  }
+
   async handleParentClick() {
     this.problemLoadId += 1
     let root = this.getRootPath()
@@ -438,36 +450,20 @@ export default class TsumegoPanel extends Component {
   renderProblem() {
     let {problem, problemIndex, problemCount, relativePath, source, gameTree} =
       this.state
-    let filename = splitRelativePath(relativePath).pop() || ''
     let initialComment = gametree.getRootProperty(gameTree, 'C', '') || ''
-    return h(
-      'div',
-      {class: 'tsumego-problem-view'},
-      h(
-        'div',
-        {class: 'tsumego-problem-toolbar'},
-        h(
-          'button',
-          {type: 'button', onClick: () => this.handleBack()},
-          `‹ ${getFolderTitle(this.state.currentPath)}`,
-        ),
-        h(
-          'span',
-          {class: 'tsumego-source-label'},
-          source === 'builtin' ? t('Built-in') : t('My Library'),
-        ),
-      ),
-      h('h2', {}, `${t('Problem')} ${problemIndex + 1} / ${problemCount}`),
-      h('p', {class: 'tsumego-problem-filename'}, filename),
-      h('p', {class: 'tsumego-problem-ready'}, t('Problem ready')),
-      h(
-        'p',
-        {class: 'tsumego-player-to-move'},
-        problem.playerToMove === 'B' ? t('Black to play') : t('White to play'),
-      ),
-      initialComment !== '' &&
-        h('p', {class: 'tsumego-initial-comment'}, initialComment),
-    )
+    return h(TsumegoSolver, {
+      key: relativePath,
+      gameTree,
+      problem,
+      problemIndex,
+      problemCount,
+      relativePath,
+      source,
+      initialComment,
+      onBack: () => this.handleBack(),
+      onPrevious: () => this.handleAdjacentProblem(-1),
+      onNext: () => this.handleAdjacentProblem(1),
+    })
   }
 }
 

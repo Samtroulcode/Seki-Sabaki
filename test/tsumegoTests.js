@@ -5,6 +5,7 @@ import {
   advanceSolution,
   analyzeProblem,
   classifyMove,
+  resolveMove,
 } from '../src/modules/tsumego.js'
 
 // Build a tree from a list of moves. Each entry is `[color, vertex, comment]`
@@ -904,6 +905,95 @@ describe('classifyMove', () => {
   })
 })
 
+describe('resolveMove', () => {
+  it('returns the canonical expected node and keeps classifyMove compatible', () => {
+    let canonical
+    let tree = gametree.new().mutate((draft) => {
+      canonical = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Correct'],
+      })
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = resolveMove(tree, problem, 'aa')
+    assert.strictEqual(result.status, 'correct')
+    assert.strictEqual(result.node.id, canonical)
+    assert.strictEqual(classifyMove(tree, problem, 'aa'), 'correct')
+  })
+
+  it('returns a correctly marked alternative branch node', () => {
+    let alternative
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Correct']})
+      let prefix = draft.appendNode(draft.root.id, {N: ['Also correct']})
+      alternative = draft.appendNode(prefix, {B: ['bb'], C: ['Correct']})
+    })
+    let problem = analyzeProblem(tree)
+    let before = JSON.stringify(tree.root)
+
+    let result = resolveMove(tree, problem, 'bb')
+    assert.strictEqual(result.status, 'correct')
+    assert.strictEqual(result.node.id, alternative)
+    assert.strictEqual(JSON.stringify(tree.root), before)
+  })
+
+  it('prefers the expected node when matching vertices are duplicated', () => {
+    let canonical
+    let alternative
+    let tree = gametree.new().mutate((draft) => {
+      canonical = draft.appendNode(draft.root.id, {B: ['aa'], C: ['Correct']})
+      let prefix = draft.appendNode(draft.root.id, {N: ['failed prefix']})
+      alternative = draft.appendNode(prefix, {B: ['aa'], BM: ['1']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let result = resolveMove(tree, problem, 'aa', null, tree.get(canonical))
+    assert.strictEqual(result.status, 'correct')
+    assert.strictEqual(result.node.id, canonical)
+    assert.notStrictEqual(result.node.id, alternative)
+  })
+
+  it('returns the matching wrong node and null for an absent move', () => {
+    let wrong
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Correct']})
+      wrong = draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let wrongResult = resolveMove(tree, problem, 'bb')
+    assert.strictEqual(wrongResult.status, 'wrong')
+    assert.strictEqual(wrongResult.node.id, wrong)
+    assert.deepStrictEqual(resolveMove(tree, problem, 'cc'), {
+      status: 'absent',
+      node: null,
+    })
+  })
+
+  it('resolves alternatives at a later decision point', () => {
+    let alternative
+    let tree = gametree.new().mutate((draft) => {
+      let first = draft.appendNode(draft.root.id, {B: ['aa'], C: ['Correct']})
+      let response = draft.appendNode(first, {W: ['bb']})
+      draft.appendNode(response, {B: ['cc']})
+      alternative = draft.appendNode(response, {B: ['dd'], C: ['Wrong']})
+    })
+    let problem = analyzeProblem(tree)
+    let advanced = advanceSolution(tree, problem, problem.firstMove)
+    let result = resolveMove(
+      tree,
+      problem,
+      'dd',
+      advanced.decisionPointId,
+      advanced.nextPlayerMove,
+    )
+
+    assert.strictEqual(result.status, 'wrong')
+    assert.strictEqual(result.node.id, alternative)
+  })
+})
+
 describe('classifyMove at later decision points', () => {
   it('classifies the second correct move after an automatic opponent response', () => {
     // B[gl] Correct -> W[hm] -> B[hl]
@@ -1222,6 +1312,7 @@ describe('classifyMove at later decision points', () => {
     assert(adv != null)
     assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
     assert.strictEqual(adv.decisionPointId, setupId)
+    assert.strictEqual(adv.positionNodeId, setupId)
 
     assert.strictEqual(
       classifyMove(
@@ -1291,6 +1382,7 @@ describe('advanceSolution', () => {
     assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
     assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
     assert.strictEqual(result.decisionPointId, w1)
+    assert.strictEqual(result.positionNodeId, w1)
   })
 
   it('advances through the documented longer solution line step by step', () => {
@@ -1322,12 +1414,14 @@ describe('advanceSolution', () => {
     assert.strictEqual(second.automaticMoves.length, 1)
     assert.strictEqual(second.automaticMoves[0].data.W[0], 'im')
     assert.strictEqual(second.nextPlayerMove.data.B[0], 'il')
+    assert.strictEqual(second.positionNodeId, second.decisionPointId)
 
     let third = advanceSolution(tree, problem, second.nextPlayerMove)
     assert(third != null)
     assert.strictEqual(third.solved, true)
     assert.deepStrictEqual(third.automaticMoves, [])
     assert.strictEqual(third.nextPlayerMove, null)
+    assert.strictEqual(third.positionNodeId, second.nextPlayerMove.id)
   })
 
   it('traverses non-move nodes around the opponent response', () => {
@@ -1367,6 +1461,7 @@ describe('advanceSolution', () => {
     assert.deepStrictEqual(result.automaticMoves, [])
     assert.strictEqual(result.nextPlayerMove, null)
     assert.strictEqual(result.decisionPointId, null)
+    assert.strictEqual(result.positionNodeId, problem.firstMove.id)
   })
 
   it('reports solved after a last opponent response', () => {
@@ -1385,6 +1480,7 @@ describe('advanceSolution', () => {
     assert.strictEqual(result.automaticMoves.length, 1)
     assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
     assert.strictEqual(result.nextPlayerMove, null)
+    assert.strictEqual(result.positionNodeId, result.automaticMoves[0].id)
   })
 
   it('reports solved when the line ends on a trailing non-move node', () => {

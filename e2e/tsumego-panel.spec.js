@@ -25,11 +25,13 @@ test.describe('Tsumego workspace', () => {
     await expect(page.locator('.tsumego-entry-directory').first()).toBeVisible()
     await page.locator('.tsumego-entry-directory').first().click()
     await expect(page.locator('.tsumego-entry-file').first()).toBeVisible()
-    await page.locator('.tsumego-entry-file').first().click()
-    await expect(page.locator('.tsumego-problem-ready')).toBeVisible()
-    await expect(page.locator('.tsumego-problem-view')).toContainText(
-      'Problem ready',
-    )
+    await page
+      .locator('.tsumego-entry-file')
+      .filter({hasText: 'ggg-easy-01.sgf'})
+      .click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+    await expect(page.locator('.tsumego-solver-board #goban')).toBeVisible()
+    await expect(page.locator('.tsumego-player-to-move')).toBeVisible()
   })
 
   test('browses a configured User Library independently', async ({page}) => {

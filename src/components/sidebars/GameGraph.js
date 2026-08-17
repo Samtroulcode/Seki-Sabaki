@@ -274,6 +274,10 @@ class GameGraph extends Component {
     this.mouseDown = evt.button
   }
 
+  handleGraphMouseUp() {
+    this.mouseDown = null
+  }
+
   handleNodeClick(evt) {
     if (this.drag) {
       this.drag = false
