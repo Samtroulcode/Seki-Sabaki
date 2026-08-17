@@ -366,6 +366,17 @@ export default class TsumegoPanel extends Component {
             h(
               'div',
               {class: 'tsumego-browser-toolbar'},
+              displayPath !== '' &&
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'tsumego-back-button',
+                    disabled: busy,
+                    onClick: () => this.handleParentClick(),
+                  },
+                  `‹ ${t('Back')}`,
+                ),
               h(
                 'div',
                 {},
@@ -380,16 +391,6 @@ export default class TsumegoPanel extends Component {
                   source === 'builtin' ? t('Built-in') : t('My Library'),
                 ),
               ),
-              displayPath !== '' &&
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    disabled: busy,
-                    onClick: () => this.handleParentClick(),
-                  },
-                  t('Back'),
-                ),
             ),
             collectionMetadata != null &&
               h(
@@ -426,11 +427,15 @@ export default class TsumegoPanel extends Component {
                         class: `tsumego-entry tsumego-entry-${entry.type}`,
                         onClick: () => this.handleEntryClick(entry),
                       },
-                      h(
-                        'span',
-                        {class: 'tsumego-entry-icon', 'aria-hidden': 'true'},
-                        entry.type === 'directory' ? '▰' : '◇',
-                      ),
+                      h('img', {
+                        class: 'tsumego-entry-icon',
+                        src:
+                          entry.type === 'directory'
+                            ? './node_modules/@primer/octicons/build/svg/file-directory-16.svg'
+                            : './node_modules/@primer/octicons/build/svg/file-16.svg',
+                        alt: '',
+                        'aria-hidden': 'true',
+                      }),
                       h('span', {class: 'tsumego-entry-name'}, entry.name),
                       entry.type === 'file' &&
                         h('span', {class: 'tsumego-entry-meta'}, t('Problem')),

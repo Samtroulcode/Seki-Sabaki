@@ -99,6 +99,7 @@ export default class TsumegoSolver extends Component {
           gameTree,
           treePosition: displayNodeId,
           board,
+          transformation: '',
           currentThemeId,
           showNextMoves: false,
           showSiblings: false,

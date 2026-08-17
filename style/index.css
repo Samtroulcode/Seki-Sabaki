@@ -863,8 +863,11 @@
 .tsumego-problem-toolbar {
   display: flex;
   align-items: start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
+}
+.tsumego-back-button {
+  flex: 0 0 auto;
 }
 .tsumego-browser-toolbar > div {
   min-width: 0;
@@ -908,8 +911,14 @@
   border-color: #0082f0;
 }
 .tsumego-entry-icon {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  padding: 0.35rem;
+  box-sizing: border-box;
   color: #d6a84f;
-  font-size: 2rem;
+  filter: invert(77%) sepia(52%) saturate(551%) hue-rotate(359deg)
+    brightness(91%) contrast(88%);
 }
 .tsumego-entry-name {
   max-width: 100%;

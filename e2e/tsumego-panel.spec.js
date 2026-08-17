@@ -23,8 +23,18 @@ test.describe('Tsumego workspace', () => {
     await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
 
     await expect(page.locator('.tsumego-entry-directory').first()).toBeVisible()
+    await expect(
+      page.locator('.tsumego-entry-directory .tsumego-entry-icon').first(),
+    ).toHaveAttribute('src', /file-directory-16\.svg$/)
     await page.locator('.tsumego-entry-directory').first().click()
+    await expect(page.locator('.tsumego-back-button')).toBeVisible()
+    await expect(
+      page.locator('.tsumego-browser-toolbar').locator('button').first(),
+    ).toHaveClass(/tsumego-back-button/)
     await expect(page.locator('.tsumego-entry-file').first()).toBeVisible()
+    await expect(
+      page.locator('.tsumego-entry-file .tsumego-entry-icon').first(),
+    ).toHaveAttribute('src', /file-16\.svg$/)
     await page
       .locator('.tsumego-entry-file')
       .filter({hasText: 'ggg-easy-01.sgf'})
@@ -40,6 +50,24 @@ test.describe('Tsumego workspace', () => {
     expect(gobanBox.height).toBeGreaterThan(100)
     expect(Math.abs(gobanBox.width - gobanBox.height)).toBeLessThan(
       Math.max(gobanBox.width, gobanBox.height) * 0.1,
+    )
+
+    let globalTreePosition = await page.evaluate(
+      () => window.__sabaki.state.treePosition,
+    )
+    await dispatchVertex(page, 0, 0)
+    await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+      'Incorrect',
+    )
+    expect(await page.evaluate(() => window.__sabaki.state.treePosition)).toBe(
+      globalTreePosition,
+    )
+
+    await dispatchVertex(page, 17, 18)
+    await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
+    await dispatchVertex(page, 13, 18)
+    await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+      'Solved',
     )
   })
 
@@ -70,3 +98,15 @@ test.describe('Tsumego workspace', () => {
     }
   })
 })
+
+async function dispatchVertex(page, x, y) {
+  await page
+    .locator(
+      `.tsumego-solver-board .shudan-vertex[data-x="${x}"][data-y="${y}"]`,
+    )
+    .evaluate((element) => {
+      let options = {bubbles: true, button: 0, clientX: 1, clientY: 1}
+      element.dispatchEvent(new MouseEvent('mousedown', options))
+      element.dispatchEvent(new MouseEvent('mouseup', options))
+    })
+}
