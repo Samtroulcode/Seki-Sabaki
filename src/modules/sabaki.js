@@ -617,7 +617,7 @@ class Sabaki extends EventEmitter {
     return this.switchWorkspaceTab(activity.tab.id)
   }
 
-  openWorkspaceTab(type) {
+  openWorkspaceTab(type, options = {}) {
     if (!['ogs', 'analysis', 'library', 'tsumego'].includes(type)) return false
 
     let tab = this.state.workspaceTabs.find(
@@ -627,6 +627,15 @@ class Sabaki extends EventEmitter {
       tab = {id: uuid(), type}
       this.state.workspaceTabs = [...this.state.workspaceTabs, tab]
       this.insertActivityTab('workspace', tab.id)
+    }
+
+    if (type === 'library') {
+      // Targeted navigation request consumed by LibraryPanel on mount. A null
+      // request resets the workspace to the User Library root.
+      tab = {...tab, libraryRequest: options.libraryRequest ?? null}
+      this.state.workspaceTabs = this.state.workspaceTabs.map((candidate) =>
+        candidate.id === tab.id ? tab : candidate,
+      )
     }
 
     this.setState({

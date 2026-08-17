@@ -6,28 +6,27 @@ import {
   getLibraryConfig,
   listBuiltinLibraryEntries,
   listLibraryEntries,
-  openBuiltinLibraryFile,
-  openLibraryFile,
 } from '../modules/library.js'
 
 const t = i18n.context('HomeDashboard')
 
-const MAX_ENTRIES = 5
+const MAX_FOLDERS = 4
 const BUILTIN_FALLBACK_ROOT = 'games'
 
-// Compact Library browser pane shown inside the Local card. Lists the root of
-// the User Library, or falls back to the built-in Library's `games/` folder
-// when no User Library is configured. Entries come pre-sorted by the Library
-// backend (directories first, then files, locale-aware).
+// Library preview pane shown inside the Local card. Shows up to four folders
+// from the User Library root and up to four folders from the built-in
+// Library's `games/` collection, side by side. Clicking a folder opens the
+// Library workspace at that source and folder.
 export default class HomeLibraryPane extends Component {
   constructor(props) {
     super(props)
     this.state = {
-      source: null, // 'user' | 'builtin'
-      sourceLabel: null,
-      entries: [],
-      busy: true,
-      error: null,
+      userFolders: [],
+      builtinFolders: [],
+      userBusy: true,
+      builtinBusy: true,
+      userError: null,
+      builtinError: null,
     }
   }
 
@@ -36,117 +35,113 @@ export default class HomeLibraryPane extends Component {
   }
 
   async refresh() {
-    this.setState({busy: true, error: null})
+    this.setState({
+      userBusy: true,
+      builtinBusy: true,
+      userError: null,
+      builtinError: null,
+    })
+    await Promise.all([this.refreshUser(), this.refreshBuiltin()])
+  }
+
+  async refreshUser() {
     try {
       let config = await getLibraryConfig()
-      let result
-      let source
-      let sourceLabel
-
-      if (config.configured) {
-        result = await listLibraryEntries('')
-        source = 'user'
-        sourceLabel = t('My Library')
-      } else {
-        result = await listBuiltinLibraryEntries(BUILTIN_FALLBACK_ROOT)
-        source = 'builtin'
-        sourceLabel = t('Pro Games')
+      if (!config.configured) {
+        this.setState({userFolders: [], userBusy: false, userError: null})
+        return
       }
 
+      let result = await listLibraryEntries('')
       if (result?.ok !== true) {
         this.setState({
-          source,
-          sourceLabel,
-          entries: [],
-          busy: false,
-          error: t('Unable to read this Library folder.'),
+          userFolders: [],
+          userBusy: false,
+          userError: t('Unable to read this Library folder.'),
         })
         return
       }
 
-      this.setState({
-        source,
-        sourceLabel,
-        entries: result.entries || [],
-        busy: false,
-        error: null,
-      })
+      let folders = (result.entries || [])
+        .filter((entry) => entry.type === 'directory')
+        .slice(0, MAX_FOLDERS)
+      this.setState({userFolders: folders, userBusy: false, userError: null})
     } catch (err) {
       this.setState({
-        entries: [],
-        busy: false,
-        error: t('Unable to load the Library.'),
+        userFolders: [],
+        userBusy: false,
+        userError: t('Unable to load the Library.'),
       })
     }
   }
 
-  async handleEntryClick(entry) {
-    if (entry.type === 'directory') {
-      // The Home preview does not inline folder navigation; hand off to the
-      // Library workspace instead.
-      sabaki.openWorkspaceTab('library')
-      return
+  async refreshBuiltin() {
+    try {
+      let result = await listBuiltinLibraryEntries(BUILTIN_FALLBACK_ROOT)
+      if (result?.ok !== true) {
+        this.setState({
+          builtinFolders: [],
+          builtinBusy: false,
+          builtinError: t('Unable to read the built-in Library.'),
+        })
+        return
+      }
+
+      let folders = (result.entries || [])
+        .filter((entry) => entry.type === 'directory')
+        .slice(0, MAX_FOLDERS)
+      this.setState({
+        builtinFolders: folders,
+        builtinBusy: false,
+        builtinError: null,
+      })
+    } catch (err) {
+      this.setState({
+        builtinFolders: [],
+        builtinBusy: false,
+        builtinError: t('Unable to load the built-in Library.'),
+      })
     }
+  }
 
-    this.setState({error: null})
-    let result =
-      this.state.source === 'builtin'
-        ? await openBuiltinLibraryFile(entry.relativePath)
-        : await openLibraryFile(entry.relativePath)
-
-    if (result?.ok !== true) {
-      this.setState({error: t('Unable to open this SGF file.')})
-      return
-    }
-
-    await sabaki.openContentInNewBoardTab(result.content, 'sgf', {
-      gotoEnd: true,
-      representedFilename: result.path,
+  handleFolderClick(source, entry) {
+    sabaki.openWorkspaceTab('library', {
+      libraryRequest: {source, currentPath: entry.relativePath},
     })
   }
 
   render() {
-    let {sourceLabel, entries, busy, error} = this.state
-    let visibleEntries = entries.slice(0, MAX_ENTRIES)
+    let {
+      userFolders,
+      builtinFolders,
+      userBusy,
+      builtinBusy,
+      userError,
+      builtinError,
+    } = this.state
 
     return h(
       'section',
       {class: 'home-pane home-library-pane'},
       h('h3', {}, t('Library')),
-      sourceLabel != null &&
-        h('p', {class: 'home-library-source'}, sourceLabel),
-      busy
-        ? h('p', {class: 'home-library-empty'}, t('Loading Library…'))
-        : error != null
-          ? h('p', {class: 'home-library-empty'}, error)
-          : visibleEntries.length === 0
-            ? h('p', {class: 'home-library-empty'}, t('This Library is empty.'))
-            : h(
-                'div',
-                {class: 'home-library-list'},
-                visibleEntries.map((entry) =>
-                  h(
-                    'button',
-                    {
-                      key: entry.relativePath,
-                      type: 'button',
-                      class: `home-library-entry home-library-entry-${entry.type}`,
-                      onClick: () => this.handleEntryClick(entry),
-                    },
-                    h('img', {
-                      class: 'home-library-entry-icon',
-                      src: `./node_modules/@primer/octicons/build/svg/${
-                        entry.type === 'directory'
-                          ? 'file-directory-16.svg'
-                          : 'file-16.svg'
-                      }`,
-                      alt: '',
-                      'aria-hidden': 'true',
-                    }),
-                    h('span', {class: 'home-library-entry-name'}, entry.name),
-                  ),
-                ),
-              ),
+      h(
+        'div',
+        {class: 'home-library-sections'},
+        this.renderSection(
+          'user',
+          t('My Library'),
+          userFolders,
+          userBusy,
+          userError,
+        ),
+        this.renderSection(
+          'builtin',
+          t('Built-in'),
+          builtinFolders,
+          builtinBusy,
+          builtinError,
+        ),
+      ),
       h(
         'button',
         {
@@ -156,6 +151,43 @@ export default class HomeLibraryPane extends Component {
         },
         t('Open Library'),
       ),
+    )
+  }
+
+  renderSection(source, title, folders, busy, error) {
+    return h(
+      'div',
+      {class: 'home-library-section'},
+      h('h4', {}, title),
+      busy
+        ? h('p', {class: 'home-library-empty'}, t('Loading…'))
+        : error != null
+          ? h('p', {class: 'home-library-empty'}, error)
+          : folders.length === 0
+            ? h('p', {class: 'home-library-empty'}, t('No folders yet.'))
+            : h(
+                'div',
+                {class: 'home-library-folder-grid'},
+                folders.map((entry) =>
+                  h(
+                    'button',
+                    {
+                      key: entry.relativePath,
+                      type: 'button',
+                      class: 'home-library-folder-card',
+                      title: entry.name,
+                      onClick: () => this.handleFolderClick(source, entry),
+                    },
+                    h('img', {
+                      class: 'home-library-folder-icon',
+                      src: './node_modules/@primer/octicons/build/svg/file-directory-24.svg',
+                      alt: '',
+                      'aria-hidden': 'true',
+                    }),
+                    h('span', {class: 'home-library-folder-name'}, entry.name),
+                  ),
+                ),
+              ),
     )
   }
 }

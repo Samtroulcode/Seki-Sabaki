@@ -542,7 +542,9 @@ function renderWorkspaceTab(state) {
   )
   if (tab?.type === 'ogs') return h(OgsPanel)
   if (tab?.type === 'analysis') return h(AnalysisPanel)
-  if (tab?.type === 'library') return h(LibraryPanel)
+  if (tab?.type === 'library') {
+    return h(LibraryPanel, {request: tab.libraryRequest})
+  }
   if (tab?.type === 'tsumego') return h(TsumegoPanel)
   return h(HomeView, {...state, homeSection: 'dashboard'})
 }

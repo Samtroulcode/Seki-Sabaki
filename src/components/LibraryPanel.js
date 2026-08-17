@@ -6,7 +6,9 @@ import {parseSgfPreview} from '../modules/sgfpreview.js'
 import {
   chooseLibraryRoot,
   getLibraryConfig,
+  listBuiltinLibraryEntries,
   listLibraryEntries,
+  openBuiltinLibraryFile,
   openLibraryFile,
 } from '../modules/library.js'
 import {MiniGoban} from './sidebars/OgsGameHistory.js'
@@ -16,10 +18,12 @@ const t = i18n.context('HomeView')
 export default class LibraryPanel extends Component {
   constructor(props) {
     super(props)
+    let request = props.request
     this.state = {
       config: null,
+      source: request?.source === 'builtin' ? 'builtin' : 'user',
       entries: [],
-      currentPath: '',
+      currentPath: request?.currentPath || '',
       truncated: false,
       busy: true,
       error: null,
@@ -31,13 +35,25 @@ export default class LibraryPanel extends Component {
     this.refresh()
   }
 
-  async refresh(relativePath = this.state.currentPath) {
+  async refresh(
+    source = this.state.source,
+    relativePath = this.state.currentPath,
+  ) {
     try {
+      // Always await before the stale-state guard so the caller's setState
+      // (e.g. from handleParentClick) has been processed by the time we read
+      // this.state again.
       let config = await getLibraryConfig()
-      if (relativePath !== this.state.currentPath) return
-      if (!config.configured) {
+      if (
+        source !== this.state.source ||
+        relativePath !== this.state.currentPath
+      )
+        return
+
+      if (source === 'user' && !config.configured) {
         this.setState({
           config,
+          source,
           entries: [],
           truncated: false,
           busy: false,
@@ -46,11 +62,19 @@ export default class LibraryPanel extends Component {
         return
       }
 
-      let result = await listLibraryEntries(relativePath)
-      if (relativePath !== this.state.currentPath) return
+      let result =
+        source === 'builtin'
+          ? await listBuiltinLibraryEntries(relativePath)
+          : await listLibraryEntries(relativePath)
+      if (
+        source !== this.state.source ||
+        relativePath !== this.state.currentPath
+      )
+        return
       if (!result.ok) {
         this.setState({
           config,
+          source,
           entries: [],
           truncated: false,
           busy: false,
@@ -60,6 +84,7 @@ export default class LibraryPanel extends Component {
       }
       this.setState({
         config,
+        source,
         entries: result.entries || [],
         truncated: result.truncated === true,
         busy: false,
@@ -72,9 +97,12 @@ export default class LibraryPanel extends Component {
         entries: [],
         truncated: false,
         busy: false,
-        error: configured
-          ? t('Unable to read this Library folder.')
-          : t('Unable to load Library settings.'),
+        error:
+          this.state.source === 'builtin'
+            ? t('Unable to read the built-in Library.')
+            : configured
+              ? t('Unable to read this Library folder.')
+              : t('Unable to load Library settings.'),
       })
     }
   }
@@ -91,7 +119,7 @@ export default class LibraryPanel extends Component {
           busy: true,
           changingRoot: false,
         })
-        await this.refresh('')
+        await this.refresh('user', '')
       } else if (!result.cancelled) {
         this.setState({
           busy: false,
@@ -114,12 +142,15 @@ export default class LibraryPanel extends Component {
     try {
       if (entry.type === 'directory') {
         this.setState({currentPath: entry.relativePath, busy: true})
-        await this.refresh(entry.relativePath)
+        await this.refresh(this.state.source, entry.relativePath)
         return
       }
 
       this.setState({error: null})
-      let result = await openLibraryFile(entry.relativePath)
+      let result =
+        this.state.source === 'builtin'
+          ? await openBuiltinLibraryFile(entry.relativePath)
+          : await openLibraryFile(entry.relativePath)
       if (!result?.ok) {
         this.setState({error: t('Unable to open this SGF file.')})
         return
@@ -143,7 +174,7 @@ export default class LibraryPanel extends Component {
       parts.pop()
       let parentPath = parts.join('/')
       this.setState({currentPath: parentPath, busy: true})
-      await this.refresh(parentPath)
+      await this.refresh(this.state.source, parentPath)
     } catch (err) {
       this.setState({
         busy: false,
@@ -153,9 +184,19 @@ export default class LibraryPanel extends Component {
   }
 
   render() {
-    let {config, entries, currentPath, truncated, busy, error, changingRoot} =
-      this.state
+    let {
+      config,
+      source,
+      entries,
+      currentPath,
+      truncated,
+      busy,
+      error,
+      changingRoot,
+    } = this.state
     let configured = config?.configured === true
+    let isBuiltin = source === 'builtin'
+    let showBrowser = isBuiltin || configured
 
     return h(
       'section',
@@ -170,9 +211,9 @@ export default class LibraryPanel extends Component {
         t('Keep your local SGF games organized and easy to reopen.'),
       ),
       error != null && h('p', {class: 'ogs-error'}, error),
-      busy && config == null
+      busy && config == null && !isBuiltin
         ? h('p', {class: 'library-panel-status'}, t('Loading Library…'))
-        : !configured
+        : !showBrowser
           ? h(
               'article',
               {class: 'library-setup-card'},
@@ -208,33 +249,38 @@ export default class LibraryPanel extends Component {
                 h(
                   'div',
                   {},
-                  h('h2', {}, t('Library folder')),
-                  h('p', {class: 'library-root-path'}, config.root),
-                ),
-                h(
-                  'div',
-                  {class: 'library-change-folder-action'},
-                  changingRoot &&
-                    h(
-                      'p',
-                      {class: 'library-setup-warning'},
-                      t(
-                        'Changing the Library folder will create its Tsumego folder if needed.',
-                      ),
-                    ),
+                  h('h2', {}, isBuiltin ? t('Built-in') : t('My Library')),
                   h(
-                    'button',
-                    {
-                      type: 'button',
-                      disabled: busy,
-                      onClick: () =>
-                        this.setState({changingRoot: true}, () =>
-                          this.handleChooseRoot(),
-                        ),
-                    },
-                    t('Change folder'),
+                    'p',
+                    {class: 'library-root-path'},
+                    isBuiltin ? t('Pro Games') : config.root,
                   ),
                 ),
+                !isBuiltin &&
+                  h(
+                    'div',
+                    {class: 'library-change-folder-action'},
+                    changingRoot &&
+                      h(
+                        'p',
+                        {class: 'library-setup-warning'},
+                        t(
+                          'Changing the Library folder will create its Tsumego folder if needed.',
+                        ),
+                      ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        disabled: busy,
+                        onClick: () =>
+                          this.setState({changingRoot: true}, () =>
+                            this.handleChooseRoot(),
+                          ),
+                      },
+                      t('Change folder'),
+                    ),
+                  ),
               ),
               h(
                 'p',

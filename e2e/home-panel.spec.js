@@ -170,12 +170,13 @@ test.describe('Home panel navigation', () => {
     )
   })
 
-  test('shows the configured User Library in the Home mini-library', async ({
+  test('shows both Library sections with folder cards in the Home mini-library', async ({
     page,
   }) => {
     let root = mkdtempSync(path.join(tmpdir(), 'seki-home-library-e2e-'))
-    let games = path.join(root, 'Games')
-    mkdirSync(games)
+    for (let name of ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon']) {
+      mkdirSync(path.join(root, name))
+    }
     writeFileSync(path.join(root, 'study.sgf'), '(;GM[1]SZ[9];B[aa])')
     writeFileSync(path.join(root, 'game.sgf'), '(;GM[1]SZ[9];W[bb])')
 
@@ -192,35 +193,103 @@ test.describe('Home panel navigation', () => {
       await page.getByTitle('Home').click()
 
       let pane = page.locator('.home-library-pane')
-      await expect(pane).toContainText('My Library')
-      await expect(pane).toContainText('Games')
-      await expect(pane).toContainText('study.sgf')
-      await expect(pane).toContainText('game.sgf')
-      await expect(pane.locator('.home-library-entry-directory')).toHaveCount(1)
-      await expect(pane.locator('.home-library-entry-file')).toHaveCount(2)
+      await expect(pane.locator('.home-library-section')).toHaveCount(2)
+      await expect(pane.locator('.home-library-section').first()).toContainText(
+        'My Library',
+      )
+      await expect(pane.locator('.home-library-section').nth(1)).toContainText(
+        'Built-in',
+      )
+
+      // User section: at most 4 folders, no SGF files.
+      let userSection = pane.locator('.home-library-section').first()
       await expect(
-        pane
-          .locator('.home-library-entry-directory .home-library-entry-icon')
-          .first(),
-      ).toHaveAttribute('src', /file-directory-16\.svg/)
+        userSection.locator('.home-library-folder-card'),
+      ).toHaveCount(4)
+      await expect(userSection).toContainText('Alpha')
+      await expect(userSection).toContainText('Epsilon')
+      await expect(userSection).not.toContainText('Gamma')
+      await expect(userSection).not.toContainText('study.sgf')
+      await expect(userSection).not.toContainText('game.sgf')
+
+      // Built-in section: at most 4 folders.
+      let builtinSection = pane.locator('.home-library-section').nth(1)
       await expect(
-        pane
-          .locator('.home-library-entry-file .home-library-entry-icon')
-          .first(),
-      ).toHaveAttribute('src', /file-16\.svg/)
+        builtinSection.locator('.home-library-folder-card'),
+      ).toHaveCount(4)
+      await expect(
+        builtinSection.locator('.home-library-folder-card', {
+          hasText: 'Go Seigen SGF Pack',
+        }),
+      ).toBeVisible()
+
+      // Real folder icons, no mini gobans, no file rows.
+      await expect(
+        pane.locator('.home-library-folder-icon').first(),
+      ).toHaveAttribute('src', /file-directory/)
       await expect(pane.locator('.ogs-mini-goban')).toHaveCount(0)
+      await expect(pane.locator('.home-library-entry-file')).toHaveCount(0)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
 
-      // A folder click hands off to the Library workspace.
-      await pane.locator('.home-library-entry-directory').click()
-      await expect(page.locator('#library-dashboard')).toBeVisible()
+  test('opens the Library workspace at the User source from a Home folder card', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-home-library-e2e-'))
+    let games = path.join(root, 'Games')
+    mkdirSync(games)
+    writeFileSync(path.join(games, 'fixture.sgf'), '(;GM[1]SZ[9];B[aa])')
 
-      // A file click opens the SGF in a board tab.
+    try {
+      await page.getByRole('button', {name: /Online play/}).click()
+      await expect(page.locator('.ogs-panel')).toBeVisible()
+
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
       await page.getByTitle('Home').click()
-      await page.locator('.home-library-entry-file').first().click()
+
+      let userSection = page
+        .locator('.home-library-pane .home-library-section')
+        .first()
+      await expect(
+        userSection.locator('.home-library-folder-card'),
+      ).toContainText('Games')
+      await userSection.locator('.home-library-folder-card').click()
+
+      // Library workspace opens at the User source, inside Games.
+      await expect(page.locator('#library-dashboard')).toBeVisible()
+      await expect(page.locator('.library-browser-toolbar h2')).toContainText(
+        'My Library',
+      )
+      await expect(page.locator('.library-current-path')).toContainText('Games')
+      await expect(page.locator('.library-entry-file')).toContainText(
+        'fixture.sgf',
+      )
+
+      // Up navigation stays in the User source.
+      await page.getByRole('button', {name: 'Up one folder'}).click()
+      await expect(page.locator('.library-browser-toolbar h2')).toContainText(
+        'My Library',
+      )
+      await expect(page.locator('.library-current-path')).toContainText(
+        'Library root',
+      )
+      await expect(page.locator('.library-entry-directory')).toContainText(
+        'Games',
+      )
+
+      // A User SGF opens through the board workflow.
+      await page.locator('.library-entry-directory').click()
+      await page.locator('.library-entry-file').click()
       await expect(page.locator('#goban')).toBeVisible()
       await expect(
         page.locator(
-          '.app-board-tab-button[title="game.sgf"][aria-current="page"]',
+          '.app-board-tab-button[title="fixture.sgf"][aria-current="page"]',
         ),
       ).toHaveAttribute('aria-current', 'page')
     } finally {
@@ -228,21 +297,48 @@ test.describe('Home panel navigation', () => {
     }
   })
 
-  test('falls back to the built-in Library when no User Library is configured', async ({
+  test('opens the Library workspace at the Built-in source from a Home folder card', async ({
     page,
   }) => {
     let pane = page.locator('.home-library-pane')
-    await expect(pane).toContainText('Pro Games')
-    await expect(pane).toContainText('Go Seigen SGF Pack')
+    let builtinSection = pane.locator('.home-library-section').nth(1)
     await expect(
-      pane
-        .locator('.home-library-entry-directory .home-library-entry-icon')
-        .first(),
-    ).toHaveAttribute('src', /file-directory-16\.svg/)
-    await expect(pane.locator('.ogs-mini-goban')).toHaveCount(0)
+      builtinSection.locator('.home-library-folder-card', {
+        hasText: 'Go Seigen SGF Pack',
+      }),
+    ).toBeVisible()
+    await builtinSection
+      .locator('.home-library-folder-card', {hasText: 'Go Seigen SGF Pack'})
+      .click()
 
-    await pane.getByRole('button', {name: 'Open Library'}).click()
+    // Library workspace opens at the Built-in source, inside the collection.
     await expect(page.locator('#library-dashboard')).toBeVisible()
+    await expect(page.locator('.library-browser-toolbar h2')).toContainText(
+      'Built-in',
+    )
+    await expect(page.locator('.library-current-path')).toContainText(
+      'games/Go Seigen SGF Pack',
+    )
+    await expect(page.locator('.library-entry-file').first()).toBeVisible()
+
+    // Built-in exposes no change-root action.
+    await expect(page.getByRole('button', {name: 'Change folder'})).toHaveCount(
+      0,
+    )
+
+    // Up navigation stays in the Built-in source.
+    await page.getByRole('button', {name: 'Up one folder'}).click()
+    await expect(page.locator('.library-browser-toolbar h2')).toContainText(
+      'Built-in',
+    )
+    await expect(page.locator('.library-current-path')).toHaveText('games')
+
+    // A Built-in SGF opens through the board workflow.
+    await page
+      .locator('.library-entry-directory', {hasText: 'Go Seigen SGF Pack'})
+      .click()
+    await page.locator('.library-entry-file').first().click()
+    await expect(page.locator('#goban')).toBeVisible()
   })
 
   test('browses a configured Library folder', async ({page}) => {
