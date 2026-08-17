@@ -32,6 +32,15 @@ test.describe('Tsumego workspace', () => {
     await expect(page.locator('.tsumego-solver')).toBeVisible()
     await expect(page.locator('.tsumego-solver-board #goban')).toBeVisible()
     await expect(page.locator('.tsumego-player-to-move')).toBeVisible()
+    let gobanBox = await page
+      .locator('.tsumego-solver-board #goban')
+      .boundingBox()
+    expect(gobanBox).not.toBeNull()
+    expect(gobanBox.width).toBeGreaterThan(100)
+    expect(gobanBox.height).toBeGreaterThan(100)
+    expect(Math.abs(gobanBox.width - gobanBox.height)).toBeLessThan(
+      Math.max(gobanBox.width, gobanBox.height) * 0.1,
+    )
   })
 
   test('browses a configured User Library independently', async ({page}) => {

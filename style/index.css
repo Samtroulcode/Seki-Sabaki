@@ -958,10 +958,6 @@
   border-radius: 8px;
   overflow: hidden;
 }
-.tsumego-solver-board #goban {
-  position: absolute;
-  inset: 0;
-}
 .tsumego-solver-sidebar {
   display: grid;
   align-content: start;
