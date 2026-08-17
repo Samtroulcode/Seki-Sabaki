@@ -15,6 +15,7 @@ test.describe('Tsumego workspace', () => {
   test('opens and reuses the workspace, then loads a built-in problem', async ({
     page,
   }) => {
+    await page.setViewportSize({width: 1600, height: 1000})
     await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
     await expect(page.locator('#tsumego-dashboard')).toBeVisible()
     await expect(
@@ -58,6 +59,16 @@ test.describe('Tsumego workspace', () => {
     expect(Math.abs(gobanBox.width - gobanBox.height)).toBeLessThan(
       Math.max(gobanBox.width, gobanBox.height) * 0.1,
     )
+
+    // The Goban should use the available space: square, within its container,
+    // and no longer capped at the old ~42rem (672px) board height.
+    let boardBox = await page.locator('.tsumego-solver-board').boundingBox()
+    expect(gobanBox.width).toBeLessThanOrEqual(boardBox.width + 1)
+    expect(gobanBox.height).toBeLessThanOrEqual(boardBox.height + 1)
+    expect(gobanBox.height).toBeGreaterThan(672)
+    expect(gobanBox.height).toBeGreaterThan(boardBox.height * 0.8)
+    await expect(page.locator('.tsumego-solver-sidebar')).toBeVisible()
+    await expect(page.locator('.tsumego-solver-navigation')).toBeVisible()
     await page.evaluate(() => {
       window.__tsumegoAudioPlays = 0
       Audio.prototype.play = () => {

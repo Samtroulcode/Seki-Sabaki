@@ -434,7 +434,10 @@ export default class TsumegoPanel extends Component {
     let {source, config, busy, error, view} = this.state
     return h(
       'section',
-      {id: 'tsumego-dashboard', class: 'tsumego-panel'},
+      {
+        id: 'tsumego-dashboard',
+        class: `tsumego-panel ${view === 'problem' ? 'is-problem' : ''}`,
+      },
       h('h1', {}, t('Tsumego')),
       error != null && h('p', {class: 'ogs-error'}, error),
       view === 'problem' ? this.renderProblem() : this.renderBrowser(),
