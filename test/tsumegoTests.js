@@ -820,10 +820,10 @@ describe('classifyMove', () => {
     assert.strictEqual(classifyMove(tree, problem, 'sq'), 'wrong')
   })
 
-  it('keeps an unmarked variation null when no variation has a positive proof', () => {
-    // No positive marker anywhere: analyzeProblem finds no problem, so the
-    // present-but-unmarked variation is never invented as wrong. A hand-built
-    // problem exercises classifyMove's own guard directly.
+  it('treats the expected move as a positive solution at the decision point', () => {
+    // A hand-built problem without markers: the expected move (firstMove) is
+    // correct by construction, so an explicitly present unmarked variation at
+    // the same decision point is wrong (GoGameGuru rule).
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['gl']})
       draft.appendNode(draft.root.id, {B: ['dd']})
@@ -834,6 +834,28 @@ describe('classifyMove', () => {
     let firstMove = tree.get(tree.root.children[0].id)
     let problem = {startNodeId: tree.root.id, playerToMove: 'B', firstMove}
     assert.strictEqual(classifyMove(tree, problem, 'gl'), 'correct')
+    assert.strictEqual(classifyMove(tree, problem, 'dd'), 'wrong')
+  })
+
+  it('keeps an unmarked variation null when the expected move is not a candidate', () => {
+    // The expected move is not reachable from the decision point, so no
+    // positive proof exists there: the present-but-unmarked variation is never
+    // invented as wrong.
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['dd']})
+    })
+    let ghostMove = {
+      id: 'ghost',
+      data: {B: ['gl']},
+      parentId: null,
+      children: [],
+    }
+    let problem = {
+      startNodeId: tree.root.id,
+      playerToMove: 'B',
+      firstMove: ghostMove,
+    }
+
     assert.strictEqual(classifyMove(tree, problem, 'dd'), null)
   })
 
@@ -882,14 +904,298 @@ describe('classifyMove', () => {
   })
 })
 
+describe('classifyMove at later decision points', () => {
+  it('classifies the second correct move after an automatic opponent response', () => {
+    // B[gl] Correct -> W[hm] -> B[hl]
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+    assert.strictEqual(adv.solved, false)
+    assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+  })
+
+  it('classifies a documented wrong second move as wrong', () => {
+    // B[gl] Correct -> W[hm] -> B[hl] (canonical) and B[xx] Wrong Answer
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+      draft.appendNode(w1, {B: ['xx'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+    assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('classifies an unmarked second move as wrong when a solution exists', () => {
+    // GoGameGuru-style: the marker sits on the first move only; the canonical
+    // second move is unmarked, and an unmarked alternative at the same decision
+    // point is a failed try.
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+      draft.appendNode(w1, {B: ['xx']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('classifies a second move absent from the SGF as absent', () => {
+    // B[gl] Correct -> W[hm] -> B[hl]
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'ee',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'absent',
+    )
+  })
+
+  it('keeps two correct second moves possible', () => {
+    // Both second moves carry a positive marker, so each stays correct even
+    // though only the canonical one is the expected move.
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl'], C: ['Correct']})
+      draft.appendNode(w1, {B: ['xx'], C: ['Also correct...']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+    assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+  })
+
+  it('supports non-move nodes between the opponent response and the decision point', () => {
+    // B[gl] Correct -> W[hm] -> C[setup] -> B[hl] and B[xx] Wrong Answer
+    let setupId
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      setupId = draft.appendNode(w1, {C: ['setup']})
+      draft.appendNode(setupId, {B: ['hl']})
+      draft.appendNode(setupId, {B: ['xx'], C: ['Wrong Answer']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+    assert.strictEqual(adv.nextPlayerMove.data.B[0], 'hl')
+    assert.strictEqual(adv.decisionPointId, setupId)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('does not inherit a marker from above the decision point', () => {
+    // The marker sits on the first move only; it must not leak into variations
+    // at the second decision point, or an unmarked alternative would wrongly
+    // become correct.
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+      draft.appendNode(w1, {B: ['xx']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'hl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+    // A leak would classify this as 'correct'; the expected-move rule makes it
+    // 'wrong'.
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('inherits a positive prefix marker between the decision point and a variation', () => {
+    // A prefix marker below the decision point still labels the variation as
+    // the solution, so the branch is correct even though the expected move
+    // alone would only make it wrong.
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+      let prefix = draft.appendNode(w1, {N: ['正解图']})
+      draft.appendNode(prefix, {B: ['xx']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'xx',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'correct',
+    )
+  })
+
+  it('does not accept the first move again at a later decision point', () => {
+    // The initial-position shortcut must not fire once the solver moved on:
+    // 'gl' is not a variation from the current decision point.
+    let tree = gametree.new().mutate((draft) => {
+      let b1 = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      let w1 = draft.appendNode(b1, {W: ['hm']})
+      draft.appendNode(w1, {B: ['hl']})
+    })
+    let problem = analyzeProblem(tree)
+
+    let adv = advanceSolution(tree, problem, problem.firstMove)
+    assert(adv != null)
+
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        problem,
+        'gl',
+        adv.decisionPointId,
+        adv.nextPlayerMove,
+      ),
+      'absent',
+    )
+  })
+})
+
 describe('advanceSolution', () => {
   it('advances B correct -> W automatic -> next B expected', () => {
+    let w1
     let tree = gametree.new().mutate((draft) => {
       let b1 = draft.appendNode(draft.root.id, {
         B: ['gl'],
         C: ['Correct Answer'],
       })
-      let w1 = draft.appendNode(b1, {W: ['hm']})
+      w1 = draft.appendNode(b1, {W: ['hm']})
       draft.appendNode(w1, {B: ['hl']})
     })
     let problem = analyzeProblem(tree)
@@ -900,6 +1206,7 @@ describe('advanceSolution', () => {
     assert.strictEqual(result.automaticMoves.length, 1)
     assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
     assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
+    assert.strictEqual(result.decisionPointId, w1)
   })
 
   it('advances through the documented longer solution line step by step', () => {
@@ -940,6 +1247,7 @@ describe('advanceSolution', () => {
   })
 
   it('traverses non-move nodes around the opponent response', () => {
+    let nm2
     let tree = gametree.new().mutate((draft) => {
       let b1 = draft.appendNode(draft.root.id, {
         B: ['gl'],
@@ -947,7 +1255,7 @@ describe('advanceSolution', () => {
       })
       let nm1 = draft.appendNode(b1, {C: ['setup']})
       let w1 = draft.appendNode(nm1, {W: ['hm']})
-      let nm2 = draft.appendNode(w1, {C: ['setup']})
+      nm2 = draft.appendNode(w1, {C: ['setup']})
       draft.appendNode(nm2, {B: ['hl']})
     })
     let problem = analyzeProblem(tree)
@@ -958,6 +1266,7 @@ describe('advanceSolution', () => {
     assert.strictEqual(result.automaticMoves.length, 1)
     assert.strictEqual(result.automaticMoves[0].data.W[0], 'hm')
     assert.strictEqual(result.nextPlayerMove.data.B[0], 'hl')
+    assert.strictEqual(result.decisionPointId, nm2)
   })
 
   it('reports solved when the solution ends immediately after the correct move', () => {
@@ -971,6 +1280,7 @@ describe('advanceSolution', () => {
     assert.strictEqual(result.solved, true)
     assert.deepStrictEqual(result.automaticMoves, [])
     assert.strictEqual(result.nextPlayerMove, null)
+    assert.strictEqual(result.decisionPointId, null)
   })
 
   it('reports solved after a last opponent response', () => {

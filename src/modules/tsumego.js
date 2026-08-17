@@ -3,9 +3,10 @@
 // This is the business layer of the future Tsumego module. `analyzeProblem`
 // determines where a problem starts and which side must play from an
 // already-parsed SGF GameTree; `classifyMove` classifies a move played by the
-// user from that starting position; `advanceSolution` walks the canonical
-// solution line after a correct move. All functions only read the tree and
-// never mutate it.
+// user at the solver's current decision point (the initial position by
+// default); `advanceSolution` walks the canonical solution line after a
+// correct move and reports the next decision point. All functions only read
+// the tree and never mutate it.
 //
 // Result markers are read from node comments (`C`) containing "correct" (e.g.
 // "Correct Answer", "Correct.", "Also correct") or "wrong" (e.g. "Wrong
@@ -27,9 +28,10 @@
 // move at the decision point, an explicitly present variation is only `wrong`
 // when it carries a negative marker. GoGameGuru collections only mark the
 // solution (`C[Correct]`) and leave failed tries unmarked, so when at least
-// one first-move variation at the decision point carries a reliable positive
-// proof, every other explicitly present variation without one is classified
-// `wrong`; variations absent from the SGF stay `absent`.
+// one variation at the decision point carries a reliable positive proof —
+// a marked branch, or the expected move itself, which is correct by
+// construction — every other explicitly present variation without one is
+// classified `wrong`; variations absent from the SGF stay `absent`.
 
 import {parseVertex} from '@sabaki/sgf'
 
@@ -381,37 +383,51 @@ export function analyzeProblem(tree, options = {}) {
   return {startNodeId, playerToMove, firstMove: best.node, allowTeFallback}
 }
 
-// Classifies a move played by the user from the starting position detected by
-// `analyzeProblem`. `problem` must be a valid (non-null) result of
-// `analyzeProblem`, and `vertexString` is the played intersection as an SGF
-// coordinate string (e.g. 'gl'), parsed with `parseVertex` from `@sabaki/sgf`.
-// The user is assumed to play as `problem.playerToMove`; variations of the
-// other color never match.
+// Classifies a move played by the user at the solver's current decision point.
+// `problem` must be a valid (non-null) result of `analyzeProblem`, and
+// `vertexString` is the played intersection as an SGF coordinate string (e.g.
+// 'gl'), parsed with `parseVertex` from `@sabaki/sgf`. The user is assumed to
+// play as `problem.playerToMove`; variations of the other color never match.
+//
+// The decision point is where the player must choose their next move: the
+// initial position (`problem.startNodeId`) by default, or the position
+// reported by `advanceSolution` (`decisionPointId`) after a correct move.
+// `expectedMoveNode` is the expected correct move at that decision point: the
+// first correct move (`problem.firstMove`) at the initial position, or the
+// next player move returned by `advanceSolution`. Both parameters default to
+// the initial position so existing callers keep working unchanged.
 //
 // Returns:
-// - `'correct'` when the move matches the first correct move, or when a
+// - `'correct'` when the move matches the expected correct move, or when a
 //   matching variation carries a positive result marker anywhere in its branch
 //   (a comment containing "correct", a node name containing 正解, or — when the
 //   problem was detected with the TE fallback — a `TE` property);
 // - `'wrong'` when every matching variation carries a negative result marker
 //   (a comment containing "wrong", a node name containing 失败, or a `BM`
 //   property on the variation's first move — the same `BM` → 'bad' convention
-//   used in gametree.js), or when at least one first-move variation at the
-//   decision point carries a reliable positive proof and the played variation
-//   is explicitly present without one (GoGameGuru collections only mark the
+//   used in gametree.js), or when at least one variation at the decision point
+//   carries a reliable positive proof — a marked branch, or the expected move
+//   itself, which is correct by construction — and the played variation is
+//   explicitly present without one (GoGameGuru collections only mark the
 //   solution);
-// - `'absent'` when no variation from the starting position contains the move
+// - `'absent'` when no variation from the decision point contains the move
 //   for the player's color;
 // - `null` when the played variation is present but not clearly marked and no
 //   proven-correct move exists at the decision point (never invented as
 //   wrong), or when the input is invalid (e.g. a pass or a malformed vertex).
 //
-// Only the next moves from the starting position are considered: each branch is
+// Only the next moves from the decision point are considered: each branch is
 // walked down to its first move node, never past a move, so non-move nodes
-// between the starting position and a variation move are handled. Moves that
-// are not explicitly present as variations from the decision point stay
+// between the decision point and a variation move are handled. Moves that are
+// not explicitly present as variations from the decision point stay
 // `'absent'` and are never reclassified.
-export function classifyMove(tree, problem, vertexString) {
+export function classifyMove(
+  tree,
+  problem,
+  vertexString,
+  decisionPointId,
+  expectedMoveNode,
+) {
   if (problem == null || problem.firstMove == null) return null
   if (typeof vertexString !== 'string') return null
 
@@ -420,26 +436,31 @@ export function classifyMove(tree, problem, vertexString) {
   // a pass is never a tsumego solution and cannot be distinguished from garbage.
   if (vertex[0] < 0 || vertex[1] < 0) return null
 
-  let startNode = tree.get(problem.startNodeId)
-  if (startNode == null) return null
+  let decisionPoint = tree.get(decisionPointId ?? problem.startNodeId)
+  if (decisionPoint == null) return null
 
-  // The first correct move defines the expected answer. The tree must still
-  // contain it so a stale problem cannot produce a false 'correct'. The color
-  // check is defensive: `playerToMove` is derived from the first move's color.
-  let firstMoveColor = getMoveColor(problem.firstMove)
+  // The expected correct move at this decision point: the first correct move
+  // at the initial position, or the next player move from `advanceSolution`.
+  let expectedMove = expectedMoveNode ?? problem.firstMove
+  let expectedMoveId = expectedMove != null ? expectedMove.id : null
+
+  // The expected move defines the correct answer. The tree must still contain
+  // it so a stale problem cannot produce a false 'correct'. The color check is
+  // defensive: `playerToMove` is derived from the first move's color.
   if (
-    firstMoveColor === problem.playerToMove &&
-    sameVertex(getMoveVertex(problem.firstMove), vertex) &&
-    tree.get(problem.firstMove.id) != null
+    expectedMove != null &&
+    getMoveColor(expectedMove) === problem.playerToMove &&
+    sameVertex(getMoveVertex(expectedMove), vertex) &&
+    tree.get(expectedMove.id) != null
   ) {
     return 'correct'
   }
 
-  // Collect the first move node of each branch from the starting position,
-  // never traversing past a move. Branches may split at non-move nodes, so this
-  // is a DFS rather than a linear walk.
+  // Collect the first move node of each branch from the decision point, never
+  // traversing past a move. Branches may split at non-move nodes, so this is a
+  // DFS rather than a linear walk.
   let candidates = []
-  let stack = [...startNode.children]
+  let stack = [...decisionPoint.children]
   while (stack.length) {
     let node = stack.pop()
     if (hasMove(node)) candidates.push(node)
@@ -454,7 +475,7 @@ export function classifyMove(tree, problem, vertexString) {
   if (matching.length === 0) return 'absent'
 
   // A branch's result is determined by markers anywhere in its subtree and on
-  // the non-move prefix between the starting position and the branch's first
+  // the non-move prefix between the decision point and the branch's first
   // move, so a marker carried by a descendant (e.g. W[ba] C[Wrong.]) or by a
   // prefix label (e.g. N[失败图] before W[md]) still classifies the branch's
   // first move. `allowTeFallback` on the problem echoes analyzeProblem's TE
@@ -462,19 +483,21 @@ export function classifyMove(tree, problem, vertexString) {
   // into the fallback.
   let allowTe = problem.allowTeFallback === true
   let results = matching.map((node) =>
-    getBranchResult(node, tree, startNode, allowTe),
+    getBranchResult(node, tree, decisionPoint, allowTe),
   )
   if (results.some((result) => result === 'correct')) return 'correct'
 
   // GoGameGuru-style collections only mark the solution (C[Correct]) and leave
   // the failed tries unmarked. At the solver's decision point, when at least
-  // one explicitly present first-move variation carries a reliable positive
-  // proof, every other variation that is explicitly present without one is
-  // wrong. Variations absent from the SGF are never affected by this rule.
+  // one variation carries a reliable positive proof — a marked branch, or the
+  // expected move itself, which is correct by construction — every other
+  // variation that is explicitly present without one is wrong. Variations
+  // absent from the SGF are never affected by this rule.
   let hasSolution = candidates.some(
     (node) =>
       getMoveColor(node) === problem.playerToMove &&
-      getBranchResult(node, tree, startNode, allowTe) === 'correct',
+      (node.id === expectedMoveId ||
+        getBranchResult(node, tree, decisionPoint, allowTe) === 'correct'),
   )
   if (hasSolution) return 'wrong'
 
@@ -485,16 +508,20 @@ export function classifyMove(tree, problem, vertexString) {
 }
 
 // Advances the solution after a move the user just played that was recognized
-// as correct. `correctMoveNode` is the node of that move — in V1, the first
-// correct move from `analyzeProblem` (the call site enforces this via
-// `classifyMove`). Walks the canonical continuation, the SGF main line (first
-// child) of the correct branch, playing the opponent's responses automatically
-// and stopping just before the player's next move.
+// as correct. `correctMoveNode` is the node of that move — the first correct
+// move from `analyzeProblem`, or the `nextPlayerMove` of a previous
+// `advanceSolution` call (the call site enforces this via `classifyMove`).
+// Walks the canonical continuation, the SGF main line (first child) of the
+// correct branch, playing the opponent's responses automatically and stopping
+// just before the player's next move.
 //
-// Returns `{automaticMoves, nextPlayerMove, solved}`:
+// Returns `{automaticMoves, nextPlayerMove, decisionPointId, solved}`:
 // - `automaticMoves`: the opponent's responses on the canonical line (nodes);
 // - `nextPlayerMove`: the player's next expected move (node), or `null` when
 //   the problem is solved;
+// - `decisionPointId`: the node id of the position the player's next move
+//   branches from (the parent of `nextPlayerMove`, which may be a non-move
+//   node), or `null` when the problem is solved;
 // - `solved`: whether the canonical line ended before another player move.
 //
 // Non-move nodes between moves are traversed; sibling variations are never
@@ -524,8 +551,15 @@ export function advanceSolution(tree, problem, correctMoveNode) {
       if (vertex == null || vertex[0] < 0 || vertex[1] < 0) return null
 
       if (getMoveColor(node) === problem.playerToMove) {
-        // Stop just before the player's next move.
-        return {automaticMoves, nextPlayerMove: node, solved: false}
+        // Stop just before the player's next move. The decision point is the
+        // node the player's variations branch from: the parent of the next
+        // move, which may be a non-move node.
+        return {
+          automaticMoves,
+          nextPlayerMove: node,
+          decisionPointId: node.parentId,
+          solved: false,
+        }
       }
 
       // The opponent's move is played automatically.
@@ -534,5 +568,10 @@ export function advanceSolution(tree, problem, correctMoveNode) {
   }
 
   // The canonical line ended before another player move.
-  return {automaticMoves, nextPlayerMove: null, solved: true}
+  return {
+    automaticMoves,
+    nextPlayerMove: null,
+    decisionPointId: null,
+    solved: true,
+  }
 }
