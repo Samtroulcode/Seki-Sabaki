@@ -1,4 +1,5 @@
 const {expect} = require('@playwright/test')
+const sgf = require('@sabaki/sgf')
 const {test} = require('./fixtures/electron-app')
 
 test.describe('Tsumego Creator', () => {
@@ -162,7 +163,180 @@ test.describe('Tsumego Creator', () => {
       await page.evaluate(() => window.__sabaki.state.gameTrees.length),
     ).toBe(globalTreeCount)
   })
+
+  test('shows Setup and Solution mode tabs', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator-mode-tabs')).toBeVisible()
+    await expect(
+      page
+        .locator('.tsumego-creator-mode-tabs')
+        .getByRole('button', {name: 'Setup', exact: true}),
+    ).toBeVisible()
+    await expect(
+      page
+        .locator('.tsumego-creator-mode-tabs')
+        .getByRole('button', {name: 'Solution', exact: true}),
+    ).toBeVisible()
+  })
+
+  test('switches to Solution mode and plays the first move from PL', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/;B\[dd\]/)
+    await expect
+      .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
+      .toBeGreaterThan(0)
+  })
+
+  test('alternates colors while building a solution line', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+    await clickCreatorVertex(page, 2, 2)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/;B\[aa\];W\[bb\];B\[cc\]/)
+  })
+
+  test('creates a variation by returning to a parent and playing a different move', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+    await clickCreatorVertex(page, 2, 2)
+
+    // Go back to root, replay the first move to navigate to it, then branch.
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'Root', exact: true})
+      .click()
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgfString).toMatch(/;B\[aa\]/)
+    expect(sgfString).toMatch(/W\[bb\]/)
+    expect(sgfString).toMatch(/W\[dd\]/)
+
+    let rootNodes = sgf.parse(sgfString)
+    expect(rootNodes).toHaveLength(1)
+    let root = rootNodes[0]
+    expect(root.children).toHaveLength(1)
+    let baa = root.children[0]
+    expect(baa.data.B).toEqual(['aa'])
+    expect(baa.children).toHaveLength(2)
+    let whiteVertices = baa.children.map((child) => child.data.W?.[0]).sort()
+    expect(whiteVertices).toEqual(['bb', 'dd'])
+  })
+
+  test('graph wheel does not navigate the global Sabaki document', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    let globalTreePosition = await page.evaluate(
+      () => window.__sabaki.state.treePosition,
+    )
+
+    await page.locator('.tsumego-creator-graph #graph').evaluate((element) => {
+      let event = new WheelEvent('wheel', {
+        bubbles: true,
+        cancelable: true,
+        deltaY: 40,
+      })
+      element.dispatchEvent(event)
+      return event.defaultPrevented
+    })
+
+    expect(await page.evaluate(() => window.__sabaki.state.treePosition)).toBe(
+      globalTreePosition,
+    )
+  })
+
+  test('returns to Setup without discarding the solution tree', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    await page
+      .locator('.tsumego-creator-mode-tabs')
+      .getByRole('button', {name: 'Setup', exact: true})
+      .click()
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/;B\[aa\]/)
+  })
+
+  test('reset the whole draft when changing size after a solution move', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    await page
+      .locator('.tsumego-creator-mode-tabs')
+      .getByRole('button', {name: 'Setup', exact: true})
+      .click()
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: '9x9', exact: true})
+      .click()
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/SZ\[9\]/)
+    expect(sgf).not.toMatch(/;B\[aa\]/)
+    expect(sgf).toMatch(/PL\[B\]/)
+  })
 })
+
+async function enterSolutionMode(page) {
+  await page
+    .locator('.tsumego-creator-mode-tabs')
+    .getByRole('button', {name: 'Solution', exact: true})
+    .click()
+  await expect(page.locator('.tsumego-creator-graph')).toBeVisible()
+}
 
 async function clickCreatorVertex(page, x, y) {
   let box = await page

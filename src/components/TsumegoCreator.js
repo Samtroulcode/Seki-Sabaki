@@ -5,7 +5,11 @@ import * as sound from '../modules/sound.js'
 import {
   createDraft,
   getBoard,
+  getNextPlayer,
+  hasSolutionMoves,
   hasStones,
+  playMove,
+  resetDraft,
   serialize,
   setBoardSize,
   setComment,
@@ -13,6 +17,7 @@ import {
   setSetupStone,
 } from '../modules/tsumegocreator.js'
 import Goban from './Goban.js'
+import GameGraph from './sidebars/GameGraph.js'
 
 const t = i18n.context('TsumegoCreator')
 const SIZES = [
@@ -27,8 +32,14 @@ export default class TsumegoCreator extends Component {
     this.state = {
       gameTree: createDraft(19),
       tool: 'B',
+      mode: 'setup',
+      currentNodeId: null,
       dirty: false,
     }
+  }
+
+  get currentNodeId() {
+    return this.state.currentNodeId ?? this.state.gameTree.root.id
   }
 
   get currentSize() {
@@ -46,22 +57,28 @@ export default class TsumegoCreator extends Component {
   handleSizeChange = (size) => {
     if (size === this.currentSize) return
 
-    if (hasStones(this.state.gameTree)) {
-      let confirmed = window.confirm(
-        t('Changing board size will clear the current setup. Continue?'),
-      )
-      if (!confirmed) return
+    let needsFullReset = hasSolutionMoves(this.state.gameTree)
+    if (hasStones(this.state.gameTree) || needsFullReset) {
+      let message = needsFullReset
+        ? t(
+            'Changing board size will reset the entire draft including the solution tree. Continue?',
+          )
+        : t('Changing board size will clear the current setup. Continue?')
+      if (!window.confirm(message)) return
     }
 
     this.setState({
-      gameTree: setBoardSize(this.state.gameTree, size),
+      gameTree: needsFullReset
+        ? resetDraft(size)
+        : setBoardSize(this.state.gameTree, size),
+      currentNodeId: null,
       dirty: true,
     })
   }
 
   handleToolChange = (tool) => {
     if (tool === this.state.tool) return
-    this.setState({tool, dirty: true})
+    this.setState({tool})
   }
 
   handlePlayerChange = (color) => {
@@ -82,20 +99,63 @@ export default class TsumegoCreator extends Component {
   handleVertexClick = (evt) => {
     if (evt.vertex == null) return
 
+    if (this.state.mode === 'setup') {
+      this.handleSetupVertexClick(evt.vertex)
+    } else {
+      this.handleSolutionVertexClick(evt.vertex)
+    }
+  }
+
+  handleSetupVertexClick(vertex) {
     let {gameTree, tool} = this.state
     let previousBoard = getBoard(gameTree)
-    let hadStone = previousBoard.get(evt.vertex) !== 0
+    let hadStone = previousBoard.get(vertex) !== 0
 
-    let nextTree = setSetupStone(gameTree, evt.vertex, tool)
+    let nextTree = setSetupStone(gameTree, vertex, tool)
     let changed = nextTree !== gameTree
 
     if (changed) {
       let nextBoard = getBoard(nextTree)
-      let hasStone = nextBoard.get(evt.vertex) !== 0
+      let hasStone = nextBoard.get(vertex) !== 0
       if (tool !== null && hasStone && !hadStone) sound.playPachi()
 
       this.setState({gameTree: nextTree, dirty: true})
     }
+  }
+
+  handleSolutionVertexClick(vertex) {
+    let result = playMove(this.state.gameTree, this.currentNodeId, vertex)
+    if (result == null) return
+
+    if (result.created) sound.playPachi()
+    this.setState({
+      gameTree: result.tree,
+      currentNodeId: result.nodeId,
+      dirty: true,
+    })
+  }
+
+  handleModeChange = (mode) => {
+    if (mode === this.state.mode) return
+    this.setState({
+      mode,
+      currentNodeId: this.state.gameTree.root.id,
+    })
+  }
+
+  handleRootClick = () => {
+    this.setState({currentNodeId: this.state.gameTree.root.id})
+  }
+
+  handleGraphNodeClick = (evt) => {
+    if (evt.button !== 0 || evt.treePosition == null) return
+    this.setState({currentNodeId: evt.treePosition})
+  }
+
+  handleGraphWheel = (step) => {
+    let next = this.state.gameTree.navigate(this.currentNodeId, step, {})
+    if (next == null) return
+    this.setState({currentNodeId: next.id})
   }
 
   handleBack = () => {
@@ -108,19 +168,29 @@ export default class TsumegoCreator extends Component {
   }
 
   render() {
-    let {gameTree, tool} = this.state
-    let board = getBoard(gameTree)
+    let {gameTree, tool, mode} = this.state
+    let isSetup = mode === 'setup'
+    let board = getBoard(
+      gameTree,
+      isSetup ? gameTree.root.id : this.currentNodeId,
+    )
     let currentThemeId = window.sabaki.setting.get('theme.current')
+    let graphGridSize = window.sabaki.setting.get('graph.grid_size')
+    let graphNodeSize = window.sabaki.setting.get('graph.node_size')
 
     return h(
       'div',
-      {class: 'tsumego-creator', 'data-test-sgf': serialize(gameTree)},
+      {
+        class: 'tsumego-creator',
+        'data-test-sgf': serialize(gameTree),
+        'data-test-current-node-id': this.currentNodeId,
+      },
       h(
         'div',
         {class: 'tsumego-creator-board'},
         h(Goban, {
           gameTree,
-          treePosition: gameTree.root.id,
+          treePosition: isSetup ? gameTree.root.id : this.currentNodeId,
           board,
           transformation: '',
           currentThemeId,
@@ -138,108 +208,29 @@ export default class TsumegoCreator extends Component {
       h(
         'aside',
         {class: 'tsumego-creator-sidebar'},
-        h('h2', {}, t('Setup')),
         h(
           'div',
-          {class: 'tsumego-creator-group'},
-          h('h3', {}, t('Board size')),
+          {class: 'tsumego-creator-mode-tabs'},
           h(
-            'div',
-            {class: 'tsumego-creator-button-row'},
-            SIZES.map(({value, label}) =>
-              h(
-                'button',
-                {
-                  key: value,
-                  type: 'button',
-                  class: value === this.currentSize ? 'selected' : '',
-                  onClick: () => this.handleSizeChange(value),
-                },
-                label,
-              ),
-            ),
+            'button',
+            {
+              type: 'button',
+              class: isSetup ? 'selected' : '',
+              onClick: () => this.handleModeChange('setup'),
+            },
+            t('Setup'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: !isSetup ? 'selected' : '',
+              onClick: () => this.handleModeChange('solution'),
+            },
+            t('Solution'),
           ),
         ),
-        h(
-          'div',
-          {class: 'tsumego-creator-group'},
-          h('h3', {}, t('Stones')),
-          h(
-            'div',
-            {class: 'tsumego-creator-button-row'},
-            h(
-              'button',
-              {
-                type: 'button',
-                class: tool === 'B' ? 'selected' : '',
-                'aria-label': t('Black stone'),
-                onClick: () => this.handleToolChange('B'),
-              },
-              t('Black'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                class: tool === 'W' ? 'selected' : '',
-                'aria-label': t('White stone'),
-                onClick: () => this.handleToolChange('W'),
-              },
-              t('White'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                class: tool === null ? 'selected' : '',
-                'aria-label': t('Erase stone'),
-                onClick: () => this.handleToolChange(null),
-              },
-              t('Erase'),
-            ),
-          ),
-        ),
-        h(
-          'div',
-          {class: 'tsumego-creator-group'},
-          h('h3', {}, t('Player to move')),
-          h(
-            'div',
-            {class: 'tsumego-creator-button-row'},
-            h(
-              'button',
-              {
-                type: 'button',
-                class: this.playerToMove === 'B' ? 'selected' : '',
-                'aria-label': t('Black to move'),
-                onClick: () => this.handlePlayerChange('B'),
-              },
-              t('Black'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                class: this.playerToMove === 'W' ? 'selected' : '',
-                'aria-label': t('White to move'),
-                onClick: () => this.handlePlayerChange('W'),
-              },
-              t('White'),
-            ),
-          ),
-        ),
-        h(
-          'div',
-          {class: 'tsumego-creator-group'},
-          h('h3', {}, t('Problem statement')),
-          h('textarea', {
-            class: 'tsumego-creator-comment',
-            rows: 4,
-            value: this.comment,
-            onInput: this.handleCommentChange,
-            placeholder: t('Black to play and live.'),
-          }),
-        ),
+        isSetup ? this.renderSetupSidebar() : this.renderSolutionSidebar(),
       ),
       h(
         'div',
@@ -251,5 +242,153 @@ export default class TsumegoCreator extends Component {
         ),
       ),
     )
+  }
+
+  renderSetupSidebar() {
+    let {tool} = this.state
+
+    return [
+      h('h2', {key: 'title'}, t('Setup')),
+      h(
+        'div',
+        {key: 'size', class: 'tsumego-creator-group'},
+        h('h3', {}, t('Board size')),
+        h(
+          'div',
+          {class: 'tsumego-creator-button-row'},
+          SIZES.map(({value, label}) =>
+            h(
+              'button',
+              {
+                key: value,
+                type: 'button',
+                class: value === this.currentSize ? 'selected' : '',
+                onClick: () => this.handleSizeChange(value),
+              },
+              label,
+            ),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        {key: 'stones', class: 'tsumego-creator-group'},
+        h('h3', {}, t('Stones')),
+        h(
+          'div',
+          {class: 'tsumego-creator-button-row'},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: tool === 'B' ? 'selected' : '',
+              'aria-label': t('Black stone'),
+              onClick: () => this.handleToolChange('B'),
+            },
+            t('Black'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: tool === 'W' ? 'selected' : '',
+              'aria-label': t('White stone'),
+              onClick: () => this.handleToolChange('W'),
+            },
+            t('White'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: tool === null ? 'selected' : '',
+              'aria-label': t('Erase stone'),
+              onClick: () => this.handleToolChange(null),
+            },
+            t('Erase'),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        {key: 'player', class: 'tsumego-creator-group'},
+        h('h3', {}, t('Player to move')),
+        h(
+          'div',
+          {class: 'tsumego-creator-button-row'},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: this.playerToMove === 'B' ? 'selected' : '',
+              'aria-label': t('Black to move'),
+              onClick: () => this.handlePlayerChange('B'),
+            },
+            t('Black'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: this.playerToMove === 'W' ? 'selected' : '',
+              'aria-label': t('White to move'),
+              onClick: () => this.handlePlayerChange('W'),
+            },
+            t('White'),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        {key: 'comment', class: 'tsumego-creator-group'},
+        h('h3', {}, t('Problem statement')),
+        h('textarea', {
+          class: 'tsumego-creator-comment',
+          rows: 4,
+          value: this.comment,
+          onInput: this.handleCommentChange,
+          placeholder: t('Black to play and live.'),
+        }),
+      ),
+    ]
+  }
+
+  renderSolutionSidebar() {
+    let {gameTree} = this.state
+    let nextPlayer = getNextPlayer(gameTree, this.currentNodeId)
+    let graphGridSize = window.sabaki.setting.get('graph.grid_size')
+    let graphNodeSize = window.sabaki.setting.get('graph.node_size')
+
+    return [
+      h('h2', {key: 'title'}, t('Solution')),
+      h(
+        'p',
+        {
+          key: 'player',
+          class: 'tsumego-creator-player-to-move',
+        },
+        nextPlayer === 'B' ? t('Black to play') : t('White to play'),
+      ),
+      h(
+        'div',
+        {key: 'graph', class: 'tsumego-creator-graph'},
+        h(GameGraph, {
+          gameTree,
+          gameCurrents: {},
+          treePosition: this.currentNodeId,
+          showGameGraph: true,
+          height: 180,
+          gridSize: graphGridSize,
+          nodeSize: graphNodeSize,
+          onNodeClick: this.handleGraphNodeClick,
+          onWheelNavigation: this.handleGraphWheel,
+        }),
+      ),
+      h(
+        'div',
+        {key: 'root', class: 'tsumego-creator-group'},
+        h('button', {type: 'button', onClick: this.handleRootClick}, t('Root')),
+      ),
+    ]
   }
 }

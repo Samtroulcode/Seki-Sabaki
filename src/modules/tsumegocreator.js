@@ -24,6 +24,10 @@ export function setBoardSize(tree, size) {
   })
 }
 
+export function resetDraft(size) {
+  return createDraft(size)
+}
+
 export function setSetupStone(tree, vertex, color) {
   let sgfVertex = stringifyVertex(vertex)
   if (sgfVertex == null || sgfVertex === '') return tree
@@ -83,8 +87,85 @@ export function hasStones(tree) {
   return (ab != null && ab.length > 0) || (aw != null && aw.length > 0)
 }
 
-export function getBoard(tree) {
-  return gametree.getBoard(tree, tree.root.id)
+export function hasSolutionMoves(tree) {
+  for (let node of tree.listNodes()) {
+    if (node.id === tree.root.id) continue
+    if (node.data.B != null || node.data.W != null) return true
+  }
+  return false
+}
+
+export function getBoard(tree, nodeId = tree.root.id) {
+  return gametree.getBoard(tree, nodeId)
+}
+
+export function getNextPlayer(tree, nodeId) {
+  let root = tree.root
+  if (nodeId === root.id) {
+    return root.data.PL?.[0] === 'W' ? 'W' : 'B'
+  }
+
+  let moveCount = 0
+  for (let node of tree.listNodesVertically(nodeId, -1, {})) {
+    if (node.id === root.id) continue
+    if (node.data.B != null || node.data.W != null) moveCount++
+  }
+
+  let start = root.data.PL?.[0] === 'W' ? 'W' : 'B'
+  return moveCount % 2 === 0 ? start : opposite(start)
+}
+
+export function findMatchingChild(tree, parentNodeId, color, sgfVertex) {
+  let parent = tree.get(parentNodeId)
+  if (parent == null) return null
+
+  for (let child of parent.children) {
+    let value = child.data[color]
+    if (value != null && value[0] === sgfVertex) return child
+  }
+  return null
+}
+
+export function playMove(tree, parentNodeId, vertex) {
+  if (vertex == null) return null
+  let sgfVertex = stringifyVertex(vertex)
+  if (sgfVertex == null || sgfVertex === '') return null
+
+  let color = getNextPlayer(tree, parentNodeId)
+  let existing = findMatchingChild(tree, parentNodeId, color, sgfVertex)
+  if (existing != null) {
+    return {tree, nodeId: existing.id, created: false}
+  }
+
+  let board = getBoard(tree, parentNodeId)
+  let sign = color === 'B' ? 1 : -1
+
+  try {
+    let analysis = board.analyzeMove(sign, vertex)
+    if (analysis.overwrite || analysis.suicide || analysis.ko) return null
+
+    let nextBoard = board.makeMove(sign, vertex, {
+      preventOverwrite: true,
+      preventSuicide: true,
+      preventKo: true,
+    })
+    if (nextBoard == null) return null
+  } catch (err) {
+    return null
+  }
+
+  let nextTree = tree.mutate((draft) => {
+    draft.appendNode(
+      parentNodeId,
+      {[color]: [sgfVertex]},
+      {disableMerging: true},
+    )
+  })
+
+  let newNode = findMatchingChild(nextTree, parentNodeId, color, sgfVertex)
+  if (newNode == null) return null
+
+  return {tree: nextTree, nodeId: newNode.id, created: true}
 }
 
 export function serialize(tree, options = {}) {
@@ -104,4 +185,8 @@ function addVertex(list, vertex) {
 function arraysEqual(a, b) {
   if (a.length !== b.length) return false
   return a.every((value, index) => value === b[index])
+}
+
+function opposite(color) {
+  return color === 'W' ? 'B' : 'W'
 }

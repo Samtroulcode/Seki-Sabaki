@@ -3,8 +3,12 @@ import sgf from '@sabaki/sgf'
 
 import {
   createDraft,
+  findMatchingChild,
   getBoard,
+  getNextPlayer,
+  hasSolutionMoves,
   hasStones,
+  playMove,
   serialize,
   setBoardSize,
   setComment,
@@ -228,6 +232,160 @@ describe('tsumegoCreator', () => {
       tree = setSetupStone(tree, [3, 3], null)
 
       assert.strictEqual(hasStones(tree), false)
+    })
+  })
+
+  describe('getNextPlayer', () => {
+    it('returns B at root when PL[B]', () => {
+      assert.strictEqual(
+        getNextPlayer(createDraft(19), createDraft(19).root.id),
+        'B',
+      )
+    })
+
+    it('returns W at root when PL[W]', () => {
+      let tree = setPlayerToMove(createDraft(19), 'W')
+
+      assert.strictEqual(getNextPlayer(tree, tree.root.id), 'W')
+    })
+
+    it('alternates after a Black move', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      assert(result != null)
+
+      assert.strictEqual(getNextPlayer(result.tree, result.nodeId), 'W')
+    })
+
+    it('alternates back to Black after White', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      assert(result?.created)
+      result = playMove(result.tree, result.nodeId, [4, 4])
+      assert(result?.created)
+
+      assert.strictEqual(getNextPlayer(result.tree, result.nodeId), 'B')
+    })
+  })
+
+  describe('playMove', () => {
+    it('creates the first move matching PL[B]', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+
+      assert(result != null)
+      assert.strictEqual(result.created, true)
+      assert.strictEqual(result.tree.root.children.length, 1)
+      assert.strictEqual(result.tree.root.children[0].data.B[0], 'dd')
+    })
+
+    it('creates the first move matching PL[W]', () => {
+      let tree = setPlayerToMove(createDraft(19), 'W')
+      let result = playMove(tree, tree.root.id, [3, 3])
+
+      assert(result != null)
+      assert.strictEqual(result.created, true)
+      assert.strictEqual(result.tree.root.children[0].data.W[0], 'dd')
+    })
+
+    it('alternates colors correctly', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [3, 3])
+      let r2 = playMove(r1.tree, r1.nodeId, [4, 4])
+
+      assert.strictEqual(r2.tree.get(r2.nodeId).data.W[0], 'ee')
+    })
+
+    it('rejects an illegal overwrite', () => {
+      let tree = createDraft(19)
+      tree = setSetupStone(tree, [3, 3], 'B')
+
+      assert.strictEqual(playMove(tree, tree.root.id, [3, 3]), null)
+    })
+
+    it('rejects suicide', () => {
+      let tree = createDraft(19)
+      tree = setSetupStone(tree, [0, 1], 'W')
+      tree = setSetupStone(tree, [1, 0], 'W')
+      tree = setSetupStone(tree, [1, 1], 'W')
+
+      assert.strictEqual(playMove(tree, tree.root.id, [0, 0]), null)
+    })
+
+    it('rejects illegal ko', () => {
+      let tree = createDraft(19)
+      // Surround a white stone in the center; one liberty remains at (1,0).
+      tree = setSetupStone(tree, [1, 1], 'W')
+      tree = setSetupStone(tree, [0, 1], 'B')
+      tree = setSetupStone(tree, [1, 2], 'B')
+      tree = setSetupStone(tree, [2, 1], 'B')
+
+      // Black captures the white stone by playing its last liberty.
+      let capture = playMove(tree, tree.root.id, [1, 0])
+      assert(capture?.created)
+
+      // White immediately recapturing on (1,1) is illegal ko.
+      assert.strictEqual(playMove(capture.tree, capture.nodeId, [1, 1]), null)
+    })
+  })
+
+  describe('existing child', () => {
+    it('does not duplicate an existing move', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [3, 3])
+      let r2 = playMove(r1.tree, r1.nodeId, [4, 4])
+      let replay = playMove(r2.tree, r1.nodeId, [4, 4])
+
+      assert(replay != null)
+      assert.strictEqual(replay.created, false)
+      assert.strictEqual(replay.nodeId, r2.nodeId)
+      assert.strictEqual(r2.tree.get(r1.nodeId).children.length, 1)
+    })
+  })
+
+  describe('variations', () => {
+    it('creates a sibling variation under the same parent', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+
+      let variation = playMove(r3.tree, r1.nodeId, [3, 3])
+      assert(variation?.created)
+
+      let parent = variation.tree.get(r1.nodeId)
+      assert.strictEqual(parent.children.length, 2)
+      assert(parent.children.some((child) => child.data.W?.[0] === 'bb'))
+      assert(parent.children.some((child) => child.data.W?.[0] === 'dd'))
+      assert(variation.tree.get(r2.nodeId).children.length, 1)
+    })
+  })
+
+  describe('hasSolutionMoves', () => {
+    it('returns false for a draft with only setup stones', () => {
+      let tree = setSetupStone(createDraft(19), [3, 3], 'B')
+
+      assert.strictEqual(hasSolutionMoves(tree), false)
+    })
+
+    it('returns true after a solution move', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+
+      assert.strictEqual(hasSolutionMoves(result.tree), true)
+    })
+
+    it('detects moves inside variations, not only on the main line', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+
+      // Go back to the first move and create a sibling variation.
+      let variation = playMove(r3.tree, r1.nodeId, [3, 3])
+      assert(variation?.created)
+
+      assert.strictEqual(hasSolutionMoves(variation.tree), true)
     })
   })
 })

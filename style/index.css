@@ -1306,6 +1306,22 @@
   color: white;
   font-size: 1.2rem;
 }
+.tsumego-creator-mode-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+.tsumego-creator-mode-tabs button {
+  flex: 1 1 auto;
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-creator-mode-tabs button:hover,
+.tsumego-creator-mode-tabs button:focus,
+.tsumego-creator-mode-tabs button.selected {
+  background: #006fca;
+}
 .tsumego-creator-sidebar h3 {
   color: #ccc;
   font-size: 0.95rem;
@@ -1347,6 +1363,23 @@
 .tsumego-creator-comment:focus {
   outline: none;
   border-color: #006fca;
+}
+.tsumego-creator-player-to-move {
+  color: white;
+  font-size: 1.1rem;
+}
+.tsumego-creator-graph {
+  position: relative;
+  height: 14rem;
+  min-width: 0;
+  overflow: hidden;
+  background: #181818;
+  border: 1px solid #292a2d;
+  border-radius: 4px;
+}
+.tsumego-creator-graph #graph {
+  position: absolute;
+  inset: 0;
 }
 .tsumego-creator-navigation {
   grid-area: navigation;
