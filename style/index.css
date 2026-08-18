@@ -1267,9 +1267,10 @@
 .tsumego-creator {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   grid-template-areas:
     'board sidebar'
+    'toolbar sidebar'
     'navigation sidebar';
   gap: 1rem;
   min-height: 0;
@@ -1288,6 +1289,81 @@
 }
 .tsumego-creator-board #goban {
   position: absolute;
+}
+.tsumego-creator-toolbar {
+  grid-area: toolbar;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #111;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+}
+.tsumego-creator-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tsumego-creator-toolbar-separator {
+  width: 1px;
+  align-self: stretch;
+  background: #292a2d;
+  margin: 0 0.25rem;
+}
+.tsumego-creator-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding: 0.3rem 0.5rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-creator-toolbar button:hover,
+.tsumego-creator-toolbar button:focus,
+.tsumego-creator-toolbar button.selected {
+  background: #006fca;
+}
+.tsumego-creator-toolbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+}
+.tsumego-creator-toolbar-icon img {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.tsumego-creator-toolbar-icon.markup img {
+  filter: invert(100%);
+}
+.tsumego-creator-toolbar-icon.stone-black {
+  background: #e8e8e8;
+}
+.tsumego-creator-toolbar-icon.stone-white {
+  background: #2a2a2a;
+  border: 1px solid #555;
+}
+.tsumego-creator-toolbar-label {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tsumego-creator-hint {
+  color: #999;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.tsumego-creator-selected-position {
+  color: #ccc;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 .tsumego-creator-sidebar {
   grid-area: sidebar;
@@ -1591,6 +1667,7 @@
     grid-template-rows: auto;
     grid-template-areas:
       'board'
+      'toolbar'
       'sidebar'
       'navigation';
   }

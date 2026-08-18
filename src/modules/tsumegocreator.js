@@ -1,4 +1,4 @@
-import sgf, {stringifyVertex} from '@sabaki/sgf'
+import sgf, {parseCompressedVertices, stringifyVertex} from '@sabaki/sgf'
 
 import * as gametree from './gametree.js'
 import {analyzeProblem} from './tsumego.js'
@@ -10,6 +10,7 @@ function clearCache(tree) {
 const VALID_SIZES = new Set([9, 13, 19])
 const CORRECT_MARKER = 'Correct'
 const WRONG_MARKER = 'Wrong'
+const MARKUP_PROPS = ['MA', 'TR', 'SQ', 'CR']
 
 export function createDraft(size = 19) {
   if (!VALID_SIZES.has(size)) size = 19
@@ -79,6 +80,52 @@ export function setPlayerToMove(tree, color) {
   return tree.mutate((draft) => {
     draft.updateProperty(draft.root.id, 'PL', [color])
   })
+}
+
+export function toggleMarkup(tree, nodeId, type, vertex) {
+  if (!MARKUP_PROPS.includes(type)) return tree
+
+  let sgfVertex = stringifyVertex(vertex)
+  if (sgfVertex == null || sgfVertex === '') return tree
+
+  let node = tree.get(nodeId)
+  if (node == null) return tree
+
+  // Collect the current simple-shape markup per vertex. Only one of
+  // MA/TR/SQ/CR may be active on a given vertex, so toggling a shape
+  // replaces any other simple shape on that vertex.
+  let current = new Map()
+  for (let prop of MARKUP_PROPS) {
+    for (let value of node.data[prop] || []) {
+      for (let v of parseCompressedVertices(value)) {
+        let key = stringifyVertex(v)
+        if (key != null && key !== '') current.set(key, prop)
+      }
+    }
+  }
+
+  let next = new Map(current)
+  if (next.get(sgfVertex) === type) next.delete(sgfVertex)
+  else next.set(sgfVertex, type)
+
+  let same =
+    current.size === next.size &&
+    [...current].every(([key, prop]) => next.get(key) === prop)
+  if (same) return tree
+
+  let nextLists = {}
+  for (let prop of MARKUP_PROPS) nextLists[prop] = []
+  for (let [key, prop] of next) nextLists[prop].push(key)
+
+  let nextTree = tree.mutate((draft) => {
+    for (let prop of MARKUP_PROPS) {
+      if (nextLists[prop].length === 0) draft.removeProperty(nodeId, prop)
+      else draft.updateProperty(nodeId, prop, nextLists[prop])
+    }
+  })
+
+  clearCache(nextTree)
+  return nextTree
 }
 
 export function setComment(tree, comment) {

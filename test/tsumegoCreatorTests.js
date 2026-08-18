@@ -20,6 +20,7 @@ import {
   setNodeResult,
   setPlayerToMove,
   setSetupStone,
+  toggleMarkup,
   validateProblem,
 } from '../src/modules/tsumegocreator.js'
 
@@ -181,6 +182,148 @@ describe('tsumegoCreator', () => {
       let tree = setPlayerToMove(createDraft(19), 'X')
 
       assert.strictEqual(tree.root.data.PL[0], 'B')
+    })
+  })
+
+  describe('toggleMarkup', () => {
+    it('adds a cross with MA', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'MA', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.MA, ['dd'])
+    })
+
+    it('adds a triangle with TR', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.TR, ['dd'])
+    })
+
+    it('adds a square with SQ', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'SQ', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.SQ, ['dd'])
+    })
+
+    it('adds a circle with CR', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'CR', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.CR, ['dd'])
+    })
+
+    it('removes the markup on a second click', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+
+      assert.strictEqual(tree.root.data.TR, undefined)
+    })
+
+    it('removes the property entirely when the last vertex is removed', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [4, 4])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [4, 4])
+
+      assert.strictEqual(tree.root.data.TR, undefined)
+    })
+
+    it('replaces TR with SQ on the same vertex', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'SQ', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.SQ, ['dd'])
+      assert.strictEqual(tree.root.data.TR, undefined)
+    })
+
+    it('keeps markup on other vertices when replacing one', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [4, 4])
+      tree = toggleMarkup(tree, tree.root.id, 'SQ', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.SQ, ['dd'])
+      assert.deepStrictEqual(tree.root.data.TR, ['ee'])
+    })
+
+    it('keeps markup on other vertices when removing one', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [4, 4])
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.TR, ['ee'])
+    })
+
+    it('annotates the root node', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'MA', [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.MA, ['dd'])
+      assert.strictEqual(tree.root.children.length, 0)
+    })
+
+    it('annotates a solution node', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = toggleMarkup(result.tree, result.nodeId, 'TR', [4, 4])
+
+      assert.strictEqual(tree.get(result.nodeId).data.TR[0], 'ee')
+      assert.strictEqual(tree.root.data.TR, undefined)
+    })
+
+    it('renders the markup on the board', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      let board = getBoard(tree)
+
+      assert.deepStrictEqual(board.markers[3][3], {type: 'triangle'})
+    })
+
+    it('does not mutate the input tree', () => {
+      let tree = createDraft(19)
+      let nextTree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+
+      assert.notStrictEqual(nextTree, tree)
+      assert.strictEqual(tree.root.data.TR, undefined)
+    })
+
+    it('returns the same tree for an unknown type', () => {
+      let tree = createDraft(19)
+      let same = toggleMarkup(tree, tree.root.id, 'LB', [3, 3])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an invalid vertex', () => {
+      let tree = createDraft(19)
+      let same = toggleMarkup(tree, tree.root.id, 'TR', [-1, -1])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an unknown node id', () => {
+      let tree = createDraft(19)
+      let same = toggleMarkup(tree, 'unknown', 'TR', [3, 3])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('serializes markup on the root without creating moves', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = toggleMarkup(tree, tree.root.id, 'SQ', [4, 4])
+      let output = serialize(tree)
+
+      assert(output.includes('TR[dd]'))
+      assert(output.includes('SQ[ee]'))
+      assert(!output.includes(';B['))
+      assert(!output.includes(';W['))
     })
   })
 

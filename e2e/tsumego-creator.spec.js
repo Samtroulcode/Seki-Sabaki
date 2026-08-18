@@ -70,8 +70,7 @@ test.describe('Tsumego Creator', () => {
     await page
       .getByRole('button', {name: 'Create Problem', exact: true})
       .click()
-    await page
-      .locator('.tsumego-creator-sidebar')
+    await toolbarFrom(page)
       .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
@@ -126,8 +125,7 @@ test.describe('Tsumego Creator', () => {
       .click()
     await expect(creator).toHaveAttribute('data-test-current-tool', 'B')
 
-    await page
-      .locator('.tsumego-creator-sidebar')
+    await toolbarFrom(page)
       .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await expect(creator).toHaveAttribute('data-test-current-tool', 'W')
@@ -144,8 +142,7 @@ test.describe('Tsumego Creator', () => {
       .getByRole('button', {name: 'Create Problem', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
-    await page
-      .locator('.tsumego-creator-sidebar')
+    await toolbarFrom(page)
       .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
@@ -170,8 +167,7 @@ test.describe('Tsumego Creator', () => {
       .getByRole('button', {name: 'Create Problem', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
-    await page
-      .locator('.tsumego-creator-sidebar')
+    await toolbarFrom(page)
       .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 4, 4)
@@ -225,8 +221,7 @@ test.describe('Tsumego Creator', () => {
       .locator('.tsumego-creator-mode-tabs')
       .getByRole('button', {name: 'Setup', exact: true})
       .click()
-    await page
-      .locator('.tsumego-creator-sidebar')
+    await toolbarFrom(page)
       .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 5, 5)
@@ -247,8 +242,7 @@ test.describe('Tsumego Creator', () => {
       .getByRole('button', {name: 'Create Problem', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
-    await page
-      .locator('.tsumego-creator-sidebar')
+    await toolbarFrom(page)
       .getByRole('button', {name: 'Erase', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
@@ -745,10 +739,277 @@ test.describe('Tsumego Creator', () => {
 
     await expect(page.locator('.tsumego-creator')).toBeVisible()
   })
+
+  test('shows the tool toolbar under the Goban with Place Black selected', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+
+    let toolbar = page.locator('.tsumego-creator-toolbar')
+    await expect(toolbar).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Place Black', exact: true}),
+    ).toHaveClass(/selected/)
+    await expect(
+      toolbar.getByRole('button', {name: 'Place White', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Erase', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Triangle Tool', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Square Tool', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Circle Tool', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Cross Tool', exact: true}),
+    ).toBeVisible()
+  })
+
+  test('Triangle tool renders a marker on a vertex', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Triangle Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/TR\[dd\]/)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-marker_triangle/)
+  })
+
+  test('Triangle tool removes the marker on a second click', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Triangle Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).not.toMatch(/TR\[dd\]/)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).not.toHaveClass(/shudan-marker_triangle/)
+  })
+
+  test('Square tool replaces Triangle on the same vertex', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Triangle Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Square Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/SQ\[dd\]/)
+    expect(sgf).not.toMatch(/TR\[dd\]/)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-marker_square/)
+    await expect(vertex).not.toHaveClass(/shudan-marker_triangle/)
+  })
+
+  test('entering Solution selects the Move tool', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-current-tool',
+      'move',
+    )
+    await expect(
+      toolbarFrom(page).getByRole('button', {name: 'Move', exact: true}),
+    ).toHaveClass(/selected/)
+  })
+
+  test('markup click in Solution does not create a move', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    let rootId = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-current-node-id')
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Triangle Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/TR\[dd\]/)
+    expect(sgf).not.toMatch(/;B\[/)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-current-node-id',
+      rootId,
+    )
+  })
+
+  test('markup belongs to the selected solution node', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Triangle Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 2, 2)
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    let rootNodes = sgf.parse(sgfString)
+    let wbb = rootNodes[0].children[0].children[0]
+    expect(wbb.data.W).toEqual(['bb'])
+    expect(wbb.data.TR).toEqual(['cc'])
+    expect(rootNodes[0].data.TR).toBeUndefined()
+  })
+
+  test('returning to Move creates moves again', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Triangle Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).not.toMatch(/;B\[/)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Move', exact: true})
+      .click()
+    await clickCreatorVertex(page, 4, 4)
+
+    sgf = await page.locator('.tsumego-creator').getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/;B\[ee\]/)
+  })
+
+  test('selecting a GameGraph node updates the selected position and comment', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.locator('[data-test-node-comment]').fill('Second move note.')
+    await expect(
+      sidebar.locator('.tsumego-creator-selected-position'),
+    ).toHaveText('Selected position: W[bb]')
+
+    await waitForGraphCamera(page)
+    await clickGraphNode(page, 0, 1)
+
+    await expect(
+      sidebar.locator('.tsumego-creator-selected-position'),
+    ).toHaveText('Selected position: B[aa]')
+    expect(await sidebar.locator('[data-test-node-comment]').inputValue()).toBe(
+      '',
+    )
+  })
 })
 
 function sidebarFrom(page) {
   return page.locator('.tsumego-creator-sidebar')
+}
+
+function toolbarFrom(page) {
+  return page.locator('.tsumego-creator-toolbar')
+}
+
+async function waitForGraphCamera(page) {
+  // The graph re-centers on the current node after `graph.delay` (100 ms).
+  // Wait until the camera transform has stayed unchanged for > 200 ms so we
+  // never catch the pre-update camera position.
+  await page.waitForFunction(() => {
+    let graph = document.querySelector('.tsumego-creator-graph #graph')
+    let style = graph?.querySelector('style')?.textContent || ''
+    let match = style.match(/translate\((-?\d+)px, (-?\d+)px\)/)
+    if (!match) return false
+
+    let key = `${match[1]},${match[2]}`
+    let now = Date.now()
+    if (window.__lastGraphCamera !== key) {
+      window.__lastGraphCamera = key
+      window.__lastGraphCameraTime = now
+      return false
+    }
+
+    return now - window.__lastGraphCameraTime > 200
+  })
+}
+
+async function clickGraphNode(page, matrixX, matrixY) {
+  await page.evaluate(
+    ({matrixX, matrixY}) => {
+      let graph = document.querySelector('.tsumego-creator-graph #graph')
+      let svg = graph.querySelector('svg')
+      let style = graph.querySelector('style').textContent
+      // The inline style stores the negated camera position (translate(-cx)).
+      let match = style.match(/translate\((-?\d+)px, (-?\d+)px\)/)
+      let [cx, cy] = [parseInt(match[1], 10), parseInt(match[2], 10)]
+      let rect = graph.getBoundingClientRect()
+      let gridSize = window.sabaki.setting.get('graph.grid_size')
+
+      // handleNodeClick maps (clientX - rect.left + camera) -> matrix cell.
+      svg.dispatchEvent(
+        new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + matrixX * gridSize + cx,
+          clientY: rect.top + matrixY * gridSize + cy,
+        }),
+      )
+    },
+    {matrixX, matrixY},
+  )
 }
 
 async function enterSolutionMode(page) {

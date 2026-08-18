@@ -20,10 +20,12 @@ import {
   setNodeResult,
   setPlayerToMove,
   setSetupStone,
+  toggleMarkup,
   validateProblem,
 } from '../modules/tsumegocreator.js'
 import Goban from './Goban.js'
 import GameGraph from './sidebars/GameGraph.js'
+import TsumegoCreatorToolbar from './TsumegoCreatorToolbar.js'
 
 const t = i18n.context('TsumegoCreator')
 const SIZES = [
@@ -31,6 +33,13 @@ const SIZES = [
   {value: 13, label: '13x13'},
   {value: 19, label: '19x19'},
 ]
+const MARKUP_PROPERTY = {
+  cross: 'MA',
+  triangle: 'TR',
+  square: 'SQ',
+  circle: 'CR',
+}
+const DEFAULT_TOOL = {setup: 'B', solution: 'move'}
 
 export default class TsumegoCreator extends Component {
   constructor(props) {
@@ -72,6 +81,18 @@ export default class TsumegoCreator extends Component {
     return getNodeComment(this.state.gameTree, this.currentNodeId)
   }
 
+  get selectedPositionLabel() {
+    if (this.isCurrentNodeRoot) return t('Root')
+
+    let node = this.state.gameTree.get(this.currentNodeId)
+    if (node == null) return t('Root')
+
+    let color = node.data.B != null ? 'B' : node.data.W != null ? 'W' : null
+    if (color == null) return t('Root')
+
+    return `${color}[${node.data[color][0]}]`
+  }
+
   get validation() {
     return validateProblem(this.state.gameTree)
   }
@@ -99,8 +120,9 @@ export default class TsumegoCreator extends Component {
   }
 
   handleToolChange = (tool) => {
-    if (tool === this.state.tool) return
-    this.setState({tool})
+    let nextTool = tool === 'erase' ? null : tool
+    if (nextTool === this.state.tool) return
+    this.setState({tool: nextTool})
     // Tool changes are pure UI state and do not modify the SGF.
   }
 
@@ -167,10 +189,28 @@ export default class TsumegoCreator extends Component {
     if (evt.vertex == null) return
 
     if (this.state.mode === 'setup') {
-      this.handleSetupVertexClick(evt.vertex)
-    } else {
+      if (this.isMarkupTool(this.state.tool)) {
+        this.handleMarkupClick(evt.vertex, this.state.gameTree.root.id)
+      } else {
+        this.handleSetupVertexClick(evt.vertex)
+      }
+    } else if (this.state.tool === 'move') {
       this.handleSolutionVertexClick(evt.vertex)
+    } else {
+      this.handleMarkupClick(evt.vertex, this.currentNodeId)
     }
+  }
+
+  isMarkupTool(tool) {
+    return MARKUP_PROPERTY[tool] != null
+  }
+
+  handleMarkupClick(vertex, nodeId) {
+    let type = MARKUP_PROPERTY[this.state.tool]
+    let nextTree = toggleMarkup(this.state.gameTree, nodeId, type, vertex)
+    if (nextTree === this.state.gameTree) return
+
+    this.setState({gameTree: nextTree, dirty: true})
   }
 
   handleSetupVertexClick(vertex) {
@@ -206,6 +246,7 @@ export default class TsumegoCreator extends Component {
     if (mode === this.state.mode) return
     this.setState({
       mode,
+      tool: DEFAULT_TOOL[mode],
       currentNodeId: this.state.gameTree.root.id,
       // Navigation between modes never modifies the SGF.
     })
@@ -277,6 +318,11 @@ export default class TsumegoCreator extends Component {
           onLineDraw: () => {},
         }),
       ),
+      h(TsumegoCreatorToolbar, {
+        mode,
+        selectedTool: tool === null ? 'erase' : tool,
+        onToolChange: this.handleToolChange,
+      }),
       h(
         'aside',
         {class: 'tsumego-creator-sidebar'},
@@ -317,8 +363,6 @@ export default class TsumegoCreator extends Component {
   }
 
   renderSetupSidebar() {
-    let {tool} = this.state
-
     return [
       h('h2', {key: 'title'}, t('Setup')),
       h(
@@ -344,47 +388,8 @@ export default class TsumegoCreator extends Component {
       ),
       h(
         'div',
-        {key: 'stones', class: 'tsumego-creator-group'},
-        h('h3', {}, t('Stones')),
-        h(
-          'div',
-          {class: 'tsumego-creator-button-row'},
-          h(
-            'button',
-            {
-              type: 'button',
-              class: tool === 'B' ? 'selected' : '',
-              'aria-label': t('Place Black'),
-              onClick: () => this.handleToolChange('B'),
-            },
-            t('Place Black'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              class: tool === 'W' ? 'selected' : '',
-              'aria-label': t('Place White'),
-              onClick: () => this.handleToolChange('W'),
-            },
-            t('Place White'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              class: tool === null ? 'selected' : '',
-              'aria-label': t('Erase'),
-              onClick: () => this.handleToolChange(null),
-            },
-            t('Erase'),
-          ),
-        ),
-      ),
-      h(
-        'div',
         {key: 'player', class: 'tsumego-creator-group'},
-        h('h3', {}, t('Player to move')),
+        h('h3', {}, t('First move')),
         h(
           'div',
           {class: 'tsumego-creator-button-row'},
@@ -408,6 +413,11 @@ export default class TsumegoCreator extends Component {
             },
             t('White to play'),
           ),
+        ),
+        h(
+          'p',
+          {class: 'tsumego-creator-hint'},
+          t('Who plays the first move of the problem.'),
         ),
       ),
       h(
@@ -477,6 +487,11 @@ export default class TsumegoCreator extends Component {
         h('button', {type: 'button', onClick: this.handleRootClick}, t('Root')),
       ),
       h(
+        'p',
+        {key: 'position', class: 'tsumego-creator-selected-position'},
+        `${t('Selected position')}: ${this.selectedPositionLabel}`,
+      ),
+      h(
         'div',
         {key: 'result', class: 'tsumego-creator-group'},
         h('h3', {}, t('Result')),
@@ -520,11 +535,15 @@ export default class TsumegoCreator extends Component {
         ),
       ),
       isRoot
-        ? null
+        ? h(
+            'p',
+            {key: 'root-hint', class: 'tsumego-creator-hint'},
+            t('Select a move to edit its result or comment.'),
+          )
         : h(
             'div',
             {key: 'comment', class: 'tsumego-creator-group'},
-            h('h3', {}, t('Comment')),
+            h('h3', {}, t('Comment for selected position')),
             h('textarea', {
               class: 'tsumego-creator-comment',
               rows: 4,
