@@ -224,6 +224,40 @@ export function applyNumberLabel(tree, nodeId, vertex) {
   return setLabel(tree, nodeId, vertex, getNextNumberLabel(tree, nodeId))
 }
 
+export function toggleLineMarkup(tree, nodeId, type, v1, v2) {
+  if (type !== 'LN' && type !== 'AR') return tree
+
+  let p1 = stringifyVertex(v1)
+  let p2 = stringifyVertex(v2)
+  if (p1 == null || p1 === '' || p2 == null || p2 === '') return tree
+  if (p1 === p2) return tree
+
+  let node = tree.get(nodeId)
+  if (node == null) return tree
+
+  // LN is non-directional, so its endpoints are canonicalized: LN[aa:bb] and
+  // LN[bb:aa] are the same line. AR keeps its direction, so AR[aa:bb] and
+  // AR[bb:aa] stay distinct.
+  let [a, b] = type === 'LN' ? [p1, p2].sort() : [p1, p2]
+  let composed = `${a}:${b}`
+
+  let values = node.data[type] || []
+  let exists = values.includes(composed)
+  let nextValues = exists
+    ? values.filter((x) => x !== composed)
+    : [...values, composed]
+
+  if (nextValues.length === values.length) return tree
+
+  let nextTree = tree.mutate((draft) => {
+    if (nextValues.length === 0) draft.removeProperty(nodeId, type)
+    else draft.updateProperty(nodeId, type, nextValues)
+  })
+
+  clearCache(nextTree)
+  return nextTree
+}
+
 export function setComment(tree, comment) {
   let value = comment == null ? '' : String(comment)
   let current = tree.root.data.C?.[0] ?? ''

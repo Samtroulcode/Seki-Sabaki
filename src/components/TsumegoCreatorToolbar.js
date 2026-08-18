@@ -11,6 +11,8 @@ const MARKUP_TOOLS = [
   {id: 'circle', title: t('Circle Tool'), icon: './img/edit/circle.svg'},
   {id: 'label', title: t('Label Tool'), icon: './img/edit/label.svg'},
   {id: 'number', title: t('Number Tool'), icon: './img/edit/number.svg'},
+  {id: 'line', title: t('Line Tool'), icon: './img/edit/line.svg'},
+  {id: 'arrow', title: t('Arrow Tool'), icon: './img/edit/arrow.svg'},
 ]
 
 export default class TsumegoCreatorToolbar extends Component {

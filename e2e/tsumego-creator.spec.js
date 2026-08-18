@@ -1199,6 +1199,165 @@ test.describe('Tsumego Creator', () => {
 
     await expect(vertex).toHaveClass(/shudan-marker_label/)
   })
+
+  test('shows Line and Arrow tools in the toolbar', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+
+    let toolbar = page.locator('.tsumego-creator-toolbar')
+    await expect(
+      toolbar.getByRole('button', {name: 'Line Tool', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Arrow Tool', exact: true}),
+    ).toBeVisible()
+  })
+
+  test('Line tool draws LN on the root in Setup', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Line Tool', exact: true})
+      .click()
+    await dragCreatorLine(page, 0, 0, 1, 1)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      /LN\[aa:bb\]/,
+    )
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/;B\[/)
+    await expect(
+      page.locator('.tsumego-creator-board .shudan-lines path.shudan-line'),
+    ).toHaveCount(1)
+  })
+
+  test('reversed line draw removes the line', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Line Tool', exact: true})
+      .click()
+    await dragCreatorLine(page, 0, 0, 1, 1)
+    await dragCreatorLine(page, 1, 1, 0, 0)
+
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/LN\[/)
+    await expect(
+      page.locator('.tsumego-creator-board .shudan-lines path.shudan-line'),
+    ).toHaveCount(0)
+  })
+
+  test('Arrow tool draws AR on the root', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Arrow Tool', exact: true})
+      .click()
+    await dragCreatorLine(page, 0, 0, 1, 1)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      /AR\[aa:bb\]/,
+    )
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/;B\[/)
+    await expect(
+      page.locator('.tsumego-creator-board .shudan-lines path.shudan-arrow'),
+    ).toHaveCount(1)
+  })
+
+  test('Line and Arrow clicks do not place stones or moves', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Line Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).not.toMatch(/AB\[/)
+    expect(sgf).not.toMatch(/AW\[/)
+    expect(sgf).not.toMatch(/;B\[/)
+    expect(sgf).not.toMatch(/LN\[/)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Arrow Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 4, 4)
+
+    sgf = await page.locator('.tsumego-creator').getAttribute('data-test-sgf')
+    expect(sgf).not.toMatch(/AB\[/)
+    expect(sgf).not.toMatch(/AW\[/)
+    expect(sgf).not.toMatch(/;B\[/)
+    expect(sgf).not.toMatch(/AR\[/)
+  })
+
+  test('Arrow in Solution annotates the current node without creating a move', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    let nodeId = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-current-node-id')
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Arrow Tool', exact: true})
+      .click()
+    await dragCreatorLine(page, 2, 2, 3, 3)
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    let rootNodes = sgf.parse(sgfString)
+    let baa = rootNodes[0].children[0]
+    expect(baa.data.B).toEqual(['aa'])
+    expect(baa.data.AR).toEqual(['cc:dd'])
+    expect(rootNodes[0].data.AR).toBeUndefined()
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-current-node-id',
+      nodeId,
+    )
+  })
+
+  test('line belongs to the selected solution node', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Line Tool', exact: true})
+      .click()
+    await dragCreatorLine(page, 2, 2, 3, 3)
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    let rootNodes = sgf.parse(sgfString)
+    let wbb = rootNodes[0].children[0].children[0]
+    expect(wbb.data.W).toEqual(['bb'])
+    expect(wbb.data.LN).toEqual(['cc:dd'])
+    expect(rootNodes[0].data.LN).toBeUndefined()
+  })
 })
 
 function sidebarFrom(page) {
@@ -1287,4 +1446,24 @@ async function clickCreatorVertex(page, x, y) {
     )
     .boundingBox()
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+}
+
+async function dragCreatorLine(page, x1, y1, x2, y2) {
+  let start = await page
+    .locator(
+      `.tsumego-creator-board .shudan-vertex[data-x="${x1}"][data-y="${y1}"]`,
+    )
+    .boundingBox()
+  let end = await page
+    .locator(
+      `.tsumego-creator-board .shudan-vertex[data-x="${x2}"][data-y="${y2}"]`,
+    )
+    .boundingBox()
+
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, {
+    steps: 5,
+  })
+  await page.mouse.up()
 }

@@ -24,6 +24,7 @@ import {
   setNodeResult,
   setPlayerToMove,
   setSetupStone,
+  toggleLineMarkup,
   toggleMarkup,
   validateProblem,
 } from '../modules/tsumegocreator.js'
@@ -192,17 +193,47 @@ export default class TsumegoCreator extends Component {
   handleVertexClick = (evt) => {
     if (evt.vertex == null) return
 
+    let tool = this.state.tool
+    // Line and Arrow are drawn exclusively through onLineDraw; a plain click
+    // with one of them selected must not place stones, moves or markup.
+    if (tool === 'line' || tool === 'arrow') return
+
     if (this.state.mode === 'setup') {
-      if (this.isAnnotationTool(this.state.tool)) {
+      if (this.isAnnotationTool(tool)) {
         this.handleAnnotationClick(evt.vertex, this.state.gameTree.root.id)
       } else {
         this.handleSetupVertexClick(evt.vertex)
       }
-    } else if (this.state.tool === 'move') {
+    } else if (tool === 'move') {
       this.handleSolutionVertexClick(evt.vertex)
     } else {
       this.handleAnnotationClick(evt.vertex, this.currentNodeId)
     }
+  }
+
+  handleLineDraw = (evt) => {
+    let line = evt.line
+    if (line == null) return
+
+    let tool = this.state.tool
+    if (tool !== 'line' && tool !== 'arrow') return
+
+    let type = tool === 'line' ? 'LN' : 'AR'
+    let nodeId =
+      this.state.mode === 'setup'
+        ? this.state.gameTree.root.id
+        : this.currentNodeId
+
+    let nextTree = toggleLineMarkup(
+      this.state.gameTree,
+      nodeId,
+      type,
+      line.v1,
+      line.v2,
+    )
+    if (nextTree === this.state.gameTree) return
+
+    this.setState({gameTree: nextTree, dirty: true})
   }
 
   isAnnotationTool(tool) {
@@ -344,9 +375,9 @@ export default class TsumegoCreator extends Component {
           showMoveColorization: false,
           fuzzyStonePlacement: false,
           animateStonePlacement: false,
-          drawLineMode: null,
+          drawLineMode: tool === 'line' || tool === 'arrow' ? tool : null,
           onVertexClick: this.handleVertexClick,
-          onLineDraw: () => {},
+          onLineDraw: this.handleLineDraw,
         }),
       ),
       h(TsumegoCreatorToolbar, {

@@ -26,6 +26,7 @@ import {
   setNodeResult,
   setPlayerToMove,
   setSetupStone,
+  toggleLineMarkup,
   toggleMarkup,
   validateProblem,
 } from '../src/modules/tsumegocreator.js'
@@ -589,6 +590,216 @@ describe('tsumegoCreator', () => {
       let same = applyNumberLabel(tree, tree.root.id, [-1, -1])
 
       assert.strictEqual(same, tree)
+    })
+  })
+
+  describe('line markup', () => {
+    it('adds a line with LN', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+
+      assert.deepStrictEqual(tree.root.data.LN, ['dd:ee'])
+    })
+
+    it('recognizes the reversed line as the same line', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [4, 4], [3, 3])
+
+      assert.strictEqual(tree.root.data.LN, undefined)
+    })
+
+    it('removes the line on a second identical draw', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+
+      assert.strictEqual(tree.root.data.LN, undefined)
+    })
+
+    it('keeps multiple lines coexisting', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [5, 5], [6, 6])
+
+      assert.deepStrictEqual(tree.root.data.LN, ['dd:ee', 'ff:gg'])
+    })
+
+    it('keeps the other lines when removing one', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [5, 5], [6, 6])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+
+      assert.deepStrictEqual(tree.root.data.LN, ['ff:gg'])
+    })
+
+    it('removes the LN property entirely when the last line is removed', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+
+      assert.strictEqual(tree.root.data.LN, undefined)
+    })
+
+    it('canonicalizes the endpoints of a line', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [4, 4], [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.LN, ['dd:ee'])
+    })
+
+    it('adds an arrow with AR', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+
+      assert.deepStrictEqual(tree.root.data.AR, ['dd:ee'])
+    })
+
+    it('removes the arrow on a second identical draw', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+
+      assert.strictEqual(tree.root.data.AR, undefined)
+    })
+
+    it('keeps AR[aa:bb] and AR[bb:aa] distinct', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [4, 4], [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.AR, ['dd:ee', 'ee:dd'])
+    })
+
+    it('keeps multiple arrows coexisting', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [5, 5], [6, 6])
+
+      assert.deepStrictEqual(tree.root.data.AR, ['dd:ee', 'ff:gg'])
+    })
+
+    it('removes the AR property entirely when the last arrow is removed', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+
+      assert.strictEqual(tree.root.data.AR, undefined)
+    })
+
+    it('does not touch AR when toggling a line', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [5, 5], [6, 6])
+
+      assert.deepStrictEqual(tree.root.data.AR, ['dd:ee'])
+      assert.deepStrictEqual(tree.root.data.LN, ['ff:gg'])
+    })
+
+    it('does not touch LN when toggling an arrow', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [5, 5], [6, 6])
+
+      assert.deepStrictEqual(tree.root.data.LN, ['dd:ee'])
+      assert.deepStrictEqual(tree.root.data.AR, ['ff:gg'])
+    })
+
+    it('preserves LB and shape markup when adding a line', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [5, 5], [6, 6])
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:A'])
+      assert.deepStrictEqual(tree.root.data.TR, ['ee'])
+      assert.deepStrictEqual(tree.root.data.LN, ['ff:gg'])
+    })
+
+    it('returns the same tree for identical endpoints', () => {
+      let tree = createDraft(19)
+      let same = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [3, 3])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an invalid vertex', () => {
+      let tree = createDraft(19)
+      let same = toggleLineMarkup(tree, tree.root.id, 'LN', [-1, -1], [3, 3])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an unknown node id', () => {
+      let tree = createDraft(19)
+      let same = toggleLineMarkup(tree, 'unknown', 'LN', [3, 3], [4, 4])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an unknown type', () => {
+      let tree = createDraft(19)
+      let same = toggleLineMarkup(tree, tree.root.id, 'XX', [3, 3], [4, 4])
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('annotates the root node', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+
+      assert.deepStrictEqual(tree.root.data.LN, ['dd:ee'])
+      assert.strictEqual(tree.root.children.length, 0)
+    })
+
+    it('annotates a solution node', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = toggleLineMarkup(result.tree, result.nodeId, 'AR', [4, 4], [5, 5])
+
+      assert.strictEqual(tree.get(result.nodeId).data.AR[0], 'ee:ff')
+      assert.strictEqual(tree.root.data.AR, undefined)
+    })
+
+    it('renders the line on the board', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      let board = getBoard(tree)
+
+      assert.deepStrictEqual(board.lines, [
+        {v1: [3, 3], v2: [4, 4], type: 'line'},
+      ])
+    })
+
+    it('renders the arrow on the board', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [3, 3], [4, 4])
+      let board = getBoard(tree)
+
+      assert.deepStrictEqual(board.lines, [
+        {v1: [3, 3], v2: [4, 4], type: 'arrow'},
+      ])
+    })
+
+    it('does not mutate the input tree', () => {
+      let tree = createDraft(19)
+      let nextTree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+
+      assert.notStrictEqual(nextTree, tree)
+      assert.strictEqual(tree.root.data.LN, undefined)
+    })
+
+    it('serializes lines and arrows without creating moves', () => {
+      let tree = createDraft(19)
+      tree = toggleLineMarkup(tree, tree.root.id, 'LN', [3, 3], [4, 4])
+      tree = toggleLineMarkup(tree, tree.root.id, 'AR', [5, 5], [6, 6])
+      let output = serialize(tree)
+
+      assert(output.includes('LN[dd:ee]'))
+      assert(output.includes('AR[ff:gg]'))
+      assert(!output.includes(';B['))
+      assert(!output.includes(';W['))
     })
   })
 
