@@ -1,8 +1,11 @@
 import sgf, {stringifyVertex} from '@sabaki/sgf'
 
 import * as gametree from './gametree.js'
+import {analyzeProblem} from './tsumego.js'
 
 const VALID_SIZES = new Set([9, 13, 19])
+const CORRECT_MARKER = 'Correct'
+const WRONG_MARKER = 'Wrong'
 
 export function createDraft(size = 19) {
   if (!VALID_SIZES.has(size)) size = 19
@@ -70,6 +73,9 @@ export function setPlayerToMove(tree, color) {
 
 export function setComment(tree, comment) {
   let value = comment == null ? '' : String(comment)
+  let current = tree.root.data.C?.[0] ?? ''
+
+  if (value === current) return tree
 
   return tree.mutate((draft) => {
     if (value === '') {
@@ -171,6 +177,93 @@ export function playMove(tree, parentNodeId, vertex) {
 export function serialize(tree, options = {}) {
   let {linebreak = ''} = options
   return sgf.stringify([tree.root], {linebreak})
+}
+
+export function getNodeResult(tree, nodeId) {
+  let node = tree.get(nodeId)
+  if (node == null) return null
+
+  return parseCommentValue(node.data.C?.[0]).result
+}
+
+export function getNodeComment(tree, nodeId) {
+  let node = tree.get(nodeId)
+  if (node == null) return ''
+
+  return parseCommentValue(node.data.C?.[0]).humanComment
+}
+
+export function setNodeResult(tree, nodeId, result) {
+  if (result !== 'correct' && result !== 'wrong' && result != null) return tree
+
+  let node = tree.get(nodeId)
+  if (node == null) return tree
+  if (nodeId === tree.root.id) return tree
+
+  let {humanComment} = parseCommentValue(node.data.C?.[0])
+  let nextValue = buildCommentValue(result, humanComment)
+
+  if (nextValue === node.data.C?.[0]) return tree
+
+  return tree.mutate((draft) => {
+    if (nextValue == null) draft.removeProperty(nodeId, 'C')
+    else draft.updateProperty(nodeId, 'C', [nextValue])
+  })
+}
+
+export function setNodeComment(tree, nodeId, comment) {
+  let node = tree.get(nodeId)
+  if (node == null) return tree
+  if (nodeId === tree.root.id) return tree
+
+  let {result} = parseCommentValue(node.data.C?.[0])
+  let nextValue = buildCommentValue(result, comment)
+
+  if (nextValue === node.data.C?.[0]) return tree
+
+  return tree.mutate((draft) => {
+    if (nextValue == null) draft.removeProperty(nodeId, 'C')
+    else draft.updateProperty(nodeId, 'C', [nextValue])
+  })
+}
+
+export function validateProblem(tree) {
+  let problem = analyzeProblem(tree, {allowTeFallback: true})
+  return {valid: problem != null, problem}
+}
+
+function parseCommentValue(value) {
+  if (value == null) return {result: null, humanComment: ''}
+
+  let correctMatch = value.match(/^Correct(?:\r?\n\r?\n([\s\S]*))?$/)
+  if (correctMatch) {
+    return {result: 'correct', humanComment: correctMatch[1] || ''}
+  }
+
+  let wrongMatch = value.match(/^Wrong(?:\r?\n\r?\n([\s\S]*))?$/)
+  if (wrongMatch) {
+    return {result: 'wrong', humanComment: wrongMatch[1] || ''}
+  }
+
+  return {result: null, humanComment: value}
+}
+
+function buildCommentValue(result, humanComment) {
+  humanComment = humanComment == null ? '' : String(humanComment).trim()
+
+  if (result === 'correct') {
+    return humanComment === ''
+      ? CORRECT_MARKER
+      : `${CORRECT_MARKER}\n\n${humanComment}`
+  }
+
+  if (result === 'wrong') {
+    return humanComment === ''
+      ? WRONG_MARKER
+      : `${WRONG_MARKER}\n\n${humanComment}`
+  }
+
+  return humanComment === '' ? null : humanComment
 }
 
 function removeVertex(list, vertex) {

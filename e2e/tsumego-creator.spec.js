@@ -328,6 +328,142 @@ test.describe('Tsumego Creator', () => {
     expect(sgf).not.toMatch(/;B\[aa\]/)
     expect(sgf).toMatch(/PL\[B\]/)
   })
+
+  test('selects a solution node and marks it Correct', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'Correct', exact: true})
+      .click()
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/;B\[aa\].*C\[Correct\]/)
+  })
+
+  test('Wrong replaces Correct on the same node', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.getByRole('button', {name: 'Correct', exact: true}).click()
+    await sidebar.getByRole('button', {name: 'Wrong', exact: true}).click()
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/;B\[aa\].*C\[Wrong\]/)
+    expect(sgf).not.toMatch(/C\[Correct\]/)
+  })
+
+  test('Clear removes only the marker and keeps the human comment', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.locator('[data-test-node-comment]').fill('Black lives.')
+    await sidebar.getByRole('button', {name: 'Correct', exact: true}).click()
+    await sidebar.getByRole('button', {name: 'Clear', exact: true}).click()
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/C\[Black lives\.\]/)
+    expect(sgf).not.toMatch(/C\[Correct/)
+    expect(sgf).not.toMatch(/C\[Wrong/)
+  })
+
+  test('human comment textarea does not show the Correct marker', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.locator('[data-test-node-comment]').fill('Black lives.')
+    await sidebar.getByRole('button', {name: 'Correct', exact: true}).click()
+
+    let value = await sidebar.locator('[data-test-node-comment]').inputValue()
+    expect(value).toBe('Black lives.')
+  })
+
+  test('selecting another node updates Result and Comment', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.locator('[data-test-node-comment]').fill('Second move note.')
+    await sidebar.getByRole('button', {name: 'Wrong', exact: true}).click()
+
+    await sidebar.getByRole('button', {name: 'Root', exact: true}).click()
+    await expect(
+      sidebar.getByRole('button', {name: 'Correct', exact: true}),
+    ).toBeDisabled()
+    await expect(sidebar.locator('[data-test-node-comment]')).toHaveCount(0)
+
+    // Replay to the first move and verify the first move has no annotation.
+    await clickCreatorVertex(page, 0, 0)
+    await expect(sidebar.locator('.result-correct')).not.toHaveClass(/selected/)
+    await expect(sidebar.locator('.result-wrong')).not.toHaveClass(/selected/)
+
+    // Select the second move via graph node click if possible, otherwise replay.
+    await clickCreatorVertex(page, 1, 1)
+    await expect(sidebar.locator('.result-wrong.selected')).toBeVisible()
+    expect(await sidebar.locator('[data-test-node-comment]').inputValue()).toBe(
+      'Second move note.',
+    )
+  })
+
+  test('shows Problem valid after a recognized solution', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+    await clickCreatorVertex(page, 2, 2)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.getByRole('button', {name: 'Correct', exact: true}).click()
+
+    await expect(
+      sidebar.locator('[data-test-validation="valid"]'),
+    ).toBeVisible()
+  })
+
+  test('shows Incomplete problem before a marker', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await expect(
+      sidebar.locator('[data-test-validation="invalid"]'),
+    ).toBeVisible()
+  })
 })
 
 async function enterSolutionMode(page) {

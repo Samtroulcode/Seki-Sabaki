@@ -1347,6 +1347,16 @@
 .tsumego-creator-button-row button.selected {
   background: #006fca;
 }
+.tsumego-creator-button-row button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tsumego-creator-button-row button.result-correct.selected {
+  background: #2f7d3f;
+}
+.tsumego-creator-button-row button.result-wrong.selected {
+  background: #a04444;
+}
 .tsumego-creator-comment {
   width: 100%;
   min-height: 5rem;
@@ -1367,6 +1377,20 @@
 .tsumego-creator-player-to-move {
   color: white;
   font-size: 1.1rem;
+}
+.tsumego-creator-validation {
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.tsumego-creator-validation.valid {
+  background: rgba(70, 167, 88, 0.15);
+  color: #5dd879;
+}
+.tsumego-creator-validation.invalid {
+  background: rgba(217, 160, 70, 0.12);
+  color: #e5b86a;
 }
 .tsumego-creator-graph {
   position: relative;

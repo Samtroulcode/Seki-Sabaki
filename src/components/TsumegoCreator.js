@@ -6,6 +6,8 @@ import {
   createDraft,
   getBoard,
   getNextPlayer,
+  getNodeComment,
+  getNodeResult,
   hasSolutionMoves,
   hasStones,
   playMove,
@@ -13,8 +15,11 @@ import {
   serialize,
   setBoardSize,
   setComment,
+  setNodeComment,
+  setNodeResult,
   setPlayerToMove,
   setSetupStone,
+  validateProblem,
 } from '../modules/tsumegocreator.js'
 import Goban from './Goban.js'
 import GameGraph from './sidebars/GameGraph.js'
@@ -54,6 +59,22 @@ export default class TsumegoCreator extends Component {
     return this.state.gameTree.root.data.C?.[0] || ''
   }
 
+  get isCurrentNodeRoot() {
+    return this.currentNodeId === this.state.gameTree.root.id
+  }
+
+  get currentNodeResult() {
+    return getNodeResult(this.state.gameTree, this.currentNodeId)
+  }
+
+  get currentNodeComment() {
+    return getNodeComment(this.state.gameTree, this.currentNodeId)
+  }
+
+  get validation() {
+    return validateProblem(this.state.gameTree)
+  }
+
   handleSizeChange = (size) => {
     if (size === this.currentSize) return
 
@@ -79,6 +100,7 @@ export default class TsumegoCreator extends Component {
   handleToolChange = (tool) => {
     if (tool === this.state.tool) return
     this.setState({tool})
+    // Tool changes are pure UI state and do not modify the SGF.
   }
 
   handlePlayerChange = (color) => {
@@ -90,10 +112,36 @@ export default class TsumegoCreator extends Component {
   }
 
   handleCommentChange = (evt) => {
-    this.setState({
-      gameTree: setComment(this.state.gameTree, evt.target.value),
-      dirty: true,
-    })
+    let nextTree = setComment(this.state.gameTree, evt.target.value)
+    if (nextTree === this.state.gameTree) return
+
+    this.setState({gameTree: nextTree, dirty: true})
+  }
+
+  handleNodeResultChange = (result) => {
+    if (this.isCurrentNodeRoot) return
+
+    let nextTree = setNodeResult(
+      this.state.gameTree,
+      this.currentNodeId,
+      result,
+    )
+    if (nextTree === this.state.gameTree) return
+
+    this.setState({gameTree: nextTree, dirty: true})
+  }
+
+  handleNodeCommentChange = (evt) => {
+    if (this.isCurrentNodeRoot) return
+
+    let nextTree = setNodeComment(
+      this.state.gameTree,
+      this.currentNodeId,
+      evt.target.value,
+    )
+    if (nextTree === this.state.gameTree) return
+
+    this.setState({gameTree: nextTree, dirty: true})
   }
 
   handleVertexClick = (evt) => {
@@ -131,7 +179,7 @@ export default class TsumegoCreator extends Component {
     this.setState({
       gameTree: result.tree,
       currentNodeId: result.nodeId,
-      dirty: true,
+      dirty: result.created ? true : this.state.dirty,
     })
   }
 
@@ -140,22 +188,26 @@ export default class TsumegoCreator extends Component {
     this.setState({
       mode,
       currentNodeId: this.state.gameTree.root.id,
+      // Navigation between modes never modifies the SGF.
     })
   }
 
   handleRootClick = () => {
     this.setState({currentNodeId: this.state.gameTree.root.id})
+    // Navigation never modifies the SGF.
   }
 
   handleGraphNodeClick = (evt) => {
     if (evt.button !== 0 || evt.treePosition == null) return
     this.setState({currentNodeId: evt.treePosition})
+    // Navigation never modifies the SGF.
   }
 
   handleGraphWheel = (step) => {
     let next = this.state.gameTree.navigate(this.currentNodeId, step, {})
     if (next == null) return
     this.setState({currentNodeId: next.id})
+    // Navigation never modifies the SGF.
   }
 
   handleBack = () => {
@@ -358,9 +410,24 @@ export default class TsumegoCreator extends Component {
     let nextPlayer = getNextPlayer(gameTree, this.currentNodeId)
     let graphGridSize = window.sabaki.setting.get('graph.grid_size')
     let graphNodeSize = window.sabaki.setting.get('graph.node_size')
+    let result = this.currentNodeResult
+    let isRoot = this.isCurrentNodeRoot
+    let validation = this.validation
 
     return [
       h('h2', {key: 'title'}, t('Solution')),
+      h(
+        'p',
+        {
+          key: 'validation',
+          class: [
+            'tsumego-creator-validation',
+            validation.valid ? 'valid' : 'invalid',
+          ].join(' '),
+          'data-test-validation': validation.valid ? 'valid' : 'invalid',
+        },
+        validation.valid ? t('Problem valid') : t('Incomplete problem'),
+      ),
       h(
         'p',
         {
@@ -389,6 +456,64 @@ export default class TsumegoCreator extends Component {
         {key: 'root', class: 'tsumego-creator-group'},
         h('button', {type: 'button', onClick: this.handleRootClick}, t('Root')),
       ),
+      h(
+        'div',
+        {key: 'result', class: 'tsumego-creator-group'},
+        h('h3', {}, t('Result')),
+        h(
+          'div',
+          {class: 'tsumego-creator-button-row'},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: ['result-correct', result === 'correct' ? 'selected' : '']
+                .filter(Boolean)
+                .join(' '),
+              disabled: isRoot,
+              onClick: () => this.handleNodeResultChange('correct'),
+            },
+            t('Correct'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: ['result-wrong', result === 'wrong' ? 'selected' : '']
+                .filter(Boolean)
+                .join(' '),
+              disabled: isRoot,
+              onClick: () => this.handleNodeResultChange('wrong'),
+            },
+            t('Wrong'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'result-clear',
+              disabled: isRoot || result == null,
+              onClick: () => this.handleNodeResultChange(null),
+            },
+            t('Clear'),
+          ),
+        ),
+      ),
+      isRoot
+        ? null
+        : h(
+            'div',
+            {key: 'comment', class: 'tsumego-creator-group'},
+            h('h3', {}, t('Comment')),
+            h('textarea', {
+              class: 'tsumego-creator-comment',
+              rows: 4,
+              value: this.currentNodeComment,
+              onInput: this.handleNodeCommentChange,
+              placeholder: t('Explain this variation.'),
+              'data-test-node-comment': true,
+            }),
+          ),
     ]
   }
 }

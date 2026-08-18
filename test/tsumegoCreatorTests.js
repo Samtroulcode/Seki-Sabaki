@@ -1,19 +1,25 @@
 import assert from 'assert'
 import sgf from '@sabaki/sgf'
 
+import {advanceSolution, resolveMove} from '../src/modules/tsumego.js'
 import {
   createDraft,
   findMatchingChild,
   getBoard,
   getNextPlayer,
+  getNodeComment,
+  getNodeResult,
   hasSolutionMoves,
   hasStones,
   playMove,
   serialize,
   setBoardSize,
   setComment,
+  setNodeComment,
+  setNodeResult,
   setPlayerToMove,
   setSetupStone,
+  validateProblem,
 } from '../src/modules/tsumegocreator.js'
 
 describe('tsumegoCreator', () => {
@@ -170,6 +176,13 @@ describe('tsumegoCreator', () => {
       tree = setComment(tree, null)
 
       assert.strictEqual(tree.root.data.C, undefined)
+    })
+
+    it('returns the same tree when the comment is unchanged', () => {
+      let tree = setComment(createDraft(19), 'Black to play.')
+      let same = setComment(tree, 'Black to play.')
+
+      assert.strictEqual(same, tree)
     })
   })
 
@@ -386,6 +399,260 @@ describe('tsumegoCreator', () => {
       assert(variation?.created)
 
       assert.strictEqual(hasSolutionMoves(variation.tree), true)
+    })
+  })
+
+  describe('node result annotation', () => {
+    it('sets Correct on a move node', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Correct')
+    })
+
+    it('sets Wrong on a move node', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'wrong')
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Wrong')
+    })
+
+    it('clears the result while preserving the human comment', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeComment(result.tree, result.nodeId, 'Black lives.')
+      tree = setNodeResult(tree, result.nodeId, 'correct')
+      tree = setNodeResult(tree, result.nodeId, null)
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Black lives.')
+    })
+
+    it('replaces Correct with Wrong', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+      tree = setNodeResult(tree, result.nodeId, 'wrong')
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Wrong')
+    })
+
+    it('replaces Wrong with Correct', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'wrong')
+      tree = setNodeResult(tree, result.nodeId, 'correct')
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Correct')
+    })
+
+    it('keeps the human comment when changing the result', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeComment(result.tree, result.nodeId, 'Black lives.')
+      tree = setNodeResult(tree, result.nodeId, 'correct')
+
+      assert.strictEqual(
+        tree.get(result.nodeId).data.C[0],
+        'Correct\n\nBlack lives.',
+      )
+    })
+
+    it('does not accumulate markers when toggling result', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+      tree = setNodeResult(tree, result.nodeId, 'wrong')
+      tree = setNodeResult(tree, result.nodeId, 'correct')
+      tree = setNodeResult(tree, result.nodeId, null)
+
+      assert.strictEqual(tree.get(result.nodeId).data.C, undefined)
+    })
+
+    it('removes C entirely when result and comment are both cleared', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+      tree = setNodeComment(tree, result.nodeId, '')
+      tree = setNodeResult(tree, result.nodeId, null)
+
+      assert.strictEqual(tree.get(result.nodeId).data.C, undefined)
+    })
+
+    it('returns the same tree when setting the same result', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+      let same = setNodeResult(tree, result.nodeId, 'correct')
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('does not annotate the root node', () => {
+      let tree = createDraft(19)
+      tree = setNodeResult(tree, tree.root.id, 'correct')
+
+      assert.strictEqual(tree.root.data.C, undefined)
+    })
+  })
+
+  describe('node human comment', () => {
+    it('stores a comment without a result marker', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeComment(result.tree, result.nodeId, 'Black lives.')
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Black lives.')
+    })
+
+    it('preserves the result marker when updating the comment', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+      tree = setNodeComment(tree, result.nodeId, 'Black lives.')
+
+      assert.strictEqual(
+        tree.get(result.nodeId).data.C[0],
+        'Correct\n\nBlack lives.',
+      )
+    })
+
+    it('updates the comment while keeping the result marker', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'wrong')
+      tree = setNodeComment(tree, result.nodeId, 'Old.')
+      tree = setNodeComment(tree, result.nodeId, 'New.')
+
+      assert.strictEqual(tree.get(result.nodeId).data.C[0], 'Wrong\n\nNew.')
+    })
+
+    it('returns only the human comment from a marked node', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+      tree = setNodeComment(tree, result.nodeId, 'Black lives.')
+
+      assert.strictEqual(getNodeComment(tree, result.nodeId), 'Black lives.')
+    })
+
+    it('returns null result for an unmarked comment', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeComment(result.tree, result.nodeId, 'Just a note.')
+
+      assert.strictEqual(getNodeResult(tree, result.nodeId), null)
+      assert.strictEqual(getNodeComment(tree, result.nodeId), 'Just a note.')
+    })
+
+    it('returns correct result for a Correct marker', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'correct')
+
+      assert.strictEqual(getNodeResult(tree, result.nodeId), 'correct')
+    })
+
+    it('returns wrong result for a Wrong marker', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeResult(result.tree, result.nodeId, 'wrong')
+
+      assert.strictEqual(getNodeResult(tree, result.nodeId), 'wrong')
+    })
+
+    it('does not comment the root node', () => {
+      let tree = createDraft(19)
+      tree = setNodeComment(tree, tree.root.id, 'Note')
+
+      assert.strictEqual(tree.root.data.C, undefined)
+    })
+
+    it('returns the same tree when the comment is unchanged', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setNodeComment(result.tree, result.nodeId, 'Black lives.')
+      let same = setNodeComment(tree, result.nodeId, 'Black lives.')
+
+      assert.strictEqual(same, tree)
+    })
+  })
+
+  describe('solver compatibility', () => {
+    it('recognizes a single correct solution', () => {
+      let tree = createDraft(9)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+      tree = setNodeResult(r3.tree, r3.nodeId, 'correct')
+
+      let {valid, problem} = validateProblem(tree)
+      assert.strictEqual(valid, true)
+      assert(problem != null)
+      assert.strictEqual(problem.playerToMove, 'B')
+    })
+
+    it('marks a wrong variation explicitly', () => {
+      let tree = createDraft(9)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+      tree = setNodeResult(r3.tree, r3.nodeId, 'correct')
+
+      let wrong1 = playMove(tree, tree.root.id, [3, 3])
+      assert(wrong1.created)
+      let wrong2 = playMove(wrong1.tree, wrong1.nodeId, [4, 4])
+      tree = setNodeResult(wrong2.tree, wrong2.nodeId, 'wrong')
+
+      let {valid, problem} = validateProblem(tree)
+      assert.strictEqual(valid, true)
+      assert(problem != null)
+    })
+
+    it('supports multiple correct solutions', () => {
+      let tree = createDraft(9)
+      let a = playMove(tree, tree.root.id, [0, 0])
+      let aEnd = playMove(a.tree, a.nodeId, [1, 1])
+      tree = setNodeResult(aEnd.tree, aEnd.nodeId, 'correct')
+
+      let b = playMove(tree, tree.root.id, [2, 2])
+      assert(b.created)
+      let bEnd = playMove(b.tree, b.nodeId, [3, 3])
+      tree = setNodeResult(bEnd.tree, bEnd.nodeId, 'correct')
+
+      let {valid} = validateProblem(tree)
+      assert.strictEqual(valid, true)
+    })
+
+    it('reports incomplete for a draft without markers', () => {
+      let tree = createDraft(9)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+
+      let {valid} = validateProblem(r2.tree)
+      assert.strictEqual(valid, false)
+    })
+
+    it('resolves and advances through a Creator-built solution', () => {
+      let tree = createDraft(9)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+      tree = setNodeResult(r3.tree, r3.nodeId, 'correct')
+
+      let {problem} = validateProblem(tree)
+      assert(problem != null)
+
+      let resolved = resolveMove(tree, problem, 'aa')
+      assert.strictEqual(resolved.status, 'correct')
+      assert.strictEqual(resolved.node.id, r1.nodeId)
+
+      let advanced = advanceSolution(tree, problem, resolved.node)
+      assert(advanced != null)
+      assert.strictEqual(advanced.automaticMoves.length, 1)
+      assert.strictEqual(advanced.automaticMoves[0].id, r2.nodeId)
+      assert.strictEqual(advanced.nextPlayerMove.id, r3.nodeId)
     })
   })
 })
