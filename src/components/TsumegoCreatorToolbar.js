@@ -16,18 +16,8 @@ export default class TsumegoCreatorToolbar extends Component {
     let isSetup = mode === 'setup'
     let positionTools = isSetup
       ? [
-          {
-            id: 'B',
-            title: t('Place Black'),
-            icon: './img/edit/stone_1.svg',
-            stone: 'black',
-          },
-          {
-            id: 'W',
-            title: t('Place White'),
-            icon: './img/edit/stone_-1.svg',
-            stone: 'white',
-          },
+          {id: 'B', title: t('Place Black'), stone: 'black'},
+          {id: 'W', title: t('Place White'), stone: 'white'},
           {id: 'erase', title: t('Erase'), label: t('Erase')},
         ]
       : [{id: 'move', title: t('Move'), label: t('Move')}]
@@ -64,15 +54,14 @@ export default class TsumegoCreatorToolbar extends Component {
     let selected = tool.id === selectedTool
     let content
 
-    if (tool.icon != null) {
+    if (tool.stone != null) {
+      content = h('span', {
+        class: `tsumego-creator-toolbar-stone stone-${tool.stone}`,
+      })
+    } else if (tool.icon != null) {
       content = h(
         'span',
-        {
-          class: [
-            'tsumego-creator-toolbar-icon',
-            tool.stone != null ? `stone-${tool.stone}` : 'markup',
-          ].join(' '),
-        },
+        {class: 'tsumego-creator-toolbar-icon markup'},
         h('img', {src: tool.icon, alt: ''}),
       )
     } else {
