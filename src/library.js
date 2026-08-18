@@ -129,6 +129,30 @@ function isSgfFile(filename) {
   return extension === '.sgf' || extension === '.rsgf'
 }
 
+// Validates a relative path for a write operation inside the user library's
+// Tsumego folder. The first segment must be exactly `Tsumego`; no segment may
+// be empty, `.`, `..`, or carry a drive letter. Returns the split segments and
+// the normalized `/`-joined path.
+function validateTsumegoWritePath(relativePath) {
+  if (typeof relativePath !== 'string' || relativePath === '') {
+    return {ok: false, code: 'invalid-path'}
+  }
+  if (relativePath.includes('\0')) return {ok: false, code: 'invalid-path'}
+
+  let segments = relativePath.split(/[\\/]/)
+  if (segments[0] !== 'Tsumego') return {ok: false, code: 'outside-tsumego'}
+  if (segments.length < 2) return {ok: false, code: 'invalid-path'}
+
+  for (let segment of segments) {
+    if (segment === '' || segment === '.' || segment === '..') {
+      return {ok: false, code: 'invalid-path'}
+    }
+    if (/^[a-zA-Z]:/.test(segment)) return {ok: false, code: 'invalid-path'}
+  }
+
+  return {ok: true, segments, normalized: segments.join('/')}
+}
+
 function ensureTsumegoDirectory(root) {
   let tsumegoPath = path.join(root, 'Tsumego')
   try {
@@ -495,6 +519,104 @@ exports.create = function (setting, dialog, options = {}) {
     return {ok: true, count: countSgfFilesRecursively(directory.path)}
   }
 
+  // Writes an SGF file into the user library, always under `Tsumego`. The
+  // path is validated segment by segment (no traversal, no absolute path, no
+  // symlinked directories) and the write is atomic: a temp file is written in
+  // the destination directory and renamed over the target, so an interruption
+  // cannot leave a partially written file behind. An existing file is only
+  // replaced when `overwrite` is explicitly requested.
+  function saveFile(relativePath, content, {overwrite = false} = {}) {
+    let config = getConfig()
+    if (!config.configured) return {ok: false, code: 'not-configured'}
+    if (typeof content !== 'string') return {ok: false, code: 'invalid-content'}
+
+    let pathResult = validateTsumegoWritePath(relativePath)
+    if (!pathResult.ok) return pathResult
+    if (!isSgfFile(relativePath)) return {ok: false, code: 'invalid-file'}
+
+    let tsumego = ensureTsumegoDirectory(config.root)
+    if (!tsumego.ok) return tsumego
+
+    let directory = validateRelativeTarget(
+      config.root,
+      pathResult.segments.slice(0, -1).join('/'),
+      (stats) => stats.isDirectory(),
+    )
+    if (!directory.ok) return {ok: false, code: 'invalid-directory'}
+
+    let filename = pathResult.segments[pathResult.segments.length - 1]
+    let targetPath = path.join(directory.path, filename)
+
+    try {
+      let stats = fs.lstatSync(targetPath)
+      if (stats.isSymbolicLink()) return {ok: false, code: 'invalid-file'}
+      if (!stats.isFile()) return {ok: false, code: 'invalid-file'}
+      if (!overwrite) return {ok: false, exists: true}
+    } catch (err) {
+      // The target does not exist yet — a fresh save.
+    }
+
+    let tempPath = path.join(
+      directory.path,
+      `.${filename}.tmp-${process.pid}-${crypto.randomBytes(6).toString('hex')}`,
+    )
+    try {
+      fs.writeFileSync(tempPath, content, {mode: 0o644})
+      fs.renameSync(tempPath, targetPath)
+    } catch (err) {
+      try {
+        fs.unlinkSync(tempPath)
+      } catch (cleanupErr) {
+        // The temp file may never have been created.
+      }
+      return {ok: false, code: 'write-failed'}
+    }
+
+    return {ok: true, relativePath: pathResult.normalized}
+  }
+
+  // Creates a directory inside the user library's `Tsumego` folder. The
+  // parent must already exist (folders are created one level at a time by the
+  // picker). An existing directory is reported as `exists` so the UI can show
+  // a clear message instead of silently reusing it.
+  function createDirectory(relativePath) {
+    let config = getConfig()
+    if (!config.configured) return {ok: false, code: 'not-configured'}
+
+    let pathResult = validateTsumegoWritePath(relativePath)
+    if (!pathResult.ok) return pathResult
+
+    let tsumego = ensureTsumegoDirectory(config.root)
+    if (!tsumego.ok) return tsumego
+
+    let directory = validateRelativeTarget(
+      config.root,
+      pathResult.segments.slice(0, -1).join('/'),
+      (stats) => stats.isDirectory(),
+    )
+    if (!directory.ok) return {ok: false, code: 'invalid-directory'}
+
+    let name = pathResult.segments[pathResult.segments.length - 1]
+    let targetPath = path.join(directory.path, name)
+
+    try {
+      let stats = fs.lstatSync(targetPath)
+      if (stats.isSymbolicLink()) return {ok: false, code: 'invalid-path'}
+      if (stats.isDirectory()) return {ok: false, exists: true}
+      return {ok: false, code: 'invalid-path'}
+    } catch (err) {
+      // The directory does not exist yet.
+    }
+
+    try {
+      fs.mkdirSync(targetPath)
+    } catch (err) {
+      return {ok: false, code: 'mkdir-failed'}
+    }
+
+    return {ok: true, relativePath: pathResult.normalized}
+  }
+
   async function chooseRoot(window) {
     let result = await dialog.showOpenDialog(window, {
       properties: ['openDirectory'],
@@ -521,9 +643,12 @@ exports.create = function (setting, dialog, options = {}) {
     openBuiltin,
     getBuiltinCollectionMetadata,
     countProblems,
+    saveFile,
+    createDirectory,
   }
 }
 
 exports.validateRoot = validateRoot
 exports.resolveBuiltinRoot = resolveBuiltinRoot
 exports.parseCollectionMetadata = parseCollectionMetadata
+exports.validateTsumegoWritePath = validateTsumegoWritePath

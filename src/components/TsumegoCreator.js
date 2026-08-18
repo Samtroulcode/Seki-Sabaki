@@ -4,6 +4,11 @@ import i18n from '../i18n.js'
 import * as sound from '../modules/sound.js'
 import {showInputBox} from '../modules/dialog.js'
 import {
+  chooseLibraryRoot,
+  getLibraryConfig,
+  saveLibraryFile,
+} from '../modules/library.js'
+import {
   applyNumberLabel,
   createDraft,
   deleteBranch,
@@ -31,6 +36,8 @@ import {validateTsumegoTree} from '../modules/tsumegovalidator.js'
 import Goban from './Goban.js'
 import GameGraph from './sidebars/GameGraph.js'
 import TsumegoCreatorToolbar from './TsumegoCreatorToolbar.js'
+import TsumegoSaveDialog from './TsumegoSaveDialog.js'
+import TsumegoSolver from './TsumegoSolver.js'
 
 const t = i18n.context('TsumegoCreator')
 const SIZES = [
@@ -55,6 +62,10 @@ export default class TsumegoCreator extends Component {
       mode: 'setup',
       currentNodeId: null,
       dirty: false,
+      savedRelativePath: null,
+      testing: false,
+      saveDialogOpen: false,
+      saveError: null,
     }
   }
 
@@ -341,7 +352,95 @@ export default class TsumegoCreator extends Component {
     this.props.onBack()
   }
 
+  // First save opens the Library picker (after ensuring a Library is
+  // configured); later saves write directly to the remembered path.
+  handleSaveClick = async () => {
+    if (this.state.savedRelativePath != null) {
+      await this.performSave(this.state.savedRelativePath, {overwrite: true})
+      return
+    }
+
+    let config = await getLibraryConfig()
+    if (config?.configured !== true) {
+      let result = await chooseLibraryRoot()
+      if (result?.ok !== true) {
+        if (result != null && result.cancelled !== true) {
+          this.setState({
+            saveError: t('This folder cannot be used as a Library.'),
+          })
+        }
+        return
+      }
+    }
+
+    this.setState({saveDialogOpen: true, saveError: null})
+  }
+
+  // Serializes the current draft and writes it. Collisions ask for an
+  // explicit replacement before overwriting. Returns a structured result the
+  // dialog can react to.
+  async performSave(relativePath, options = {}) {
+    let content = serialize(this.state.gameTree)
+    let result = await saveLibraryFile(relativePath, content, options)
+    if (result?.ok === true) {
+      let savedPath = result.relativePath || relativePath
+      this.setState({
+        savedRelativePath: savedPath,
+        dirty: false,
+        saveDialogOpen: false,
+        saveError: null,
+      })
+      this.props.onSaved?.(savedPath)
+      return {ok: true, relativePath: savedPath}
+    }
+    if (result?.exists === true) {
+      let confirmed = window.confirm(
+        t('A problem with this name already exists. Replace it?'),
+      )
+      if (confirmed) {
+        return this.performSave(relativePath, {...options, overwrite: true})
+      }
+      return {ok: false, cancelled: true}
+    }
+    return {ok: false, error: result?.error || 'save-failed'}
+  }
+
+  handleSaveDialogSave = async (relativePath) => {
+    return this.performSave(relativePath)
+  }
+
+  handleSaveDialogClose = () => {
+    this.setState({saveDialogOpen: false, saveError: null})
+  }
+
+  handleTestProblemClick = () => {
+    if (!this.validation.valid) return
+    this.setState({testing: true})
+  }
+
+  handleTestBack = () => {
+    this.setState({testing: false})
+  }
+
   render() {
+    if (this.state.testing) {
+      return this.renderTestSolver()
+    }
+    return this.renderCreator()
+  }
+
+  renderTestSolver() {
+    let validation = this.validation
+    return h(TsumegoSolver, {
+      key: 'creator-test',
+      gameTree: this.state.gameTree,
+      problem: validation.problem,
+      testMode: true,
+      onBack: this.handleTestBack,
+    })
+  }
+
+  renderCreator() {
     let {gameTree, tool, mode} = this.state
     let isSetup = mode === 'setup'
     let board = getBoard(
@@ -351,6 +450,11 @@ export default class TsumegoCreator extends Component {
     let currentThemeId = window.sabaki.setting.get('theme.current')
     let graphGridSize = window.sabaki.setting.get('graph.grid_size')
     let graphNodeSize = window.sabaki.setting.get('graph.node_size')
+    let validation = this.validation
+    let saveStatus =
+      this.state.savedRelativePath != null && !this.state.dirty
+        ? `${t('Saved')} — ${this.state.savedRelativePath}`
+        : null
 
     return h(
       'div',
@@ -410,7 +514,9 @@ export default class TsumegoCreator extends Component {
             t('Solution'),
           ),
         ),
-        isSetup ? this.renderSetupSidebar() : this.renderSolutionSidebar(),
+        isSetup
+          ? this.renderSetupSidebar()
+          : this.renderSolutionSidebar(validation),
       ),
       h(
         'div',
@@ -420,7 +526,45 @@ export default class TsumegoCreator extends Component {
           {type: 'button', onClick: this.handleBack},
           `‹ ${t('Back')}`,
         ),
+        h(
+          'div',
+          {class: 'tsumego-creator-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'tsumego-save-button',
+              onClick: this.handleSaveClick,
+            },
+            this.state.savedRelativePath != null
+              ? t('Save')
+              : t('Save to My Library'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'tsumego-test-button',
+              disabled: !validation.valid,
+              onClick: this.handleTestProblemClick,
+              title: validation.valid
+                ? undefined
+                : t('Complete a playable solution before testing.'),
+            },
+            t('Test Problem'),
+          ),
+        ),
+        saveStatus != null &&
+          h('p', {class: 'tsumego-creator-save-status'}, saveStatus),
       ),
+      this.state.saveError != null &&
+        h('p', {class: 'ogs-error'}, this.state.saveError),
+      this.state.saveDialogOpen &&
+        h(TsumegoSaveDialog, {
+          initialDirectory: this.props.initialSaveDirectory,
+          onSave: this.handleSaveDialogSave,
+          onClose: this.handleSaveDialogClose,
+        }),
     )
   }
 
@@ -497,14 +641,13 @@ export default class TsumegoCreator extends Component {
     ]
   }
 
-  renderSolutionSidebar() {
+  renderSolutionSidebar(validation = this.validation) {
     let {gameTree} = this.state
     let nextPlayer = getNextPlayer(gameTree, this.currentNodeId)
     let graphGridSize = window.sabaki.setting.get('graph.grid_size')
     let graphNodeSize = window.sabaki.setting.get('graph.node_size')
     let result = this.currentNodeResult
     let isRoot = this.isCurrentNodeRoot
-    let validation = this.validation
     let validationMessage = validation.valid
       ? t('Problem valid')
       : validation.errors[0] != null

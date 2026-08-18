@@ -229,8 +229,15 @@ export default class TsumegoSolver extends Component {
   }
 
   render() {
-    let {gameTree, problem, problemIndex, problemCount, relativePath, source} =
-      this.props
+    let {
+      gameTree,
+      problem,
+      problemIndex,
+      problemCount,
+      relativePath,
+      source,
+      testMode = false,
+    } = this.props
     let {displayNodeId, phase, feedback, showGameGraph, explorationBoard} =
       this.state
     let solved = phase === 'solved'
@@ -268,13 +275,24 @@ export default class TsumegoSolver extends Component {
       h(
         'aside',
         {class: 'tsumego-solver-sidebar'},
-        h('h2', {}, `${t('Problem')} ${problemIndex + 1} / ${problemCount}`),
-        h('p', {class: 'tsumego-problem-filename'}, filename),
+        h(
+          'h2',
+          {},
+          testMode
+            ? t('Test Problem')
+            : `${t('Problem')} ${problemIndex + 1} / ${problemCount}`,
+        ),
         h(
           'p',
-          {class: 'tsumego-source-label'},
-          source === 'builtin' ? t('Built-in') : t('My Library'),
+          {class: 'tsumego-problem-filename'},
+          testMode ? t('Unsaved draft') : filename,
         ),
+        !testMode &&
+          h(
+            'p',
+            {class: 'tsumego-source-label'},
+            source === 'builtin' ? t('Built-in') : t('My Library'),
+          ),
         h(
           'p',
           {class: 'tsumego-player-to-move'},
@@ -319,27 +337,29 @@ export default class TsumegoSolver extends Component {
         h(
           'button',
           {type: 'button', onClick: this.handleBack},
-          `‹ ${t('Collection')}`,
+          `‹ ${testMode ? t('Back to Editor') : t('Collection')}`,
         ),
-        h(
-          'button',
-          {
-            type: 'button',
-            disabled: problemIndex <= 0,
-            onClick: this.handlePrevious,
-          },
-          `‹ ${t('Previous')}`,
-        ),
-        h('span', {}, `${problemIndex + 1} / ${problemCount}`),
-        h(
-          'button',
-          {
-            type: 'button',
-            disabled: problemIndex >= problemCount - 1,
-            onClick: this.handleNext,
-          },
-          `${t('Next')} ›`,
-        ),
+        !testMode &&
+          h(
+            'button',
+            {
+              type: 'button',
+              disabled: problemIndex <= 0,
+              onClick: this.handlePrevious,
+            },
+            `‹ ${t('Previous')}`,
+          ),
+        !testMode && h('span', {}, `${problemIndex + 1} / ${problemCount}`),
+        !testMode &&
+          h(
+            'button',
+            {
+              type: 'button',
+              disabled: problemIndex >= problemCount - 1,
+              onClick: this.handleNext,
+            },
+            `${t('Next')} ›`,
+          ),
         (phase === 'failed' || solved) &&
           h(
             'button',

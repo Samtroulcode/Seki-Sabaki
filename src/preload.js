@@ -161,6 +161,10 @@ window.sabaki = {
       ipcRenderer.invoke('library:getBuiltinCollectionMetadata', relativePath),
     countProblems: (source, relativePath) =>
       ipcRenderer.invoke('library:countProblems', source, relativePath),
+    saveFile: (relativePath, content, options) =>
+      ipcRenderer.invoke('library:saveFile', relativePath, content, options),
+    createDirectory: (relativePath) =>
+      ipcRenderer.invoke('library:createDirectory', relativePath),
   },
 
   tsumegoProgress: {

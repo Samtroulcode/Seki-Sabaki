@@ -1522,6 +1522,189 @@
 .tsumego-creator-navigation button:focus {
   background: #006fca;
 }
+.tsumego-creator-navigation button:disabled {
+  opacity: 0.45;
+}
+.tsumego-creator-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+.tsumego-creator-save-status {
+  margin: 0;
+  padding: 0.45rem 0.8rem;
+  color: #8ed49a;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tsumego-save-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.tsumego-save-dialog-card {
+  display: grid;
+  gap: 0.8rem;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.25rem;
+  background: #181818;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.5);
+  color: #eee;
+}
+.tsumego-save-dialog-card h2 {
+  margin: 0;
+  color: white;
+}
+.tsumego-save-dialog-label {
+  margin: 0;
+  color: #aaa;
+  font-size: 0.85rem;
+}
+.tsumego-save-dialog-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+.tsumego-save-dialog-breadcrumb span,
+.tsumego-save-dialog-breadcrumb button {
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  background: transparent;
+  color: #bbb;
+}
+.tsumego-save-dialog-breadcrumb button:not(:disabled):hover,
+.tsumego-save-dialog-breadcrumb button:not(:disabled):focus {
+  background: #292a2d;
+  color: #eee;
+}
+.tsumego-save-dialog-breadcrumb button.current {
+  color: #eee;
+  font-weight: 600;
+}
+.tsumego-save-dialog-toolbar {
+  display: flex;
+  align-items: center;
+}
+.tsumego-save-dialog-parent {
+  width: 2.2rem;
+  height: 2.2rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-save-dialog-parent:hover:not(:disabled),
+.tsumego-save-dialog-parent:focus:not(:disabled) {
+  background: #006fca;
+}
+.tsumego-save-dialog-parent:disabled {
+  opacity: 0.45;
+}
+.tsumego-save-dialog-folders {
+  display: grid;
+  gap: 0.3rem;
+  max-height: 12rem;
+  overflow: auto;
+  padding: 0.4rem;
+  background: #111;
+  border: 1px solid #292a2d;
+  border-radius: 4px;
+}
+.tsumego-save-dialog-folder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: transparent;
+  color: #ddd;
+  border-radius: 4px;
+  text-align: left;
+}
+.tsumego-save-dialog-folder:hover,
+.tsumego-save-dialog-folder:focus {
+  background: #292a2d;
+}
+.tsumego-save-dialog-folder-icon {
+  width: 1rem;
+  height: 1rem;
+  filter: invert(0.8);
+}
+.tsumego-save-dialog-status,
+.tsumego-save-dialog-empty {
+  margin: 0;
+  padding: 0.5rem;
+  color: #999;
+}
+.tsumego-save-dialog-new-folder {
+  display: flex;
+  gap: 0.5rem;
+}
+.tsumego-save-dialog-new-folder input,
+.tsumego-save-dialog-name input {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  background: #111;
+  color: #eee;
+  border: 1px solid #292a2d;
+  border-radius: 4px;
+}
+.tsumego-save-dialog-new-folder input:focus,
+.tsumego-save-dialog-name input:focus {
+  border-color: #006fca;
+}
+.tsumego-save-dialog-new-folder button,
+.tsumego-save-dialog-actions button {
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.tsumego-save-dialog-new-folder button:hover:not(:disabled),
+.tsumego-save-dialog-actions button:hover:not(:disabled),
+.tsumego-save-dialog-actions button:focus:not(:disabled) {
+  background: #006fca;
+}
+.tsumego-save-dialog-new-folder button:disabled,
+.tsumego-save-dialog-actions button:disabled {
+  opacity: 0.45;
+}
+.tsumego-save-dialog-name {
+  display: grid;
+  gap: 0.3rem;
+}
+.tsumego-save-dialog-name label {
+  color: #aaa;
+  font-size: 0.85rem;
+}
+.tsumego-save-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.tsumego-save-dialog-actions .tsumego-save-dialog-save {
+  background: #006fca;
+}
+.tsumego-save-dialog-actions .tsumego-save-dialog-save:hover:not(:disabled) {
+  background: #0082f0;
+}
 .home-matchmaking-toast {
   position: fixed;
   right: 1.25rem;

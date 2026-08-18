@@ -29,3 +29,11 @@ export async function getBuiltinCollectionMetadata(relativePath) {
 export async function countLibraryProblems(source, relativePath = '') {
   return window.sabaki.library.countProblems(source, relativePath)
 }
+
+export async function saveLibraryFile(relativePath, content, options = {}) {
+  return window.sabaki.library.saveFile(relativePath, content, options)
+}
+
+export async function createLibraryDirectory(relativePath) {
+  return window.sabaki.library.createDirectory(relativePath)
+}

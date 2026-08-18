@@ -1,5 +1,15 @@
 const {expect} = require('@playwright/test')
 const sgf = require('@sabaki/sgf')
+const {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} = require('fs')
+const path = require('path')
+const {tmpdir} = require('os')
 const {test} = require('./fixtures/electron-app')
 
 test.describe('Tsumego Creator', () => {
@@ -1394,6 +1404,587 @@ test.describe('Tsumego Creator', () => {
   })
 })
 
+test.describe('Tsumego Creator Save to My Library', () => {
+  test.beforeEach(async ({page}) => {
+    await page.setViewportSize({width: 1600, height: 1000})
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await expect(page.locator('#tsumego-dashboard')).toBeVisible()
+
+    await page.evaluate(() => {
+      window.__tsumegoAudioPlays = 0
+      Audio.prototype.play = () => {
+        window.__tsumegoAudioPlays += 1
+        return Promise.resolve()
+      }
+      window.confirm = () => true
+    })
+  })
+
+  async function configureUserLibrary(page, root) {
+    await page.evaluate(
+      async (libraryRoot) =>
+        window.sabaki.setting.set('library.root', libraryRoot),
+      root,
+    )
+    await page.getByRole('tab', {name: 'My Library'}).click()
+    await expect(page.locator('.tsumego-browser-card')).toBeVisible()
+  }
+
+  async function openCreator(page) {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+  }
+
+  async function saveViaDialog(page, name) {
+    await page
+      .getByRole('button', {name: 'Save to My Library', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+    await page.locator('#tsumego-save-name').fill(name)
+    await page.getByRole('button', {name: 'Save', exact: true}).click()
+    await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+  }
+
+  test('saves a problem into a folder created in the picker', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-save-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+      await clickCreatorVertex(page, 3, 3)
+
+      await page
+        .getByRole('button', {name: 'Save to My Library', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+
+      // Create a folder and save into it.
+      await page
+        .locator('.tsumego-save-dialog-new-folder input')
+        .fill('My Problems')
+      await page
+        .getByRole('button', {name: '+ New Folder', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog-folder')).toContainText(
+        'My Problems',
+      )
+      await page.locator('.tsumego-save-dialog-folder').click()
+      await page.locator('#tsumego-save-name').fill('Test Problem')
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+
+      await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+      let savedPath = path.join(
+        root,
+        'Tsumego',
+        'My Problems',
+        'Test Problem.sgf',
+      )
+      await expect.poll(() => existsSync(savedPath)).toBe(true)
+      let content = readFileSync(savedPath, 'utf8')
+      expect(content).toMatch(/AB\[dd\]/)
+      expect(content).toMatch(/SZ\[19\]/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('saves the full draft content', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-content-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+
+      // Setup: black and white stones.
+      await clickCreatorVertex(page, 3, 3)
+      await toolbarFrom(page)
+        .getByRole('button', {name: 'Place White', exact: true})
+        .click()
+      await clickCreatorVertex(page, 4, 4)
+
+      // Problem statement.
+      await page
+        .locator('.tsumego-creator-comment')
+        .fill('Black to play and live.')
+
+      // Solution with a Correct marker.
+      await enterSolutionMode(page)
+      await clickCreatorVertex(page, 5, 5)
+      await clickCreatorVertex(page, 6, 6)
+      await clickCreatorVertex(page, 7, 7)
+      await page
+        .locator('.tsumego-creator-button-row')
+        .getByRole('button', {name: 'Correct', exact: true})
+        .click()
+
+      // Annotation on the solution node.
+      await toolbarFrom(page)
+        .getByRole('button', {name: 'Triangle Tool', exact: true})
+        .click()
+      await clickCreatorVertex(page, 8, 8)
+
+      await saveViaDialog(page, 'full')
+
+      let savedPath = path.join(root, 'Tsumego', 'full.sgf')
+      await expect.poll(() => existsSync(savedPath)).toBe(true)
+      let content = readFileSync(savedPath, 'utf8')
+      expect(content).toMatch(/AB\[dd\]/)
+      expect(content).toMatch(/AW\[ee\]/)
+      expect(content).toMatch(/PL\[B\]/)
+      expect(content).toMatch(/;B\[ff\]/)
+      expect(content).toMatch(/;W\[gg\]/)
+      expect(content).toMatch(/;B\[hh\]/)
+      expect(content).toMatch(/Correct/)
+      expect(content).toMatch(/TR\[ii\]/)
+      expect(content).toMatch(/Black to play and live/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('saves an incomplete draft', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-draft-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+
+      // Setup stones only — no solution.
+      await clickCreatorVertex(page, 3, 3)
+      await clickCreatorVertex(page, 4, 4)
+      await enterSolutionMode(page)
+      await expect(page.locator('.tsumego-creator-validation')).toHaveAttribute(
+        'data-test-validation',
+        'invalid',
+      )
+
+      await saveViaDialog(page, 'draft')
+
+      let savedPath = path.join(root, 'Tsumego', 'draft.sgf')
+      await expect.poll(() => existsSync(savedPath)).toBe(true)
+      let content = readFileSync(savedPath, 'utf8')
+      expect(content).toMatch(/AB\[dd\]/)
+      expect(content).toMatch(/AB\[dd\]\[ee\]/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('creates nested folders and saves inside them', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-nested-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+
+      await page
+        .getByRole('button', {name: 'Save to My Library', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+
+      // My Problems → Life and Death.
+      await page
+        .locator('.tsumego-save-dialog-new-folder input')
+        .fill('My Problems')
+      await page
+        .getByRole('button', {name: '+ New Folder', exact: true})
+        .click()
+      await page.locator('.tsumego-save-dialog-folder').click()
+      await page
+        .locator('.tsumego-save-dialog-new-folder input')
+        .fill('Life and Death')
+      await page
+        .getByRole('button', {name: '+ New Folder', exact: true})
+        .click()
+      await page.locator('.tsumego-save-dialog-folder').click()
+
+      await page.locator('#tsumego-save-name').fill('problem')
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+      await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+
+      let savedPath = path.join(
+        root,
+        'Tsumego',
+        'My Problems',
+        'Life and Death',
+        'problem.sgf',
+      )
+      await expect.poll(() => existsSync(savedPath)).toBe(true)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('cannot navigate above the Tsumego root', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-root-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego', 'A', 'B'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+
+      await page
+        .getByRole('button', {name: 'Save to My Library', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+
+      let parent = page.locator('.tsumego-save-dialog-parent')
+      await expect(parent).toBeDisabled()
+
+      await page.locator('.tsumego-save-dialog-folder').first().click()
+      await expect(parent).toBeEnabled()
+      await parent.click()
+      await expect(parent).toBeDisabled()
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('asks before replacing an existing problem', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-collision-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego', 'My Problems'), {recursive: true})
+    writeFileSync(
+      path.join(root, 'Tsumego', 'My Problems', 'test.sgf'),
+      'old-content',
+    )
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+
+      await page
+        .getByRole('button', {name: 'Save to My Library', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+      await page.locator('.tsumego-save-dialog-folder').click()
+      await page.locator('#tsumego-save-name').fill('test')
+
+      // Decline the replacement: the dialog stays open, the file is intact.
+      await page.evaluate(() => {
+        window.confirm = () => false
+      })
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+      expect(
+        readFileSync(
+          path.join(root, 'Tsumego', 'My Problems', 'test.sgf'),
+          'utf8',
+        ),
+      ).toBe('old-content')
+
+      // Accept the replacement.
+      await page.evaluate(() => {
+        window.confirm = () => true
+      })
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+      await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+      let content = readFileSync(
+        path.join(root, 'Tsumego', 'My Problems', 'test.sgf'),
+        'utf8',
+      )
+      expect(content).not.toBe('old-content')
+      expect(content).toMatch(/SZ\[19\]/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('second save updates the same file without the picker', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-resave-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+      await clickCreatorVertex(page, 3, 3)
+
+      await saveViaDialog(page, 'problem')
+
+      let savedPath = path.join(root, 'Tsumego', 'problem.sgf')
+      await expect.poll(() => existsSync(savedPath)).toBe(true)
+
+      // The button becomes a plain Save.
+      await expect(
+        page.getByRole('button', {name: 'Save', exact: true}),
+      ).toBeVisible()
+
+      // Modify the draft.
+      await clickCreatorVertex(page, 4, 4)
+      let sgfAfterEdit = await page
+        .locator('.tsumego-creator')
+        .getAttribute('data-test-sgf')
+      expect(sgfAfterEdit).toMatch(/AB\[dd\]\[ee\]/)
+
+      // Second save: no picker, same file updated.
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+      await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+      await expect
+        .poll(() => readFileSync(savedPath, 'utf8'))
+        .toMatch(/AB\[dd\]\[ee\]/)
+      await expect(page.locator('.tsumego-creator-save-status')).toContainText(
+        'Saved',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('Back confirms only when the draft is dirty', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-back-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await configureUserLibrary(page, root)
+      await openCreator(page)
+
+      await page.evaluate(() => {
+        window.__confirmCalls = 0
+        window.confirm = () => {
+          window.__confirmCalls += 1
+          return true
+        }
+      })
+
+      await saveViaDialog(page, 'problem')
+
+      // Clean draft: Back without confirmation.
+      await page.getByRole('button', {name: /Back/}).click()
+      await expect(page.locator('.tsumego-creator')).toHaveCount(0)
+      expect(await page.evaluate(() => window.__confirmCalls)).toBe(0)
+
+      // Reopen, modify, Back asks for confirmation.
+      await openCreator(page)
+      await clickCreatorVertex(page, 3, 3)
+      await page.getByRole('button', {name: /Back/}).click()
+      expect(await page.evaluate(() => window.__confirmCalls)).toBe(1)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+})
+
+test.describe('Tsumego Creator Test Problem', () => {
+  test.beforeEach(async ({page}) => {
+    await page.setViewportSize({width: 1600, height: 1000})
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await expect(page.locator('#tsumego-dashboard')).toBeVisible()
+
+    await page.evaluate(() => {
+      window.__tsumegoAudioPlays = 0
+      Audio.prototype.play = () => {
+        window.__tsumegoAudioPlays += 1
+        return Promise.resolve()
+      }
+      window.confirm = () => true
+    })
+  })
+
+  async function buildValidProblem(page) {
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await page
+      .locator('.tsumego-creator-button-row')
+      .getByRole('button', {name: 'Correct', exact: true})
+      .click()
+    await expect(page.locator('[data-test-validation="valid"]')).toBeVisible()
+  }
+
+  test('disables Test Problem for an invalid draft', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+    await expect(page.locator('.tsumego-test-button')).toBeDisabled()
+  })
+
+  test('enables Test Problem for a valid draft and opens the real solver', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+    await buildValidProblem(page)
+
+    await expect(page.locator('.tsumego-test-button')).toBeEnabled()
+    await page.locator('.tsumego-test-button').click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+
+    // Test mode has no Previous/Next and a dedicated Back label.
+    await expect(page.getByRole('button', {name: /Previous/})).toHaveCount(0)
+    await expect(page.getByRole('button', {name: /Next/})).toHaveCount(0)
+    await expect(
+      page.getByRole('button', {name: /Back to Editor/}),
+    ).toBeVisible()
+  })
+
+  test('solves the draft in the real solver', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+    await buildValidProblem(page)
+
+    await page.locator('.tsumego-test-button').click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+    await clickSolverVertex(page, 0, 0)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+  })
+
+  test('Back to Editor preserves the draft exactly', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+    await buildValidProblem(page)
+
+    let sgfBefore = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+
+    await page.locator('.tsumego-test-button').click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+    await page.getByRole('button', {name: /Back to Editor/}).click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+
+    let sgfAfter = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgfAfter).toBe(sgfBefore)
+  })
+
+  test('preserves dirty state through a test run', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-dirty-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page
+        .getByRole('button', {name: 'Create Problem', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-creator')).toBeVisible()
+      await buildValidProblem(page)
+
+      // Save → clean.
+      await page
+        .getByRole('button', {name: 'Save to My Library', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+      await page.locator('#tsumego-save-name').fill('problem')
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+      await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+
+      await page.evaluate(() => {
+        window.__confirmCalls = 0
+        window.confirm = () => {
+          window.__confirmCalls += 1
+          return true
+        }
+      })
+
+      // Modify → dirty.
+      await page
+        .locator('.tsumego-creator-mode-tabs')
+        .getByRole('button', {name: 'Setup', exact: true})
+        .click()
+      await clickCreatorVertex(page, 3, 3)
+
+      // Test → back → dirty preserved.
+      await page.locator('.tsumego-test-button').click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await page.getByRole('button', {name: /Back to Editor/}).click()
+      await expect(page.locator('.tsumego-creator')).toBeVisible()
+
+      await page.getByRole('button', {name: /Back/}).click()
+      expect(await page.evaluate(() => window.__confirmCalls)).toBe(1)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('tests the in-memory draft, not the saved file', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-memory-e2e-'))
+    mkdirSync(path.join(root, 'Tsumego'), {recursive: true})
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page
+        .getByRole('button', {name: 'Create Problem', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-creator')).toBeVisible()
+      await buildValidProblem(page)
+
+      // Save version A (solution B[aa]).
+      await page
+        .getByRole('button', {name: 'Save to My Library', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-save-dialog')).toBeVisible()
+      await page.locator('#tsumego-save-name').fill('problem')
+      await page.getByRole('button', {name: 'Save', exact: true}).click()
+      await expect(page.locator('.tsumego-save-dialog')).toHaveCount(0)
+
+      // Replace the solution in memory with B[bb] without resaving.
+      await page.locator('.tsumego-creator-delete-branch').click()
+      await clickCreatorVertex(page, 1, 1)
+      await page
+        .locator('.tsumego-creator-button-row')
+        .getByRole('button', {name: 'Correct', exact: true})
+        .click()
+
+      // The solver must expect the new move, not the saved one.
+      await page.locator('.tsumego-test-button').click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await clickSolverVertex(page, 1, 1)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('does not record progress for a test run', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+    await buildValidProblem(page)
+
+    let progressBefore = await page.evaluate(() =>
+      window.sabaki.tsumegoProgress.getAll(),
+    )
+
+    await page.locator('.tsumego-test-button').click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+    await clickSolverVertex(page, 0, 0)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+    await page.getByRole('button', {name: /Back to Editor/}).click()
+
+    let progressAfter = await page.evaluate(() =>
+      window.sabaki.tsumegoProgress.getAll(),
+    )
+    expect(progressAfter).toEqual(progressBefore)
+  })
+})
+
 function sidebarFrom(page) {
   return page.locator('.tsumego-creator-sidebar')
 }
@@ -1500,4 +2091,13 @@ async function dragCreatorLine(page, x1, y1, x2, y2) {
     steps: 5,
   })
   await page.mouse.up()
+}
+
+async function clickSolverVertex(page, x, y) {
+  let box = await page
+    .locator(
+      `.tsumego-solver-board .shudan-vertex[data-x="${x}"][data-y="${y}"]`,
+    )
+    .boundingBox()
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
 }

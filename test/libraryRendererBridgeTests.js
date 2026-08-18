@@ -3,9 +3,11 @@ import {readFileSync} from 'fs'
 import {join} from 'path'
 
 import {
+  createLibraryDirectory,
   getBuiltinCollectionMetadata,
   listBuiltinLibraryEntries,
   openBuiltinLibraryFile,
+  saveLibraryFile,
 } from '../src/modules/library.js'
 import {
   buildProgressKey,
@@ -29,6 +31,8 @@ describe('built-in Library renderer bridge', () => {
       'library:openBuiltin',
       'library:getBuiltinCollectionMetadata',
       'library:countProblems',
+      'library:saveFile',
+      'library:createDirectory',
     ]) {
       assert.match(
         mainSource,
@@ -89,6 +93,44 @@ describe('built-in Library renderer bridge', () => {
       ['list', 'tsumego/easy'],
       ['open', 'tsumego/easy/001.sgf'],
       ['metadata', 'tsumego/easy'],
+    ])
+  })
+
+  it('delegates save operations through window.sabaki', async () => {
+    let calls = []
+    let previousWindow = global.window
+    global.window = {
+      sabaki: {
+        library: {
+          saveFile: async (relativePath, content, options) => {
+            calls.push(['saveFile', relativePath, content, options])
+            return {ok: true, relativePath}
+          },
+          createDirectory: async (relativePath) => {
+            calls.push(['createDirectory', relativePath])
+            return {ok: true, relativePath}
+          },
+        },
+      },
+    }
+
+    try {
+      await saveLibraryFile('Tsumego/My Problems/foo.sgf', '(;GM[1])', {
+        overwrite: true,
+      })
+      await createLibraryDirectory('Tsumego/My Problems')
+    } finally {
+      global.window = previousWindow
+    }
+
+    assert.deepStrictEqual(calls, [
+      [
+        'saveFile',
+        'Tsumego/My Problems/foo.sgf',
+        '(;GM[1])',
+        {overwrite: true},
+      ],
+      ['createDirectory', 'Tsumego/My Problems'],
     ])
   })
 

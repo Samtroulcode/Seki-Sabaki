@@ -409,6 +409,18 @@ export default class TsumegoPanel extends Component {
     this.setState({view: 'browser'})
   }
 
+  // After a successful save the browser switches to My Library and shows the
+  // folder that received the file, so the new problem is visible without
+  // restarting Seki. The Creator itself stays open.
+  handleCreatorSaved(relativePath) {
+    let parts = splitRelativePath(relativePath)
+    parts.pop()
+    let folder = parts.join('/') || 'Tsumego'
+    this.problemLoadId += 1
+    this.setState({source: 'user', currentPath: folder})
+    this.refresh('user', folder)
+  }
+
   async handleAdjacentProblem(offset) {
     let problemEntries = this.state.entries
       .filter((entry) => entry.type === 'file')
@@ -687,8 +699,20 @@ export default class TsumegoPanel extends Component {
   }
 
   renderCreator() {
+    // The save picker starts in the folder the user was browsing when it is
+    // inside My Library/Tsumego; otherwise it starts at the Tsumego root.
+    // A Built-in path is never offered as a save destination.
+    let initialSaveDirectory = 'Tsumego'
+    if (
+      this.state.source === 'user' &&
+      this.state.currentPath.startsWith('Tsumego/')
+    ) {
+      initialSaveDirectory = this.state.currentPath
+    }
     return h(TsumegoCreator, {
       onBack: () => this.handleCreatorBack(),
+      initialSaveDirectory,
+      onSaved: (relativePath) => this.handleCreatorSaved(relativePath),
     })
   }
 }
