@@ -5,10 +5,12 @@ import i18n from '../i18n.js'
 const t = i18n.context('TsumegoCreator')
 
 const MARKUP_TOOLS = [
-  {id: 'cross', title: 'Cross Tool', icon: './img/edit/cross.svg'},
-  {id: 'triangle', title: 'Triangle Tool', icon: './img/edit/triangle.svg'},
-  {id: 'square', title: 'Square Tool', icon: './img/edit/square.svg'},
-  {id: 'circle', title: 'Circle Tool', icon: './img/edit/circle.svg'},
+  {id: 'cross', title: t('Cross Tool'), icon: './img/edit/cross.svg'},
+  {id: 'triangle', title: t('Triangle Tool'), icon: './img/edit/triangle.svg'},
+  {id: 'square', title: t('Square Tool'), icon: './img/edit/square.svg'},
+  {id: 'circle', title: t('Circle Tool'), icon: './img/edit/circle.svg'},
+  {id: 'label', title: t('Label Tool'), icon: './img/edit/label.svg'},
+  {id: 'number', title: t('Number Tool'), icon: './img/edit/number.svg'},
 ]
 
 export default class TsumegoCreatorToolbar extends Component {

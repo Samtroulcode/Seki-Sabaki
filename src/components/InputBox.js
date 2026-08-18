@@ -34,18 +34,19 @@ export default class InputBox extends Component {
     this.cancel = this.cancel.bind(this)
   }
 
-  shouldComponentUpdate({show, text, onSubmit, onCancel}) {
+  shouldComponentUpdate({show, text, onSubmit, onCancel, defaultValue}) {
     return (
       show !== this.props.show ||
       text !== this.props.text ||
       onSubmit !== this.props.onSubmit ||
-      onCancel !== this.props.onCancel
+      onCancel !== this.props.onCancel ||
+      defaultValue !== this.props.defaultValue
     )
   }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.show && !this.props.show) {
-      this.setState({value: ''})
+      this.setState({value: nextProps.defaultValue || ''})
     }
   }
 

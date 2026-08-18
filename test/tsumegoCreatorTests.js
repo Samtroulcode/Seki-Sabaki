@@ -3,19 +3,25 @@ import sgf from '@sabaki/sgf'
 
 import {advanceSolution, resolveMove} from '../src/modules/tsumego.js'
 import {
+  applyNumberLabel,
   createDraft,
   deleteBranch,
   findMatchingChild,
   getBoard,
+  getLabel,
+  getLabels,
+  getNextNumberLabel,
   getNextPlayer,
   getNodeComment,
   getNodeResult,
   hasSolutionMoves,
   hasStones,
   playMove,
+  removeLabel,
   serialize,
   setBoardSize,
   setComment,
+  setLabel,
   setNodeComment,
   setNodeResult,
   setPlayerToMove,
@@ -324,6 +330,265 @@ describe('tsumegoCreator', () => {
       assert(output.includes('SQ[ee]'))
       assert(!output.includes(';B['))
       assert(!output.includes(';W['))
+    })
+  })
+
+  describe('labels', () => {
+    it('sets a label with LB', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:A'])
+    })
+
+    it('modifies an existing label', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [3, 3], 'B')
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:B'])
+    })
+
+    it('removes a label with an empty string', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [3, 3], '')
+
+      assert.strictEqual(tree.root.data.LB, undefined)
+    })
+
+    it('removes the LB property entirely when the last label is removed', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], 'B')
+      tree = setLabel(tree, tree.root.id, [3, 3], '')
+      tree = setLabel(tree, tree.root.id, [4, 4], '')
+
+      assert.strictEqual(tree.root.data.LB, undefined)
+    })
+
+    it('keeps two labels on two vertices', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], 'B')
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:A', 'ee:B'])
+    })
+
+    it('does not modify the other vertex when editing one', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], 'B')
+      tree = setLabel(tree, tree.root.id, [3, 3], 'C')
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:C', 'ee:B'])
+    })
+
+    it('allows a label to coexist with a shape markup on the same vertex', () => {
+      let tree = createDraft(19)
+      tree = toggleMarkup(tree, tree.root.id, 'TR', [3, 3])
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+
+      assert.deepStrictEqual(tree.root.data.TR, ['dd'])
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:A'])
+    })
+
+    it('returns the same tree when the label is unchanged', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      let same = setLabel(tree, tree.root.id, [3, 3], 'A')
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree when removing a label that does not exist', () => {
+      let tree = createDraft(19)
+      let same = setLabel(tree, tree.root.id, [3, 3], '')
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an invalid vertex', () => {
+      let tree = createDraft(19)
+      let same = setLabel(tree, tree.root.id, [-1, -1], 'A')
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('returns the same tree for an unknown node id', () => {
+      let tree = createDraft(19)
+      let same = setLabel(tree, 'unknown', [3, 3], 'A')
+
+      assert.strictEqual(same, tree)
+    })
+
+    it('does not mutate the input tree', () => {
+      let tree = createDraft(19)
+      let nextTree = setLabel(tree, tree.root.id, [3, 3], 'A')
+
+      assert.notStrictEqual(nextTree, tree)
+      assert.strictEqual(tree.root.data.LB, undefined)
+    })
+
+    it('annotates the root node', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:A'])
+      assert.strictEqual(tree.root.children.length, 0)
+    })
+
+    it('annotates a solution node', () => {
+      let tree = createDraft(19)
+      let result = playMove(tree, tree.root.id, [3, 3])
+      tree = setLabel(result.tree, result.nodeId, [4, 4], 'A')
+
+      assert.strictEqual(tree.get(result.nodeId).data.LB[0], 'ee:A')
+      assert.strictEqual(tree.root.data.LB, undefined)
+    })
+
+    it('renders the label on the board', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      let board = getBoard(tree)
+
+      assert.deepStrictEqual(board.markers[3][3], {type: 'label', label: 'A'})
+    })
+
+    it('serializes labels without creating moves', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], '12')
+      let output = serialize(tree)
+
+      assert(output.includes('LB[dd:A][ee:12]'))
+      assert(!output.includes(';B['))
+      assert(!output.includes(';W['))
+    })
+
+    it('getLabels returns a map of vertex to label', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], 'B')
+
+      let labels = getLabels(tree, tree.root.id)
+      assert.strictEqual(labels.get('dd'), 'A')
+      assert.strictEqual(labels.get('ee'), 'B')
+      assert.strictEqual(labels.size, 2)
+    })
+
+    it('getLabels returns an empty map for an unknown node', () => {
+      let labels = getLabels(createDraft(19), 'unknown')
+
+      assert.strictEqual(labels.size, 0)
+    })
+
+    it('getLabel returns the label for a vertex', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+
+      assert.strictEqual(getLabel(tree, tree.root.id, [3, 3]), 'A')
+      assert.strictEqual(getLabel(tree, tree.root.id, [4, 4]), null)
+    })
+
+    it('removeLabel removes a single label', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], 'B')
+      tree = removeLabel(tree, tree.root.id, [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.LB, ['ee:B'])
+    })
+  })
+
+  describe('number labels', () => {
+    it('returns 1 on an empty node', () => {
+      let tree = createDraft(19)
+
+      assert.strictEqual(getNextNumberLabel(tree, tree.root.id), '1')
+    })
+
+    it('returns 2 after 1', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], '1')
+
+      assert.strictEqual(getNextNumberLabel(tree, tree.root.id), '2')
+    })
+
+    it('returns 3 after 1 and 2', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], '1')
+      tree = setLabel(tree, tree.root.id, [4, 4], '2')
+
+      assert.strictEqual(getNextNumberLabel(tree, tree.root.id), '3')
+    })
+
+    it('fills the first gap when numbers are missing', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], '1')
+      tree = setLabel(tree, tree.root.id, [4, 4], '2')
+      tree = setLabel(tree, tree.root.id, [5, 5], '4')
+
+      assert.strictEqual(getNextNumberLabel(tree, tree.root.id), '3')
+    })
+
+    it('ignores non-numeric labels', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], 'B')
+
+      assert.strictEqual(getNextNumberLabel(tree, tree.root.id), '1')
+    })
+
+    it('ignores non-numeric labels mixed with numbers', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = setLabel(tree, tree.root.id, [4, 4], '1')
+
+      assert.strictEqual(getNextNumberLabel(tree, tree.root.id), '2')
+    })
+
+    it('returns 1 for an unknown node', () => {
+      assert.strictEqual(getNextNumberLabel(createDraft(19), 'unknown'), '1')
+    })
+
+    it('applyNumberLabel places the next number on an empty vertex', () => {
+      let tree = createDraft(19)
+      tree = applyNumberLabel(tree, tree.root.id, [3, 3])
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:1'])
+    })
+
+    it('applyNumberLabel numbers three vertices 1, 2, 3', () => {
+      let tree = createDraft(19)
+      tree = applyNumberLabel(tree, tree.root.id, [3, 3])
+      tree = applyNumberLabel(tree, tree.root.id, [4, 4])
+      tree = applyNumberLabel(tree, tree.root.id, [5, 5])
+
+      assert.deepStrictEqual(tree.root.data.LB, ['dd:1', 'ee:2', 'ff:3'])
+    })
+
+    it('applyNumberLabel removes a label on a labeled vertex', () => {
+      let tree = createDraft(19)
+      tree = setLabel(tree, tree.root.id, [3, 3], 'A')
+      tree = applyNumberLabel(tree, tree.root.id, [3, 3])
+
+      assert.strictEqual(tree.root.data.LB, undefined)
+    })
+
+    it('applyNumberLabel removes a numeric label on a labeled vertex', () => {
+      let tree = createDraft(19)
+      tree = applyNumberLabel(tree, tree.root.id, [3, 3])
+      tree = applyNumberLabel(tree, tree.root.id, [3, 3])
+
+      assert.strictEqual(tree.root.data.LB, undefined)
+    })
+
+    it('applyNumberLabel returns the same tree for an invalid vertex', () => {
+      let tree = createDraft(19)
+      let same = applyNumberLabel(tree, tree.root.id, [-1, -1])
+
+      assert.strictEqual(same, tree)
     })
   })
 

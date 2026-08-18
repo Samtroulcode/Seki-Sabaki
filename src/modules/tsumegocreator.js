@@ -128,6 +128,102 @@ export function toggleMarkup(tree, nodeId, type, vertex) {
   return nextTree
 }
 
+export function getLabels(tree, nodeId) {
+  let node = tree.get(nodeId)
+  if (node == null) return new Map()
+
+  let labels = new Map()
+  for (let composed of node.data.LB || []) {
+    let sep = composed.indexOf(':')
+    if (sep < 0) continue
+
+    let point = composed.slice(0, sep)
+    let label = composed.slice(sep + 1)
+    if (point === '') continue
+
+    labels.set(point, label)
+  }
+
+  return labels
+}
+
+export function getLabel(tree, nodeId, vertex) {
+  let sgfVertex = stringifyVertex(vertex)
+  if (sgfVertex == null || sgfVertex === '') return null
+
+  let label = getLabels(tree, nodeId).get(sgfVertex)
+  return label === undefined ? null : label
+}
+
+export function setLabel(tree, nodeId, vertex, text) {
+  let sgfVertex = stringifyVertex(vertex)
+  if (sgfVertex == null || sgfVertex === '') return tree
+
+  let node = tree.get(nodeId)
+  if (node == null) return tree
+
+  let labels = getLabels(tree, nodeId)
+  let nextLabel = text == null ? '' : String(text)
+  let current = labels.get(sgfVertex)
+
+  if (nextLabel === '') {
+    if (current == null) return tree
+    labels.delete(sgfVertex)
+  } else {
+    if (current === nextLabel) return tree
+    labels.set(sgfVertex, nextLabel)
+  }
+
+  let nextValues = [...labels].map(([point, label]) => `${point}:${label}`)
+  let nextTree = tree.mutate((draft) => {
+    if (nextValues.length === 0) draft.removeProperty(nodeId, 'LB')
+    else draft.updateProperty(nodeId, 'LB', nextValues)
+  })
+
+  clearCache(nextTree)
+  return nextTree
+}
+
+export function removeLabel(tree, nodeId, vertex) {
+  return setLabel(tree, nodeId, vertex, '')
+}
+
+export function getNextNumberLabel(tree, nodeId) {
+  let node = tree.get(nodeId)
+  if (node == null) return '1'
+
+  // Reproduce Sabaki's Number Tool: the next number is the smallest positive
+  // integer not already used by a numeric label on this node. Non-numeric
+  // labels are ignored.
+  let numbers = (node.data.LB || [])
+    .map((composed) => {
+      let sep = composed.indexOf(':')
+      return sep < 0 ? NaN : parseFloat(composed.slice(sep + 1))
+    })
+    .filter((x) => !isNaN(x))
+    .sort((a, b) => a - b)
+    .filter((x, i, arr) => i === 0 || x !== arr[i - 1])
+
+  let next = numbers.concat([null]).findIndex((x, i) => i + 1 !== x) + 1
+  return next.toString()
+}
+
+export function applyNumberLabel(tree, nodeId, vertex) {
+  let sgfVertex = stringifyVertex(vertex)
+  if (sgfVertex == null || sgfVertex === '') return tree
+
+  let node = tree.get(nodeId)
+  if (node == null) return tree
+
+  // Reproduce Sabaki's Number Tool: clicking a vertex that already carries a
+  // label removes it; otherwise the next available number is placed.
+  if (getLabels(tree, nodeId).has(sgfVertex)) {
+    return removeLabel(tree, nodeId, vertex)
+  }
+
+  return setLabel(tree, nodeId, vertex, getNextNumberLabel(tree, nodeId))
+}
+
 export function setComment(tree, comment) {
   let value = comment == null ? '' : String(comment)
   let current = tree.root.data.C?.[0] ?? ''

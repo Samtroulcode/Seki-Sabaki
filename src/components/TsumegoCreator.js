@@ -2,10 +2,13 @@ import {h, Component} from 'preact'
 
 import i18n from '../i18n.js'
 import * as sound from '../modules/sound.js'
+import {showInputBox} from '../modules/dialog.js'
 import {
+  applyNumberLabel,
   createDraft,
   deleteBranch,
   getBoard,
+  getLabel,
   getNextPlayer,
   getNodeComment,
   getNodeResult,
@@ -16,6 +19,7 @@ import {
   serialize,
   setBoardSize,
   setComment,
+  setLabel,
   setNodeComment,
   setNodeResult,
   setPlayerToMove,
@@ -189,25 +193,52 @@ export default class TsumegoCreator extends Component {
     if (evt.vertex == null) return
 
     if (this.state.mode === 'setup') {
-      if (this.isMarkupTool(this.state.tool)) {
-        this.handleMarkupClick(evt.vertex, this.state.gameTree.root.id)
+      if (this.isAnnotationTool(this.state.tool)) {
+        this.handleAnnotationClick(evt.vertex, this.state.gameTree.root.id)
       } else {
         this.handleSetupVertexClick(evt.vertex)
       }
     } else if (this.state.tool === 'move') {
       this.handleSolutionVertexClick(evt.vertex)
     } else {
-      this.handleMarkupClick(evt.vertex, this.currentNodeId)
+      this.handleAnnotationClick(evt.vertex, this.currentNodeId)
     }
   }
 
-  isMarkupTool(tool) {
-    return MARKUP_PROPERTY[tool] != null
+  isAnnotationTool(tool) {
+    return (
+      MARKUP_PROPERTY[tool] != null || tool === 'label' || tool === 'number'
+    )
   }
 
-  handleMarkupClick(vertex, nodeId) {
-    let type = MARKUP_PROPERTY[this.state.tool]
+  handleAnnotationClick(vertex, nodeId) {
+    let tool = this.state.tool
+
+    if (tool === 'label') {
+      this.handleLabelClick(vertex, nodeId)
+      return
+    }
+
+    if (tool === 'number') {
+      let nextTree = applyNumberLabel(this.state.gameTree, nodeId, vertex)
+      if (nextTree === this.state.gameTree) return
+      this.setState({gameTree: nextTree, dirty: true})
+      return
+    }
+
+    let type = MARKUP_PROPERTY[tool]
     let nextTree = toggleMarkup(this.state.gameTree, nodeId, type, vertex)
+    if (nextTree === this.state.gameTree) return
+
+    this.setState({gameTree: nextTree, dirty: true})
+  }
+
+  handleLabelClick = async (vertex, nodeId) => {
+    let current = getLabel(this.state.gameTree, nodeId, vertex)
+    let value = await showInputBox(t('Enter label text'), current)
+    if (value == null) return
+
+    let nextTree = setLabel(this.state.gameTree, nodeId, vertex, value)
     if (nextTree === this.state.gameTree) return
 
     this.setState({gameTree: nextTree, dirty: true})

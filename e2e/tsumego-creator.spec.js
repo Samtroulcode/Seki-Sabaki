@@ -954,6 +954,251 @@ test.describe('Tsumego Creator', () => {
       '',
     )
   })
+
+  test('shows Label and Number tools in the toolbar', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+
+    let toolbar = page.locator('.tsumego-creator-toolbar')
+    await expect(
+      toolbar.getByRole('button', {name: 'Label Tool', exact: true}),
+    ).toBeVisible()
+    await expect(
+      toolbar.getByRole('button', {name: 'Number Tool', exact: true}),
+    ).toBeVisible()
+  })
+
+  test('Label tool opens an input and stores LB on the root', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await submitLabelInput(page, 'A')
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      /LB\[dd:A\]/,
+    )
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/;B\[/)
+  })
+
+  test('Label is rendered on the Goban', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await submitLabelInput(page, 'A')
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-marker_label/)
+    await expect(vertex.locator('.shudan-marker')).toHaveText('A')
+  })
+
+  test('Label input is pre-filled and replaces the existing label', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await submitLabelInput(page, 'A')
+
+    await clickCreatorVertex(page, 3, 3)
+    let input = page.locator('#input-box.show input[name="input"]')
+    await expect(input).toHaveValue('A')
+    await input.fill('B')
+    await input.press('Enter')
+    await expect(page.locator('#input-box.show')).toHaveCount(0)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      /LB\[dd:B\]/,
+    )
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/LB\[dd:A\]/)
+  })
+
+  test('empty label removes the label', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await submitLabelInput(page, 'A')
+
+    await clickCreatorVertex(page, 3, 3)
+    await submitLabelInput(page, '')
+
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/LB\[/)
+  })
+
+  test('cancelling the Label input leaves the draft unchanged', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    let before = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+
+    await cancelLabelInput(page)
+
+    let after = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(after).toBe(before)
+  })
+
+  test('Number tool places 1, 2, 3 on successive vertices', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Number Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await clickCreatorVertex(page, 4, 4)
+    await clickCreatorVertex(page, 5, 5)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      /LB\[dd:1\]\[ee:2\]\[ff:3\]/,
+    )
+  })
+
+  test('Number labels are rendered on the Goban', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Number Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-marker_label/)
+    await expect(vertex.locator('.shudan-marker')).toHaveText('1')
+  })
+
+  test('Number click on a labeled vertex removes the label', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Number Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await clickCreatorVertex(page, 3, 3)
+
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/LB\[/)
+  })
+
+  test('Number in Solution annotates the node without creating a move', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Number Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      /LB\[dd:1\]/,
+    )
+    expect(
+      await page.locator('.tsumego-creator').getAttribute('data-test-sgf'),
+    ).not.toMatch(/;B\[/)
+  })
+
+  test('labels belong to the selected solution node', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 2, 2)
+    await submitLabelInput(page, 'A')
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    let rootNodes = sgf.parse(sgfString)
+    let wbb = rootNodes[0].children[0].children[0]
+    expect(wbb.data.W).toEqual(['bb'])
+    expect(wbb.data.LB).toEqual(['cc:A'])
+    expect(rootNodes[0].data.LB).toBeUndefined()
+  })
+
+  test('label disappears on another node and reappears on return', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await toolbarFrom(page)
+      .getByRole('button', {name: 'Label Tool', exact: true})
+      .click()
+    await clickCreatorVertex(page, 2, 2)
+    await submitLabelInput(page, 'A')
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="2"][data-y="2"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-marker_label/)
+
+    await waitForGraphCamera(page)
+    await clickGraphNode(page, 0, 1)
+
+    await expect(vertex).not.toHaveClass(/shudan-marker_label/)
+
+    await waitForGraphCamera(page)
+    await clickGraphNode(page, 0, 2)
+
+    await expect(vertex).toHaveClass(/shudan-marker_label/)
+  })
 })
 
 function sidebarFrom(page) {
@@ -1018,6 +1263,21 @@ async function enterSolutionMode(page) {
     .getByRole('button', {name: 'Solution', exact: true})
     .click()
   await expect(page.locator('.tsumego-creator-graph')).toBeVisible()
+}
+
+async function submitLabelInput(page, text) {
+  let input = page.locator('#input-box.show input[name="input"]')
+  await expect(input).toBeVisible()
+  await input.fill(text)
+  await input.press('Enter')
+  await expect(page.locator('#input-box.show')).toHaveCount(0)
+}
+
+async function cancelLabelInput(page) {
+  let input = page.locator('#input-box.show input[name="input"]')
+  await expect(input).toBeVisible()
+  await input.press('Escape')
+  await expect(page.locator('#input-box.show')).toHaveCount(0)
 }
 
 async function clickCreatorVertex(page, x, y) {

@@ -188,6 +188,7 @@ class Sabaki extends EventEmitter {
 
       showInputBox: false,
       inputBoxText: '',
+      inputBoxDefaultValue: '',
       onInputBoxSubmit: helper.noop,
       onInputBoxCancel: helper.noop,
 

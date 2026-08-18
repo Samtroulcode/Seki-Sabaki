@@ -43,10 +43,11 @@ export async function showSaveDialog(options) {
   return result.canceled ? null : result.filePath
 }
 
-export async function showInputBox(message) {
+export async function showInputBox(message, defaultValue) {
   return new Promise((resolve) => {
     sabaki.setState({
       inputBoxText: message,
+      inputBoxDefaultValue: defaultValue == null ? '' : String(defaultValue),
       showInputBox: true,
       onInputBoxSubmit: (evt) => resolve(evt.value),
       onInputBoxCancel: () => resolve(null),
