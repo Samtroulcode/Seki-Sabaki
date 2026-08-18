@@ -1,7 +1,21 @@
 # Seki-Sabaki Agent Rules
 
-This repo is a fork of Sabaki. Treat existing Sabaki behavior as a compatibility
-contract unless the user explicitly asks to change it.
+Seki is a functional fork of Sabaki. Existing Sabaki behavior is a compatibility
+contract unless the user explicitly asks to change it. Preserve existing
+functionality unless a task explicitly redesigns it.
+
+## Current Priorities
+
+The current phase is production hardening, not feature growth. No major new
+product features should be introduced. Favor cleanup and simplification over new
+abstractions. Priorities are:
+
+- Production readiness and regression safety
+- Architecture cleanup
+- UI/UX redesign preparation
+- Accessibility
+- Documentation
+- Packaging and release quality
 
 ## Project Shape
 
@@ -13,10 +27,34 @@ contract unless the user explicitly asks to change it.
 - Go domain modules include `src/modules/gametree.js`,
   `src/modules/analysis.js`, `src/modules/enginesyncer.js`,
   `src/modules/fileformats/*`, and `src/modules/gobantransformer.js`.
+- OGS online play is an existing, production-sensitive domain: main-process
+  networking and IPC live in `src/ogs.js` and `src/ogs/`; renderer state and
+  sync in `src/modules/ogs*.js` and `src/modules/onlinestore.js`; UI in
+  `src/components/sidebars/Ogs*.js`, `src/components/OnlineGameView.js`, and
+  `src/components/HomeOnlinePanel.js`.
+- Post-game analysis lives in `src/sgfanalysis.js` and
+  `src/modules/sgfanalysis*.js`; the Library in `src/library.js`,
+  `src/modules/library.js`, and `src/components/LibraryPanel.js`.
+- Tsumego browser, Solver, and Creator live in `src/components/TsumegoPanel.js`,
+  `src/components/TsumegoSolver.js`, `src/components/TsumegoCreator.js`, and
+  `src/components/TsumegoSaveDialog.js`, with domain logic in
+  `src/modules/tsumego*.js`.
 - UI components are Preact class components under `src/components/`; preserve
   existing Preact patterns unless a local file already uses another pattern.
 - Tests live in `test/` for Mocha unit tests and `e2e/` for Playwright Electron
   tests.
+
+## Preservation Contract
+
+Maintenance and refactors must preserve the following core functionality:
+
+- Local Sabaki board/editor behavior (SGF editing, GTP engines, analysis)
+- OGS online play (auth, matchmaking, live games, reviews)
+- Post-game analysis
+- Library
+- Tsumego browser
+- Tsumego Solver
+- Tsumego Creator
 
 ## Commands
 
@@ -51,17 +89,16 @@ contract unless the user explicitly asks to change it.
 
 ## Online And OGS Rules
 
-- There is no existing OGS integration in this repo. Treat online play as a new
-  domain boundary.
-- Before implementing OGS behavior, verify the protocol/API/auth assumptions
-  from official OGS documentation or a clearly identified source.
+- OGS integration already exists and is substantial. Treat it as
+  production-sensitive: preserve existing behavior and verify assumptions
+  against the current implementation before changing it.
+- Before implementing or changing OGS behavior, verify the protocol/API/auth
+  assumptions from official OGS documentation or a clearly identified source.
 - Do not store OAuth tokens, session cookies, API keys, or user credentials in
   plain text without an explicit user-approved design.
 - Any network feature must consider Electron main/renderer boundaries, IPC
   validation, origin handling, token storage, reconnect behavior, and
   deterministic tests.
-- Prefer a minimal vertical slice: connection/auth boundary, state model, one UI
-  entry point, and one testable workflow.
 
 ## Electron Safety
 
