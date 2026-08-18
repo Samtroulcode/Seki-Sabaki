@@ -72,7 +72,7 @@ test.describe('Tsumego Creator', () => {
       .click()
     await page
       .locator('.tsumego-creator-sidebar')
-      .getByRole('button', {name: 'White stone', exact: true})
+      .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
 
@@ -110,6 +110,35 @@ test.describe('Tsumego Creator', () => {
     await expect(vertex).toHaveClass(/shudan-sign_1/)
   })
 
+  test('player-to-move buttons do not change the active stone tool', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+
+    let creator = page.locator('.tsumego-creator')
+    await expect(creator).toHaveAttribute('data-test-current-tool', 'B')
+
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'White to play', exact: true})
+      .click()
+    await expect(creator).toHaveAttribute('data-test-current-tool', 'B')
+
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'Place White', exact: true})
+      .click()
+    await expect(creator).toHaveAttribute('data-test-current-tool', 'W')
+
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'Black to play', exact: true})
+      .click()
+    await expect(creator).toHaveAttribute('data-test-current-tool', 'W')
+  })
+
   test('replaces black by white on the same vertex', async ({page}) => {
     await page
       .getByRole('button', {name: 'Create Problem', exact: true})
@@ -117,7 +146,7 @@ test.describe('Tsumego Creator', () => {
     await clickCreatorVertex(page, 3, 3)
     await page
       .locator('.tsumego-creator-sidebar')
-      .getByRole('button', {name: 'White stone', exact: true})
+      .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
 
@@ -143,7 +172,7 @@ test.describe('Tsumego Creator', () => {
     await clickCreatorVertex(page, 3, 3)
     await page
       .locator('.tsumego-creator-sidebar')
-      .getByRole('button', {name: 'White stone', exact: true})
+      .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 4, 4)
 
@@ -198,7 +227,7 @@ test.describe('Tsumego Creator', () => {
       .click()
     await page
       .locator('.tsumego-creator-sidebar')
-      .getByRole('button', {name: 'White stone', exact: true})
+      .getByRole('button', {name: 'Place White', exact: true})
       .click()
     await clickCreatorVertex(page, 5, 5)
 
@@ -220,7 +249,7 @@ test.describe('Tsumego Creator', () => {
     await clickCreatorVertex(page, 3, 3)
     await page
       .locator('.tsumego-creator-sidebar')
-      .getByRole('button', {name: 'Erase stone', exact: true})
+      .getByRole('button', {name: 'Erase', exact: true})
       .click()
     await clickCreatorVertex(page, 3, 3)
 
@@ -243,7 +272,7 @@ test.describe('Tsumego Creator', () => {
 
     await page
       .locator('.tsumego-creator-sidebar')
-      .getByRole('button', {name: 'White to move', exact: true})
+      .getByRole('button', {name: 'White to play', exact: true})
       .click()
 
     sgf = await page.locator('.tsumego-creator').getAttribute('data-test-sgf')
