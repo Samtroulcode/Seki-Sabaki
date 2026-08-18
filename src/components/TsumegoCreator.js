@@ -4,6 +4,7 @@ import i18n from '../i18n.js'
 import * as sound from '../modules/sound.js'
 import {
   createDraft,
+  deleteBranch,
   getBoard,
   getNextPlayer,
   getNodeComment,
@@ -142,6 +143,24 @@ export default class TsumegoCreator extends Component {
     if (nextTree === this.state.gameTree) return
 
     this.setState({gameTree: nextTree, dirty: true})
+  }
+
+  handleDeleteBranch = () => {
+    if (this.isCurrentNodeRoot) return
+
+    let confirmed = window.confirm(
+      t('Delete this branch and all its continuations?'),
+    )
+    if (!confirmed) return
+
+    let result = deleteBranch(this.state.gameTree, this.currentNodeId)
+    if (result == null) return
+
+    this.setState({
+      gameTree: result.tree,
+      currentNodeId: result.parentId,
+      dirty: true,
+    })
   }
 
   handleVertexClick = (evt) => {
@@ -514,6 +533,20 @@ export default class TsumegoCreator extends Component {
               'data-test-node-comment': true,
             }),
           ),
+      h(
+        'div',
+        {key: 'delete', class: 'tsumego-creator-group'},
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'tsumego-creator-delete-branch',
+            disabled: isRoot,
+            onClick: this.handleDeleteBranch,
+          },
+          t('Delete Branch'),
+        ),
+      ),
     ]
   }
 }

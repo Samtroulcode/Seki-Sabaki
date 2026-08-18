@@ -464,7 +464,150 @@ test.describe('Tsumego Creator', () => {
       sidebar.locator('[data-test-validation="invalid"]'),
     ).toBeVisible()
   })
+
+  test('Delete Branch is disabled on the root', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await expect(
+      sidebarFrom(page).getByRole('button', {
+        name: 'Delete Branch',
+        exact: true,
+      }),
+    ).toBeDisabled()
+  })
+
+  test('deletes the selected branch and its descendants after confirmation', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+    await clickCreatorVertex(page, 2, 2)
+
+    // Go back to the second move and delete it.
+    let sidebar = page.locator('.tsumego-creator-sidebar')
+    await sidebar.getByRole('button', {name: 'Root', exact: true}).click()
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await sidebar
+      .getByRole('button', {name: 'Delete Branch', exact: true})
+      .click()
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgfString).toMatch(/;B\[aa\]/)
+    expect(sgfString).not.toMatch(/W\[bb\]/)
+    expect(sgfString).not.toMatch(/B\[cc\]/)
+
+    // After deletion, selection moves to the parent (B[aa]); White plays next.
+    await expect(page.locator('.tsumego-creator-player-to-move')).toHaveText(
+      'White to play',
+    )
+  })
+
+  test('keeps sibling variations when deleting a branch', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    // Build: B[aa] -> W[bb] -> B[cc] and B[aa] -> W[dd].
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+    await clickCreatorVertex(page, 2, 2)
+    await sidebarFrom(page)
+      .getByRole('button', {name: 'Root', exact: true})
+      .click()
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 3, 3)
+
+    // Delete W[bb] branch.
+    await sidebarFrom(page)
+      .getByRole('button', {name: 'Root', exact: true})
+      .click()
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+    await sidebarFrom(page)
+      .getByRole('button', {name: 'Delete Branch', exact: true})
+      .click()
+
+    let sgfString = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    let rootNodes = sgf.parse(sgfString)
+    let baa = rootNodes[0].children[0]
+    expect(baa.data.B).toEqual(['aa'])
+    expect(baa.children).toHaveLength(1)
+    expect(baa.children[0].data.W).toEqual(['dd'])
+  })
+
+  test('cancelling Delete Branch leaves the draft unchanged', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await page.evaluate(() => {
+      window.confirm = () => false
+    })
+
+    await clickCreatorVertex(page, 0, 0)
+    let before = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+
+    await sidebarFrom(page)
+      .getByRole('button', {name: 'Delete Branch', exact: true})
+      .click()
+
+    let after = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(after).toBe(before)
+  })
+
+  test('deleting a branch marks the draft dirty', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await sidebarFrom(page)
+      .getByRole('button', {name: 'Delete Branch', exact: true})
+      .click()
+
+    // If the draft is dirty, clicking Back calls confirm. Make confirm return
+    // false so we stay on the creator; if dirty were false we would leave.
+    await page.evaluate(() => {
+      window.confirm = () => false
+    })
+
+    await page
+      .locator('.tsumego-creator-navigation')
+      .getByRole('button', {name: 'Back'})
+      .click()
+
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+  })
 })
+
+function sidebarFrom(page) {
+  return page.locator('.tsumego-creator-sidebar')
+}
 
 async function enterSolutionMode(page) {
   await page

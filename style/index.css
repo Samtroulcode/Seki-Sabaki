@@ -1357,6 +1357,21 @@
 .tsumego-creator-button-row button.result-wrong.selected {
   background: #a04444;
 }
+.tsumego-creator-delete-branch {
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-creator-delete-branch:hover:not(:disabled),
+.tsumego-creator-delete-branch:focus:not(:disabled) {
+  background: #7a2f2f;
+}
+.tsumego-creator-delete-branch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .tsumego-creator-comment {
   width: 100%;
   min-height: 5rem;

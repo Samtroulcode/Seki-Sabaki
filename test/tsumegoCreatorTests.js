@@ -4,6 +4,7 @@ import sgf from '@sabaki/sgf'
 import {advanceSolution, resolveMove} from '../src/modules/tsumego.js'
 import {
   createDraft,
+  deleteBranch,
   findMatchingChild,
   getBoard,
   getNextPlayer,
@@ -653,6 +654,98 @@ describe('tsumegoCreator', () => {
       assert.strictEqual(advanced.automaticMoves.length, 1)
       assert.strictEqual(advanced.automaticMoves[0].id, r2.nodeId)
       assert.strictEqual(advanced.nextPlayerMove.id, r3.nodeId)
+    })
+  })
+
+  describe('deleteBranch', () => {
+    it('does not delete the root', () => {
+      let tree = createDraft(19)
+
+      assert.strictEqual(deleteBranch(tree, tree.root.id), null)
+      assert.strictEqual(tree.root.data.SZ[0], '19')
+    })
+
+    it('deletes a leaf node', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+
+      let result = deleteBranch(r1.tree, r1.nodeId)
+      assert(result != null)
+      assert.strictEqual(result.deleted, true)
+      assert.strictEqual(result.parentId, tree.root.id)
+      assert.strictEqual(result.tree.root.children.length, 0)
+    })
+
+    it('deletes a node and all its descendants', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+
+      let result = deleteBranch(r3.tree, r2.nodeId)
+      assert(result != null)
+      assert.strictEqual(result.parentId, r1.nodeId)
+
+      let r1Node = result.tree.get(r1.nodeId)
+      assert.strictEqual(r1Node.children.length, 0)
+      assert.strictEqual(result.tree.get(r2.nodeId), null)
+      assert.strictEqual(result.tree.get(r3.nodeId), null)
+    })
+
+    it('keeps sibling variations intact', () => {
+      // root
+      // └─ B[aa]
+      //    ├─ W[bb]
+      //    │  └─ B[cc]
+      //    └─ W[dd]
+      //       └─ B[ee]
+      let tree = createDraft(19)
+      let baa = playMove(tree, tree.root.id, [0, 0])
+      let wbb = playMove(baa.tree, baa.nodeId, [1, 1])
+      let bcc = playMove(wbb.tree, wbb.nodeId, [2, 2])
+      let wdd = playMove(bcc.tree, baa.nodeId, [3, 3])
+      let bee = playMove(wdd.tree, wdd.nodeId, [4, 4])
+
+      let result = deleteBranch(bee.tree, wbb.nodeId)
+      assert(result != null)
+      assert.strictEqual(result.parentId, baa.nodeId)
+
+      let baaNode = result.tree.get(baa.nodeId)
+      assert.strictEqual(baaNode.children.length, 1)
+      assert.strictEqual(baaNode.children[0].id, wdd.nodeId)
+      assert.strictEqual(result.tree.get(wbb.nodeId), null)
+      assert.strictEqual(result.tree.get(bcc.nodeId), null)
+      assert.notStrictEqual(result.tree.get(wdd.nodeId), null)
+      assert.notStrictEqual(result.tree.get(bee.nodeId), null)
+    })
+
+    it('returns a different tree reference', () => {
+      let tree = createDraft(19)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+
+      let result = deleteBranch(r1.tree, r1.nodeId)
+      assert(result != null)
+      assert.notStrictEqual(result.tree, r1.tree)
+    })
+
+    it('returns null for an unknown node id', () => {
+      let tree = createDraft(19)
+
+      assert.strictEqual(deleteBranch(tree, 'unknown'), null)
+    })
+
+    it('invalidates validation when the only correct solution is deleted', () => {
+      let tree = createDraft(9)
+      let r1 = playMove(tree, tree.root.id, [0, 0])
+      let r2 = playMove(r1.tree, r1.nodeId, [1, 1])
+      let r3 = playMove(r2.tree, r2.nodeId, [2, 2])
+      tree = setNodeResult(r3.tree, r3.nodeId, 'correct')
+
+      assert.strictEqual(validateProblem(tree).valid, true)
+
+      let result = deleteBranch(tree, r1.nodeId)
+      assert(result != null)
+      assert.strictEqual(validateProblem(result.tree).valid, false)
     })
   })
 })

@@ -232,6 +232,21 @@ export function validateProblem(tree) {
   return {valid: problem != null, problem}
 }
 
+export function deleteBranch(tree, nodeId) {
+  if (nodeId === tree.root.id) return null
+
+  let node = tree.get(nodeId)
+  if (node == null) return null
+  if (node.parentId == null) return null
+
+  let parentId = node.parentId
+  let nextTree = tree.mutate((draft) => {
+    draft.removeNode(nodeId)
+  })
+
+  return {tree: nextTree, parentId, deleted: true}
+}
+
 function parseCommentValue(value) {
   if (value == null) return {result: null, humanComment: ''}
 
