@@ -3,6 +3,10 @@ import sgf, {stringifyVertex} from '@sabaki/sgf'
 import * as gametree from './gametree.js'
 import {analyzeProblem} from './tsumego.js'
 
+function clearCache(tree) {
+  gametree.clearBoardCacheForTree(tree)
+}
+
 const VALID_SIZES = new Set([9, 13, 19])
 const CORRECT_MARKER = 'Correct'
 const WRONG_MARKER = 'Wrong'
@@ -20,11 +24,14 @@ export function createDraft(size = 19) {
 export function setBoardSize(tree, size) {
   if (!VALID_SIZES.has(size)) return tree
 
-  return tree.mutate((draft) => {
+  let nextTree = tree.mutate((draft) => {
     draft.updateProperty(draft.root.id, 'SZ', [size.toString()])
     draft.removeProperty(draft.root.id, 'AB')
     draft.removeProperty(draft.root.id, 'AW')
   })
+
+  clearCache(nextTree)
+  return nextTree
 }
 
 export function resetDraft(size) {
@@ -54,13 +61,16 @@ export function setSetupStone(tree, vertex, color) {
 
   if (arraysEqual(nextAb, ab) && arraysEqual(nextAw, aw)) return tree
 
-  return tree.mutate((draft) => {
+  let nextTree = tree.mutate((draft) => {
     let rootId = draft.root.id
     if (nextAb.length === 0) draft.removeProperty(rootId, 'AB')
     else draft.updateProperty(rootId, 'AB', nextAb)
     if (nextAw.length === 0) draft.removeProperty(rootId, 'AW')
     else draft.updateProperty(rootId, 'AW', nextAw)
   })
+
+  clearCache(nextTree)
+  return nextTree
 }
 
 export function setPlayerToMove(tree, color) {
@@ -168,6 +178,8 @@ export function playMove(tree, parentNodeId, vertex) {
     )
   })
 
+  clearCache(nextTree)
+
   let newNode = findMatchingChild(nextTree, parentNodeId, color, sgfVertex)
   if (newNode == null) return null
 
@@ -244,6 +256,7 @@ export function deleteBranch(tree, nodeId) {
     draft.removeNode(nodeId)
   })
 
+  clearCache(nextTree)
   return {tree: nextTree, parentId, deleted: true}
 }
 

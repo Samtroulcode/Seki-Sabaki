@@ -83,6 +83,7 @@ describe('tsumegoCreator', () => {
 
       assert.deepStrictEqual(tree.root.data.AB, ['dd'])
       assert.strictEqual(tree.root.data.AW, undefined)
+      assert.strictEqual(getBoard(tree).get([3, 3]), 1)
     })
 
     it('adds a white stone with AW', () => {
@@ -90,6 +91,7 @@ describe('tsumegoCreator', () => {
 
       assert.deepStrictEqual(tree.root.data.AW, ['dd'])
       assert.strictEqual(tree.root.data.AB, undefined)
+      assert.strictEqual(getBoard(tree).get([3, 3]), -1)
     })
 
     it('replaces a black stone by a white stone on the same vertex', () => {
@@ -98,6 +100,7 @@ describe('tsumegoCreator', () => {
 
       assert.deepStrictEqual(tree.root.data.AW, ['dd'])
       assert.strictEqual(tree.root.data.AB, undefined)
+      assert.strictEqual(getBoard(tree).get([3, 3]), -1)
     })
 
     it('replaces a white stone by a black stone on the same vertex', () => {
@@ -114,6 +117,7 @@ describe('tsumegoCreator', () => {
 
       assert.strictEqual(tree.root.data.AB, undefined)
       assert.strictEqual(tree.root.data.AW, undefined)
+      assert.strictEqual(getBoard(tree).get([3, 3]), 0)
     })
 
     it('keeps other stones when erasing one', () => {
@@ -135,6 +139,28 @@ describe('tsumegoCreator', () => {
       let tree = setSetupStone(createDraft(19), [-1, -1], 'B')
 
       assert.strictEqual(tree.root.data.AB, undefined)
+    })
+
+    it('renders black and white stones distinctly on different vertices', () => {
+      let tree = setSetupStone(createDraft(19), [3, 3], 'B')
+      tree = setSetupStone(tree, [4, 4], 'W')
+
+      assert.strictEqual(getBoard(tree).get([3, 3]), 1)
+      assert.strictEqual(getBoard(tree).get([4, 4]), -1)
+    })
+
+    it('reflects setup changes in descendant boards after solution moves exist', () => {
+      let tree = createDraft(9)
+      tree = setSetupStone(tree, [3, 3], 'B')
+      let move = playMove(tree, tree.root.id, [0, 0])
+
+      // Populate the board cache for the root and the move node.
+      assert.strictEqual(getBoard(move.tree, move.nodeId).get([3, 3]), 1)
+
+      tree = setSetupStone(move.tree, [3, 3], 'W')
+
+      // The move node's board must reflect the updated setup stone.
+      assert.strictEqual(getBoard(tree, move.nodeId).get([3, 3]), -1)
     })
   })
 

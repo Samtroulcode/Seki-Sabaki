@@ -66,6 +66,29 @@ test.describe('Tsumego Creator', () => {
     expect(await vertices.count()).toBe(9 * 9)
   })
 
+  test('places a white setup stone as the first action', async ({page}) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'White stone', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/AW\[dd\]/)
+    expect(sgf).not.toMatch(/AB\[dd\]/)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-sign_-1/)
+    await expect(vertex).not.toHaveClass(/shudan-sign_1/)
+  })
+
   test('places a black setup stone with the Black tool', async ({page}) => {
     await page
       .getByRole('button', {name: 'Create Problem', exact: true})
@@ -80,6 +103,11 @@ test.describe('Tsumego Creator', () => {
     await expect
       .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
       .toBeGreaterThan(0)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-sign_1/)
   })
 
   test('replaces black by white on the same vertex', async ({page}) => {
@@ -98,6 +126,76 @@ test.describe('Tsumego Creator', () => {
       .getAttribute('data-test-sgf')
     expect(sgf).toMatch(/AW\[dd\]/)
     expect(sgf).not.toMatch(/AB\[dd\]/)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-sign_-1/)
+    await expect(vertex).not.toHaveClass(/shudan-sign_1/)
+  })
+
+  test('places white stone on a different vertex after black', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'White stone', exact: true})
+      .click()
+    await clickCreatorVertex(page, 4, 4)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/AB\[dd\]/)
+    expect(sgf).toMatch(/AW\[ee\]/)
+
+    let blackVertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]',
+    )
+    let whiteVertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="4"][data-y="4"]',
+    )
+    await expect(blackVertex).toHaveClass(/shudan-sign_1/)
+    await expect(whiteVertex).toHaveClass(/shudan-sign_-1/)
+  })
+
+  test('places white stone after switching back from Solution mode', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await clickCreatorVertex(page, 3, 3)
+
+    await page
+      .locator('.tsumego-creator-mode-tabs')
+      .getByRole('button', {name: 'Solution', exact: true})
+      .click()
+    await clickCreatorVertex(page, 4, 4)
+
+    await page
+      .locator('.tsumego-creator-mode-tabs')
+      .getByRole('button', {name: 'Setup', exact: true})
+      .click()
+    await page
+      .locator('.tsumego-creator-sidebar')
+      .getByRole('button', {name: 'White stone', exact: true})
+      .click()
+    await clickCreatorVertex(page, 5, 5)
+
+    let sgf = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(sgf).toMatch(/AW\[ff\]/)
+
+    let vertex = page.locator(
+      '.tsumego-creator-board .shudan-vertex[data-x="5"][data-y="5"]',
+    )
+    await expect(vertex).toHaveClass(/shudan-sign_-1/)
   })
 
   test('erases a setup stone', async ({page}) => {

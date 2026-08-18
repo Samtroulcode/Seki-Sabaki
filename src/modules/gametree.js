@@ -385,3 +385,11 @@ export function getBoard(tree, id) {
 export function clearBoardCache() {
   boardCache = {}
 }
+
+export function clearBoardCacheForTree(tree) {
+  if (tree == null) return
+
+  for (let node of tree.listNodes()) {
+    delete boardCache[node.id]
+  }
+}
