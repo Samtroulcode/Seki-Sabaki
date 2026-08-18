@@ -9,7 +9,7 @@ const changelog = readFileSync(join(__dirname, '..', 'CHANGELOG.md'), 'utf8')
 const lines = changelog.split('\n')
 
 const start = lines.findIndex((line) =>
-  line.startsWith(`## [Sabaki v${version}]`),
+  line.startsWith(`## [Seki v${version}]`),
 )
 if (start < 0) {
   console.error(`No CHANGELOG.md section found for v${version}`)

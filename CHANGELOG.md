@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.1.0-alpha.1]
+
+This is the first Seki alpha: a functional fork of Sabaki that keeps the
+familiar local board and editor while adding new product areas.
+
+### Highlights
+
+- Sabaki-compatible local board/editor: SGF editing, GTP engine support, and
+  board analysis.
+- OGS online play: account sign-in, matchmaking, live games, and reviews.
+- Post-game analysis with configurable engine settings.
+- A personal Library for organizing games and Tsumego collections.
+- Tsumego Browser for finding problems, plus a Tsumego Solver and a Tsumego
+  Creator for solving and making your own problems.
+
 ## [Sabaki v0.60.2][v0.60.2] (2026-07-09)
 
 A bugfix and stability release on top of v0.60.0, plus an experimental Linux
