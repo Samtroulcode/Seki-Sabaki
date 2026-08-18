@@ -21,6 +21,7 @@ import {
   markTsumegoProblemCompleted,
 } from '../modules/tsumegoprogress.js'
 import {setLastTsumegoCollection} from '../modules/tsumegocollection.js'
+import TsumegoCreator from './TsumegoCreator.js'
 import TsumegoSolver from './TsumegoSolver.js'
 
 const t = i18n.context('TsumegoPanel')
@@ -382,6 +383,15 @@ export default class TsumegoPanel extends Component {
     this.setState({view: 'browser', error: null})
   }
 
+  handleCreateProblem() {
+    this.problemLoadId += 1
+    this.setState({view: 'creator', error: null})
+  }
+
+  handleCreatorBack() {
+    this.setState({view: 'browser'})
+  }
+
   async handleAdjacentProblem(offset) {
     let problemEntries = this.state.entries
       .filter((entry) => entry.type === 'file')
@@ -432,23 +442,28 @@ export default class TsumegoPanel extends Component {
 
   render() {
     let {source, config, busy, error, view} = this.state
+    let isProblemView = view === 'problem' || view === 'creator'
     return h(
       'section',
       {
         id: 'tsumego-dashboard',
-        class: `tsumego-panel ${view === 'problem' ? 'is-problem' : ''}`,
+        class: `tsumego-panel ${isProblemView ? 'is-problem' : ''}`,
       },
       h('h1', {}, t('Tsumego')),
       error != null && h('p', {class: 'ogs-error'}, error),
-      view === 'problem' ? this.renderProblem() : this.renderBrowser(),
-      source === 'user' && config?.configured !== true && view !== 'problem'
+      view === 'problem'
+        ? this.renderProblem()
+        : view === 'creator'
+          ? this.renderCreator()
+          : this.renderBrowser(),
+      source === 'user' && config?.configured !== true && !isProblemView
         ? h(
             'p',
             {class: 'tsumego-panel-status'},
             t('My Library is not configured.'),
           )
         : null,
-      busy && view !== 'problem'
+      busy && !isProblemView
         ? h('p', {class: 'tsumego-panel-status'}, t('Loading Tsumego…'))
         : null,
     )
@@ -464,6 +479,19 @@ export default class TsumegoPanel extends Component {
     return h(
       'div',
       {class: 'tsumego-browser'},
+      h(
+        'div',
+        {class: 'tsumego-browser-actions'},
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'tsumego-create-problem-button',
+            onClick: () => this.handleCreateProblem(),
+          },
+          t('Create Problem'),
+        ),
+      ),
       h(
         'div',
         {class: 'tsumego-source-tabs', role: 'tablist'},
@@ -638,6 +666,12 @@ export default class TsumegoPanel extends Component {
       onPrevious: () => this.handleAdjacentProblem(-1),
       onNext: () => this.handleAdjacentProblem(1),
       onSolved: () => this.handleProblemSolved(),
+    })
+  }
+
+  renderCreator() {
+    return h(TsumegoCreator, {
+      onBack: () => this.handleCreatorBack(),
     })
   }
 }

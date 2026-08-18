@@ -115,7 +115,9 @@ const test = base.extend({
     // Most legacy E2E suites are board-centric and predate the Home workspace.
     // Keep their starting point stable while smoke/home specs cover Home itself.
     if (
-      !['smoke', 'home-panel', 'tsumego-panel'].includes(testInfo.project.name)
+      !['smoke', 'home-panel', 'tsumego-panel', 'tsumego-creator'].includes(
+        testInfo.project.name,
+      )
     ) {
       await page.evaluate(() => {
         window.__sabaki.setState({activeWorkspace: 'board'})

@@ -1053,6 +1053,16 @@
 .tsumego-browser-card {
   min-height: 0;
 }
+.tsumego-browser-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.tsumego-create-problem-button,
+.tsumego-create-problem-button:hover,
+.tsumego-create-problem-button:focus {
+  background: #46a758;
+  color: white;
+}
 .tsumego-browser-toolbar,
 .tsumego-problem-toolbar {
   display: flex;
@@ -1254,6 +1264,107 @@
 .tsumego-solver-navigation button:disabled {
   opacity: 0.45;
 }
+.tsumego-creator {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'board sidebar'
+    'navigation sidebar';
+  gap: 1rem;
+  min-height: 0;
+  height: 100%;
+}
+.tsumego-creator-board {
+  grid-area: board;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: #111;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tsumego-creator-board #goban {
+  position: absolute;
+}
+.tsumego-creator-sidebar {
+  grid-area: sidebar;
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 1.25rem;
+  background: #111;
+  border: 1px solid #292a2d;
+  border-radius: 8px;
+}
+.tsumego-creator-sidebar h2 {
+  color: white;
+  font-size: 1.2rem;
+}
+.tsumego-creator-sidebar h3 {
+  color: #ccc;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.tsumego-creator-group {
+  display: grid;
+  gap: 0.55rem;
+}
+.tsumego-creator-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tsumego-creator-button-row button {
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-creator-button-row button:hover,
+.tsumego-creator-button-row button:focus,
+.tsumego-creator-button-row button.selected {
+  background: #006fca;
+}
+.tsumego-creator-comment {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.6rem 0.8rem;
+  box-sizing: border-box;
+  background: #181818;
+  border: 1px solid #292a2d;
+  border-radius: 4px;
+  color: #ddd;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+.tsumego-creator-comment:focus {
+  outline: none;
+  border-color: #006fca;
+}
+.tsumego-creator-navigation {
+  grid-area: navigation;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+}
+.tsumego-creator-navigation button {
+  padding: 0.45rem 0.8rem;
+  background: #292a2d;
+  color: #eee;
+  border-radius: 4px;
+}
+.tsumego-creator-navigation button:hover,
+.tsumego-creator-navigation button:focus {
+  background: #006fca;
+}
 .home-matchmaking-toast {
   position: fixed;
   right: 1.25rem;
@@ -1400,6 +1511,18 @@
       'navigation';
   }
   .tsumego-solver-board {
+    height: 60vh;
+    min-height: 24rem;
+  }
+  .tsumego-creator {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      'board'
+      'sidebar'
+      'navigation';
+  }
+  .tsumego-creator-board {
     height: 60vh;
     min-height: 24rem;
   }
