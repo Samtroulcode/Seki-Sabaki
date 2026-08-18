@@ -36,6 +36,10 @@ let runningWayland =
 
 const expectedAppUrl = pathToFileURL(resolve(__dirname, '../index.html'))
 
+// GitHub repository used for update checks. Matches package.json's
+// repository/homepage/bugs URLs.
+const updateRepository = 'Samtroulcode/Seki-Sabaki'
+
 function isTrustedRendererEvent(event) {
   let window = BrowserWindow.fromWebContents(event.sender)
   let url = event.senderFrame?.url || event.sender.getURL?.() || ''
@@ -192,7 +196,7 @@ function buildMenu(props = {}) {
 async function checkForUpdates({showFailDialogs = false} = {}) {
   try {
     let t = i18n.context('updater')
-    let info = await updater.check(`SabakiHQ/${app.name}`)
+    let info = await updater.check(updateRepository)
 
     if (info.hasUpdates) {
       dialog.showMessageBox(
