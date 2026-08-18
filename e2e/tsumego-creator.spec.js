@@ -161,6 +161,21 @@ test.describe('Tsumego Creator', () => {
     )
     await expect(blackVertex).toHaveClass(/shudan-sign_1/)
     await expect(whiteVertex).toHaveClass(/shudan-sign_-1/)
+
+    let blackStone = blackVertex.locator('.shudan-stone-image')
+    let whiteStone = whiteVertex.locator('.shudan-stone-image')
+    await expect(blackStone).toHaveClass(/shudan-sign_1/)
+    await expect(whiteStone).toHaveClass(/shudan-sign_-1/)
+
+    let blackBackground = await blackStone.evaluate(
+      (el) => window.getComputedStyle(el).backgroundImage,
+    )
+    let whiteBackground = await whiteStone.evaluate(
+      (el) => window.getComputedStyle(el).backgroundImage,
+    )
+    expect(blackBackground).not.toBe('none')
+    expect(whiteBackground).not.toBe('none')
+    expect(blackBackground).not.toBe(whiteBackground)
   })
 
   test('places white stone after switching back from Solution mode', async ({
