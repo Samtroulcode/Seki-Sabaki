@@ -410,6 +410,125 @@ test.describe('Tsumego workspace', () => {
       'Collections',
     )
   })
+
+  test('a broken SGF in My Library shows INVALID_SGF without crashing', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(path.join(tsumego, 'broken.sgf'), '(;GM[1]SZ[9]AB[aa')
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toHaveCount(0)
+      await expect(page.locator('.ogs-error')).toContainText(
+        'This file is not a valid SGF.',
+      )
+      await expect(page.locator('.tsumego-browser')).toBeVisible()
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('a normal game SGF does not launch the Solver', async ({page}) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, 'game.sgf'),
+      '(;GM[1]SZ[19]FF[4];B[pd];W[dp];B[pp])',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toHaveCount(0)
+      await expect(page.locator('.ogs-error')).toContainText(
+        'No playable Tsumego solution could be detected.',
+      )
+      await expect(page.locator('.tsumego-browser')).toBeVisible()
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('a setup-only SGF reports the missing solution sequence', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, 'setup.sgf'),
+      '(;GM[1]SZ[9]AB[aa][bb]AW[cc]PL[B])',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toHaveCount(0)
+      await expect(page.locator('.ogs-error')).toContainText(
+        'This SGF does not contain a Tsumego solution.',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('a real Tsumego in My Library opens the Solver normally', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, 'real.sgf'),
+      '(;GM[1]SZ[9]PL[B]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.ogs-error')).toHaveCount(0)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
 })
 
 async function dispatchVertex(page, x, y) {

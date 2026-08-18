@@ -26,8 +26,8 @@ import {
   setSetupStone,
   toggleLineMarkup,
   toggleMarkup,
-  validateProblem,
 } from '../modules/tsumegocreator.js'
+import {validateTsumegoTree} from '../modules/tsumegovalidator.js'
 import Goban from './Goban.js'
 import GameGraph from './sidebars/GameGraph.js'
 import TsumegoCreatorToolbar from './TsumegoCreatorToolbar.js'
@@ -99,7 +99,7 @@ export default class TsumegoCreator extends Component {
   }
 
   get validation() {
-    return validateProblem(this.state.gameTree)
+    return validateTsumegoTree(this.state.gameTree)
   }
 
   handleSizeChange = (size) => {
@@ -505,6 +505,11 @@ export default class TsumegoCreator extends Component {
     let result = this.currentNodeResult
     let isRoot = this.isCurrentNodeRoot
     let validation = this.validation
+    let validationMessage = validation.valid
+      ? t('Problem valid')
+      : validation.errors[0] != null
+        ? `${t('Incomplete problem')} — ${t(validation.errors[0].message)}`
+        : t('Incomplete problem')
 
     return [
       h('h2', {key: 'title'}, t('Solution')),
@@ -518,7 +523,7 @@ export default class TsumegoCreator extends Component {
           ].join(' '),
           'data-test-validation': validation.valid ? 'valid' : 'invalid',
         },
-        validation.valid ? t('Problem valid') : t('Incomplete problem'),
+        validationMessage,
       ),
       h(
         'p',

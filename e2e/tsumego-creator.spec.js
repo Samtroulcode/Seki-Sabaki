@@ -601,6 +601,40 @@ test.describe('Tsumego Creator', () => {
     ).toBeVisible()
   })
 
+  test('a fresh draft reports the missing solution sequence', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+
+    await expect(page.locator('.tsumego-creator-validation')).toContainText(
+      'Incomplete problem',
+    )
+    await expect(page.locator('.tsumego-creator-validation')).toContainText(
+      'The SGF does not contain a solution sequence.',
+    )
+  })
+
+  test('unresolved moves report the playable-solution diagnostic', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await enterSolutionMode(page)
+    await clickCreatorVertex(page, 0, 0)
+    await clickCreatorVertex(page, 1, 1)
+
+    await expect(page.locator('.tsumego-creator-validation')).toContainText(
+      'Incomplete problem',
+    )
+    await expect(page.locator('.tsumego-creator-validation')).toContainText(
+      'No playable Tsumego solution could be detected.',
+    )
+  })
+
   test('Delete Branch is disabled on the root', async ({page}) => {
     await page
       .getByRole('button', {name: 'Create Problem', exact: true})

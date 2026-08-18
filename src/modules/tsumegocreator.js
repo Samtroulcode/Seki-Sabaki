@@ -1,7 +1,7 @@
 import sgf, {parseCompressedVertices, stringifyVertex} from '@sabaki/sgf'
 
 import * as gametree from './gametree.js'
-import {analyzeProblem} from './tsumego.js'
+import {validateTsumegoTree} from './tsumegovalidator.js'
 
 function clearCache(tree) {
   gametree.clearBoardCacheForTree(tree)
@@ -417,8 +417,10 @@ export function setNodeComment(tree, nodeId, comment) {
 }
 
 export function validateProblem(tree) {
-  let problem = analyzeProblem(tree, {allowTeFallback: true})
-  return {valid: problem != null, problem}
+  // Delegates to the shared validator so the Creator and the Reader never
+  // diverge on what makes a problem playable.
+  let {valid, problem} = validateTsumegoTree(tree)
+  return {valid, problem}
 }
 
 export function deleteBranch(tree, nodeId) {

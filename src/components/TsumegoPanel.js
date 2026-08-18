@@ -3,8 +3,7 @@ import natsort from 'natsort'
 
 import i18n from '../i18n.js'
 import * as gametree from '../modules/gametree.js'
-import {analyzeProblem} from '../modules/tsumego.js'
-import * as sgfFileFormat from '../modules/fileformats/sgf.js'
+import {validateTsumegoContent} from '../modules/tsumegovalidator.js'
 import {
   countLibraryProblems,
   getBuiltinCollectionMetadata,
@@ -341,19 +340,18 @@ export default class TsumegoPanel extends Component {
         return
       }
 
-      let trees = sgfFileFormat.parse(result.content)
-      let gameTree = trees[0]
-      let problem = gameTree
-        ? analyzeProblem(gameTree, {allowTeFallback: true})
-        : null
+      let validation = validateTsumegoContent(result.content)
       if (problemLoadId !== this.problemLoadId) return
-      if (gameTree == null || problem == null) {
+      if (!validation.valid) {
         this.setState({
           busy: false,
-          error: t('Unsupported or invalid tsumego.'),
+          error: this.getValidationErrorMessage(validation),
         })
         return
       }
+
+      let gameTree = validation.gameTree
+      let problem = validation.problem
 
       let problemEntries = this.state.entries
         .filter((candidate) => candidate.type === 'file')
@@ -381,6 +379,25 @@ export default class TsumegoPanel extends Component {
   async handleBack() {
     this.problemLoadId += 1
     this.setState({view: 'browser', error: null})
+  }
+
+  // Maps the first validation error to a user-facing message. Unknown codes
+  // fall back to the generic message so a new diagnostic never crashes the UI.
+  getValidationErrorMessage(validation) {
+    let first = validation.errors[0]
+    if (first == null) return t('Unsupported or invalid tsumego.')
+    switch (first.code) {
+      case 'INVALID_SGF':
+        return t('This file is not a valid SGF.')
+      case 'NO_MOVES':
+        return t('This SGF does not contain a Tsumego solution.')
+      case 'NO_PLAYABLE_SOLUTION':
+        return t('No playable Tsumego solution could be detected.')
+      case 'NO_GAME_TREE':
+        return t('No SGF game tree was found.')
+      default:
+        return t('Unsupported or invalid tsumego.')
+    }
   }
 
   handleCreateProblem() {
