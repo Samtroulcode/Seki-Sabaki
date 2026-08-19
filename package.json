@@ -191,6 +191,7 @@
     "dist:linux:all": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --x64 --arm64 --publish never",
     "dist:flatpak": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l flatpak --publish never",
     "dist:macos": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -m --x64 --arm64 --publish never",
+    "dist:macos:unsigned": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -m --x64 --arm64 --publish never -c.mac.identity=null -c.mac.notarize=false -c.mac.hardenedRuntime=false",
     "dist:win64": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w nsis --x64 --publish never && node ./ci/mv.js ./dist/seki-vx.x.x-windows.exe ./dist/seki-vx.x.x-windows-x64-setup.exe",
     "dist:win64-portable": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w portable --x64 --publish never && node ./ci/mv.js ./dist/seki-vx.x.x-windows.exe ./dist/seki-vx.x.x-windows-x64-portable.exe",
     "dist:win": "npm run dist:win64 && npm run dist:win64-portable",

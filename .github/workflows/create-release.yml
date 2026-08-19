@@ -40,9 +40,10 @@ jobs:
       matrix:
         include:
           # Pinned macOS version for reproducible release builds; both mac
-          # arches cross-package on the arm64 runner.
+          # arches cross-package on the arm64 runner. Alpha rehearsals use the
+          # unsigned path (no Developer ID credentials configured).
           - os: macos-15
-            dist: dist:macos
+            dist: dist:macos:unsigned
           - os: windows-latest
             dist: dist:win
           - os: ubuntu-latest
@@ -62,17 +63,12 @@ jobs:
         run: npm test
         env:
           CI: true
-      # electron-builder signs/notarizes only when these secrets are set.
-      # Scoped to macOS: CSC_LINK would otherwise also engage Windows signing.
+      # Alpha rehearsal: macOS builds are unsigned/unnotarized because no Apple
+      # Developer ID credentials are configured. The production dist:macos path
+      # remains for future signing.
       - name: Build distributables (macOS)
         if: runner.os == 'macOS'
         run: npm run ${{ matrix.dist }}
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Build distributables
         if: runner.os != 'macOS'
         run: npm run ${{ matrix.dist }}

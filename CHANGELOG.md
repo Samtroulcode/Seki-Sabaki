@@ -8,7 +8,10 @@ Prepares another release-pipeline rehearsal. Aligns the analyzed-game regression
 coverage with the intended new-board-tab opening behavior, makes analyze-sgf
 packaging invocation cross-platform (including the Windows npx.cmd fix), and
 temporarily removes ARM64 Flatpak from the mandatory release matrix while its
-packaging failure remains under investigation. The complete release pipeline has
+packaging failure remains under investigation. The release rehearsal now uses an
+explicit unsigned/unnotarized macOS CI build path because Developer ID
+credentials are not configured; this is for alpha/testing only and does not
+represent production-ready macOS distribution. The complete release pipeline has
 not been validated yet.
 
 ## [Seki v0.2.0-alpha.2]

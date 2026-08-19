@@ -69,6 +69,7 @@ describe('analyze-sgf packaging', () => {
     for (let scriptName of [
       'build',
       'dist:macos',
+      'dist:macos:unsigned',
       'dist:linux',
       'dist:flatpak',
       'dist:win64',
