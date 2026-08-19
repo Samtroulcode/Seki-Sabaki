@@ -330,4 +330,14 @@ describe('AnalysisStore', () => {
       'KataGo executable was not found.',
     )
   })
+
+  it('forwards analyzed-game open validation for new-tab gating', async () => {
+    let api = createAnalysisApi({
+      openAnalyzedGame: async (path) => path === '/analysis/game.sgf',
+    })
+    let store = new AnalysisStore({analysis: () => api})
+
+    assert.strictEqual(await store.openAnalyzedGame('/analysis/game.sgf'), true)
+    assert.strictEqual(await store.openAnalyzedGame('/etc/passwd'), false)
+  })
 })

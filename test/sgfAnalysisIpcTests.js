@@ -187,7 +187,7 @@ describe('SGF analysis IPC handlers', () => {
     assert.deepStrictEqual(shown, ['/analysis/game.sgf'])
   })
 
-  it('only opens known analyzed games', async () => {
+  it('only validates known analyzed games', async () => {
     let sent = []
     let handlers = setup({service: createService()})
     let evt = {sender: {send: (...args) => sent.push(args)}}
@@ -200,7 +200,9 @@ describe('SGF analysis IPC handlers', () => {
       await handlers['analysis:openAnalyzedGame'](evt, '/etc/passwd'),
       false,
     )
-    assert.deepStrictEqual(sent, [['load-file', '/analysis/game.sgf']])
+    // The handler only validates; AnalysisPanel.handleOpenGame opens the game
+    // in a new board tab, so no load-file event is sent from here.
+    assert.deepStrictEqual(sent, [])
   })
 
   it('only shows known analysis logs in folder', async () => {

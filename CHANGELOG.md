@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.2.0-alpha.3]
+
+Prepares another release-pipeline rehearsal. Aligns the analyzed-game regression
+coverage with the intended new-board-tab opening behavior, makes analyze-sgf
+packaging invocation cross-platform (including the Windows npx.cmd fix), and
+temporarily removes ARM64 Flatpak from the mandatory release matrix while its
+packaging failure remains under investigation. The complete release pipeline has
+not been validated yet.
+
 ## [Seki v0.2.0-alpha.2]
 
 Prepares another release-pipeline rehearsal and fixes native Flatpak

@@ -86,7 +86,8 @@ jobs:
           path: dist/seki-*
           if-no-files-found: error
 
-  # Flatpak, built natively per-arch (x86_64 + aarch64, e.g. Raspberry Pi).
+  # Flatpak, built natively on x86_64. ARM64 packaging is deferred while its
+  # electron-builder failure is under investigation.
   flatpak:
     needs: [validate-release]
     strategy:
@@ -95,8 +96,6 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64
-          - os: ubuntu-24.04-arm
-            arch: aarch64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

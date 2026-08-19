@@ -7,6 +7,12 @@ const packagePath = join(root, 'node_modules', 'analyze-sgf', 'package.json')
 const analyzeSgfDirectory = join(root, 'node_modules', 'analyze-sgf')
 const outDir = join(root, 'build', 'analyze-sgf')
 const tmpDir = join(root, 'build', 'analyze-sgf-pkg')
+// pkg is a project devDependency; run its CLI entry directly through Node so
+// packaging works on Windows without the platform-specific npx shim.
+const pkgPackageJson = require(
+  join(root, 'node_modules', 'pkg', 'package.json'),
+)
+const pkgCliPath = join(root, 'node_modules', 'pkg', pkgPackageJson.bin.pkg)
 const forkFeatureFiles = [
   'src/comment-renderer.js',
   'src/comment-i18n.js',
@@ -39,6 +45,17 @@ const targets = [
   },
 ]
 
+function buildPkgCommand() {
+  return [
+    pkgCliPath,
+    packagePath,
+    '--targets',
+    targets.map((target) => target.pkg).join(','),
+    '--out-path',
+    tmpDir,
+  ]
+}
+
 function prepareAnalyzeSgfBinaries() {
   assertCompatibleAnalyzeSgfPackage()
 
@@ -47,18 +64,7 @@ function prepareAnalyzeSgfBinaries() {
   mkdirSync(tmpDir, {recursive: true})
   mkdirSync(outDir, {recursive: true})
 
-  execFileSync(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    [
-      'pkg',
-      packagePath,
-      '--targets',
-      targets.map((target) => target.pkg).join(','),
-      '--out-path',
-      tmpDir,
-    ],
-    {stdio: 'inherit'},
-  )
+  execFileSync(process.execPath, buildPkgCommand(), {stdio: 'inherit'})
 
   let generatedFiles = readdirSync(tmpDir)
 
@@ -111,8 +117,10 @@ if (require.main === module) prepareAnalyzeSgfBinaries()
 module.exports = {
   analyzeSgfDirectory,
   assertCompatibleAnalyzeSgfPackage,
+  buildPkgCommand,
   forkFeatureFiles,
   matchesPkgOutput,
   packagePath,
+  pkgCliPath,
   prepareAnalyzeSgfBinaries,
 }
