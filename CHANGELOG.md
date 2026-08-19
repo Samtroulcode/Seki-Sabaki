@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.2.0-alpha.1]
+
+A production-hardening alpha following the first functional milestone, focused
+on release and update pipeline integrity. The release pipeline has not yet been
+proven end-to-end.
+
+### Highlights
+
+- Release artifacts aligned with the `seki-*` namespace.
+- Seki-specific GitHub release notes.
+- In-app updater targeting the Seki repository.
+- SemVer-correct updater version comparison for prerelease versions.
+- Release tag/package version consistency validation in the release workflow.
+
 ## [Seki v0.1.0-alpha.1]
 
 This is the first Seki alpha: a functional fork of Sabaki that keeps the
