@@ -74,8 +74,31 @@ function resolveTargets(requested) {
   return targets.filter((target) => names.includes(target.resource))
 }
 
+// pkg writes a single target to exactly the --output path (appending .exe
+// itself for Windows targets), so the filename is deterministic and needs no
+// platform/architecture substring guessing. The extension mirrors the target's
+// executable name so the target mapping stays the source of truth.
+function singleTargetOutputPath(target) {
+  let extension = target.executable.endsWith('.exe') ? '.exe' : ''
+
+  return join(tmpDir, `analyze-sgf-${target.resource}${extension}`)
+}
+
 function buildPkgCommand(selectedTargets) {
   let selected = selectedTargets ?? targets
+
+  if (selected.length === 1) {
+    let target = selected[0]
+
+    return [
+      pkgCliPath,
+      packagePath,
+      '--targets',
+      target.pkg,
+      '--output',
+      singleTargetOutputPath(target),
+    ]
+  }
 
   return [
     pkgCliPath,
@@ -100,6 +123,30 @@ function prepareAnalyzeSgfBinaries(requestedTargets) {
     stdio: 'inherit',
   })
 
+  if (selectedTargets.length === 1) {
+    copySingleTargetOutput(selectedTargets[0])
+  } else {
+    copyMultiTargetOutputs(selectedTargets)
+  }
+
+  rmSync(tmpDir, {recursive: true, force: true})
+}
+
+function copySingleTargetOutput(target) {
+  let generated = singleTargetOutputPath(target)
+
+  if (!existsSync(generated)) {
+    throw new Error(
+      `pkg did not generate an analyze-sgf binary for ${target.pkg}.`,
+    )
+  }
+
+  let resourceDir = join(outDir, target.resource)
+  mkdirSync(resourceDir, {recursive: true})
+  copyFileSync(generated, join(resourceDir, target.executable))
+}
+
+function copyMultiTargetOutputs(selectedTargets) {
   let generatedFiles = readdirSync(tmpDir)
 
   for (let target of selectedTargets) {
@@ -116,8 +163,6 @@ function prepareAnalyzeSgfBinaries(requestedTargets) {
     mkdirSync(resourceDir, {recursive: true})
     copyFileSync(join(tmpDir, generated), join(resourceDir, target.executable))
   }
-
-  rmSync(tmpDir, {recursive: true, force: true})
 }
 
 function assertCompatibleAnalyzeSgfPackage() {
@@ -152,11 +197,13 @@ module.exports = {
   analyzeSgfDirectory,
   assertCompatibleAnalyzeSgfPackage,
   buildPkgCommand,
+  copySingleTargetOutput,
   forkFeatureFiles,
   matchesPkgOutput,
   packagePath,
   pkgCliPath,
   prepareAnalyzeSgfBinaries,
   resolveTargets,
+  singleTargetOutputPath,
   targets,
 }
