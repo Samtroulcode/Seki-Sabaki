@@ -1,0 +1,30 @@
+name: Windows Package Check
+
+# Manual packaging verification tool for Windows distributables. It only
+# builds and uploads artifacts; it never creates a release, tag, or
+# prerelease, and it does not invoke any other platform job.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Windows distributables
+        run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package-check
+          path: |
+            dist/seki-*-windows-x64-setup.exe
+            dist/seki-*-windows-x64-portable.exe
+          if-no-files-found: error

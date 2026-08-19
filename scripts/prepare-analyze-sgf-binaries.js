@@ -45,18 +45,50 @@ const targets = [
   },
 ]
 
-function buildPkgCommand() {
+// Resolve requested resource target names (e.g. 'win32-x64') against the
+// target mapping. Defaults to the current host when nothing is requested.
+function resolveTargets(requested) {
+  if (requested != null && !Array.isArray(requested)) {
+    throw new Error(
+      `Expected an array of analyze-sgf resource targets, got ${typeof requested}.`,
+    )
+  }
+
+  let names =
+    requested == null || requested.length === 0
+      ? [`${process.platform}-${process.arch}`]
+      : requested
+
+  let unknown = names.filter(
+    (name) => !targets.some((target) => target.resource === name),
+  )
+
+  if (unknown.length > 0) {
+    throw new Error(
+      `Unknown analyze-sgf resource target${unknown.length > 1 ? 's' : ''}: ${unknown.join(
+        ', ',
+      )}. Supported targets: ${targets.map((target) => target.resource).join(', ')}.`,
+    )
+  }
+
+  return targets.filter((target) => names.includes(target.resource))
+}
+
+function buildPkgCommand(selectedTargets) {
+  let selected = selectedTargets ?? targets
+
   return [
     pkgCliPath,
     packagePath,
     '--targets',
-    targets.map((target) => target.pkg).join(','),
+    selected.map((target) => target.pkg).join(','),
     '--out-path',
     tmpDir,
   ]
 }
 
-function prepareAnalyzeSgfBinaries() {
+function prepareAnalyzeSgfBinaries(requestedTargets) {
+  let selectedTargets = resolveTargets(requestedTargets)
   assertCompatibleAnalyzeSgfPackage()
 
   rmSync(tmpDir, {recursive: true, force: true})
@@ -64,11 +96,13 @@ function prepareAnalyzeSgfBinaries() {
   mkdirSync(tmpDir, {recursive: true})
   mkdirSync(outDir, {recursive: true})
 
-  execFileSync(process.execPath, buildPkgCommand(), {stdio: 'inherit'})
+  execFileSync(process.execPath, buildPkgCommand(selectedTargets), {
+    stdio: 'inherit',
+  })
 
   let generatedFiles = readdirSync(tmpDir)
 
-  for (let target of targets) {
+  for (let target of selectedTargets) {
     let generated = generatedFiles.find((file) =>
       matchesPkgOutput(file, target),
     )
@@ -112,7 +146,7 @@ function matchesPkgOutput(file, target) {
   return normalized.includes(platform) && normalized.includes(runtimeArch)
 }
 
-if (require.main === module) prepareAnalyzeSgfBinaries()
+if (require.main === module) prepareAnalyzeSgfBinaries(process.argv.slice(2))
 
 module.exports = {
   analyzeSgfDirectory,
@@ -123,4 +157,6 @@ module.exports = {
   packagePath,
   pkgCliPath,
   prepareAnalyzeSgfBinaries,
+  resolveTargets,
+  targets,
 }

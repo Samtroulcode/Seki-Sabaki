@@ -71,11 +71,47 @@ describe('analyze-sgf packaging', () => {
       'dist:macos',
       'dist:macos:unsigned',
       'dist:linux',
+      'dist:linux:arm64',
+      'dist:linux:all',
       'dist:flatpak',
       'dist:win64',
       'dist:win64-portable',
     ]) {
       assert.match(packageJson.scripts[scriptName], /prepare:analyze-sgf/)
+    }
+  })
+
+  it('scopes analyze-sgf preparation to the packaged targets', () => {
+    let expected = {
+      'dist:linux': ['linux-x64'],
+      'dist:linux:arm64': ['linux-arm64'],
+      'dist:linux:all': ['linux-x64', 'linux-arm64'],
+      'dist:macos': ['darwin-x64', 'darwin-arm64'],
+      'dist:macos:unsigned': ['darwin-x64', 'darwin-arm64'],
+      'dist:win64': ['win32-x64'],
+      'dist:win64-portable': ['win32-x64'],
+    }
+
+    for (let [scriptName, targets] of Object.entries(expected)) {
+      let script = packageJson.scripts[scriptName]
+      let match = script.match(/prepare:analyze-sgf\s+([^&]+)/)
+
+      assert.ok(match, `${scriptName} should pass explicit analyze-sgf targets`)
+      assert.deepStrictEqual(
+        match[1].trim().split(/\s+/),
+        targets,
+        `${scriptName} should prepare exactly ${targets.join(', ')}`,
+      )
+    }
+
+    // build and dist:flatpak use the host-default target (no explicit args).
+    for (let scriptName of ['build', 'dist:flatpak']) {
+      assert.ok(
+        !/prepare:analyze-sgf\s+(linux|darwin|win32)-/.test(
+          packageJson.scripts[scriptName],
+        ),
+        `${scriptName} should use the host-default analyze-sgf target`,
+      )
     }
   })
 })
