@@ -2,15 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.2.0-alpha.5]
+
+Prepares another release-pipeline rehearsal. Replaces analyze-sgf multi-target
+generated-filename guessing with one deterministic pkg `--output` invocation per
+target, fixing same-platform multi-architecture packaging such as macOS x64 +
+arm64 and the analogous latent Linux multi-arch case. Adds an isolated manual
+macOS packaging check workflow and retains the existing isolated Windows
+packaging check. The full release pipeline has not been validated yet.
+
 ## [Seki v0.2.0-alpha.4]
 
 Prepares another release-pipeline rehearsal. Scopes the bundled analyze-sgf
 binaries to the package targets each distribution actually requires, so the
-Windows build no longer compiles all six pkg targets, and adds an isolated
-manual Windows packaging check workflow. Analyze-sgf packaging now builds each
-target with its own pkg invocation and an explicit deterministic `--output`
-path, removing the generated-filename guessing that broke same-platform
-multi-architecture builds.
+Windows build no longer compiles all six pkg targets. Adds an isolated manual
+Windows packaging check workflow and makes single-target analyze-sgf output
+deterministic by passing pkg an explicit `--output` filename instead of guessing
+the generated name from platform and architecture substrings.
 
 ## [Seki v0.2.0-alpha.3]
 
