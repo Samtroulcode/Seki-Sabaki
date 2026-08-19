@@ -26,16 +26,20 @@ describe('analyze-sgf packaging dependency', () => {
   })
 
   it('builds a cross-platform pkg invocation without npx shims', () => {
-    let command = buildPkgCommand(targets)
-
     assert.strictEqual(existsSync(pkgCliPath), true)
-    assert.strictEqual(command[0], pkgCliPath)
-    assert.strictEqual(command[1], packagePath)
-    assert.strictEqual(command[2], '--targets')
-    assert.ok(command[3].includes('node18-linux-x64'))
-    assert.ok(command[3].includes('node18-win-arm64'))
-    assert.strictEqual(command[4], '--out-path')
-    assert.ok(command.every((arg) => !/npx/.test(arg)))
+
+    for (let target of targets) {
+      let command = buildPkgCommand(target)
+
+      assert.strictEqual(command[0], pkgCliPath)
+      assert.strictEqual(command[1], packagePath)
+      assert.strictEqual(command[2], '--targets')
+      assert.strictEqual(command[3], target.pkg)
+      assert.strictEqual(command[4], '--output')
+      assert.strictEqual(command[5], singleTargetOutputPath(target))
+      assert.ok(command.every((arg) => !/npx/.test(arg)))
+      assert.ok(!command.includes('--out-path'))
+    }
   })
 })
 
@@ -83,28 +87,27 @@ describe('analyze-sgf target selection', () => {
     )
   })
 
-  it('builds the pkg command with only the selected targets', () => {
-    let command = buildPkgCommand(
-      resolveTargets(['darwin-x64', 'darwin-arm64']),
-    )
+  it('builds one pkg command per selected target', () => {
+    let selected = resolveTargets(['darwin-x64', 'darwin-arm64'])
+    let commands = selected.map((target) => buildPkgCommand(target))
 
-    assert.deepStrictEqual(command[3].split(','), [
-      'node18-macos-x64',
-      'node18-macos-arm64',
-    ])
+    assert.deepStrictEqual(
+      commands.map((command) => command[3]),
+      ['node18-macos-x64', 'node18-macos-arm64'],
+    )
   })
 })
 
-describe('analyze-sgf single-target pkg output', () => {
+describe('analyze-sgf deterministic pkg output', () => {
   it('builds a single-target invocation with exactly the selected pkg target', () => {
-    let command = buildPkgCommand(resolveTargets(['win32-x64']))
+    let command = buildPkgCommand(resolveTargets(['win32-x64'])[0])
 
     assert.strictEqual(command[3], 'node18-win-x64')
   })
 
   it('uses --output with the deterministic path instead of filename heuristics', () => {
     let target = resolveTargets(['win32-x64'])[0]
-    let command = buildPkgCommand([target])
+    let command = buildPkgCommand(target)
 
     assert.strictEqual(command[4], '--output')
     assert.strictEqual(command[5], singleTargetOutputPath(target))
@@ -124,14 +127,29 @@ describe('analyze-sgf single-target pkg output', () => {
     assert.ok(!output.endsWith('.exe'))
   })
 
-  it('keeps the multi-target --out-path invocation for multiple targets', () => {
-    let command = buildPkgCommand(resolveTargets(['linux-x64', 'linux-arm64']))
+  it('builds independent deterministic commands for multiple targets', () => {
+    let selected = resolveTargets(['linux-x64', 'linux-arm64'])
 
-    assert.strictEqual(command[4], '--out-path')
-    assert.deepStrictEqual(command[3].split(','), [
-      'node18-linux-x64',
-      'node18-linux-arm64',
-    ])
+    for (let target of selected) {
+      let command = buildPkgCommand(target)
+
+      assert.strictEqual(command[4], '--output')
+      assert.strictEqual(command[5], singleTargetOutputPath(target))
+      assert.ok(!command.includes('--out-path'))
+      assert.strictEqual(command[3], target.pkg)
+    }
+  })
+
+  it('builds deterministic macOS commands without filename matching', () => {
+    let selected = resolveTargets(['darwin-x64', 'darwin-arm64'])
+    let commands = selected.map((target) => buildPkgCommand(target))
+
+    assert.deepStrictEqual(
+      commands.map((command) => command[3]),
+      ['node18-macos-x64', 'node18-macos-arm64'],
+    )
+    assert.ok(commands[0][5].endsWith('analyze-sgf-darwin-x64'))
+    assert.ok(commands[1][5].endsWith('analyze-sgf-darwin-arm64'))
   })
 
   it('fails clearly when pkg did not produce the explicit output file', () => {
@@ -147,7 +165,7 @@ describe('analyze-sgf single-target pkg output', () => {
 
   it('never introduces npx shims', () => {
     for (let resource of ['win32-x64', 'linux-x64']) {
-      let command = buildPkgCommand(resolveTargets([resource]))
+      let command = buildPkgCommand(resolveTargets([resource])[0])
 
       assert.strictEqual(command[0], pkgCliPath)
       assert.ok(command.every((arg) => !/npx/.test(arg)))

@@ -1,4 +1,4 @@
-const {copyFileSync, existsSync, mkdirSync, readdirSync, rmSync} = require('fs')
+const {copyFileSync, existsSync, mkdirSync, rmSync} = require('fs')
 const {join, resolve} = require('path')
 const {execFileSync} = require('child_process')
 
@@ -74,39 +74,22 @@ function resolveTargets(requested) {
   return targets.filter((target) => names.includes(target.resource))
 }
 
-// pkg writes a single target to exactly the --output path (appending .exe
-// itself for Windows targets), so the filename is deterministic and needs no
-// platform/architecture substring guessing. The extension mirrors the target's
-// executable name so the target mapping stays the source of truth.
+// Each pkg target uses an explicit output path so packaging never depends on
+// pkg's generated multi-target filenames.
 function singleTargetOutputPath(target) {
   let extension = target.executable.endsWith('.exe') ? '.exe' : ''
 
   return join(tmpDir, `analyze-sgf-${target.resource}${extension}`)
 }
 
-function buildPkgCommand(selectedTargets) {
-  let selected = selectedTargets ?? targets
-
-  if (selected.length === 1) {
-    let target = selected[0]
-
-    return [
-      pkgCliPath,
-      packagePath,
-      '--targets',
-      target.pkg,
-      '--output',
-      singleTargetOutputPath(target),
-    ]
-  }
-
+function buildPkgCommand(target) {
   return [
     pkgCliPath,
     packagePath,
     '--targets',
-    selected.map((target) => target.pkg).join(','),
-    '--out-path',
-    tmpDir,
+    target.pkg,
+    '--output',
+    singleTargetOutputPath(target),
   ]
 }
 
@@ -119,14 +102,12 @@ function prepareAnalyzeSgfBinaries(requestedTargets) {
   mkdirSync(tmpDir, {recursive: true})
   mkdirSync(outDir, {recursive: true})
 
-  execFileSync(process.execPath, buildPkgCommand(selectedTargets), {
-    stdio: 'inherit',
-  })
+  for (let target of selectedTargets) {
+    execFileSync(process.execPath, buildPkgCommand(target), {
+      stdio: 'inherit',
+    })
 
-  if (selectedTargets.length === 1) {
-    copySingleTargetOutput(selectedTargets[0])
-  } else {
-    copyMultiTargetOutputs(selectedTargets)
+    copySingleTargetOutput(target)
   }
 
   rmSync(tmpDir, {recursive: true, force: true})
@@ -144,25 +125,6 @@ function copySingleTargetOutput(target) {
   let resourceDir = join(outDir, target.resource)
   mkdirSync(resourceDir, {recursive: true})
   copyFileSync(generated, join(resourceDir, target.executable))
-}
-
-function copyMultiTargetOutputs(selectedTargets) {
-  let generatedFiles = readdirSync(tmpDir)
-
-  for (let target of selectedTargets) {
-    let generated = generatedFiles.find((file) =>
-      matchesPkgOutput(file, target),
-    )
-    if (generated == null) {
-      throw new Error(
-        `pkg did not generate an analyze-sgf binary for ${target.pkg}.`,
-      )
-    }
-
-    let resourceDir = join(outDir, target.resource)
-    mkdirSync(resourceDir, {recursive: true})
-    copyFileSync(join(tmpDir, generated), join(resourceDir, target.executable))
-  }
 }
 
 function assertCompatibleAnalyzeSgfPackage() {
@@ -183,14 +145,6 @@ function assertCompatibleAnalyzeSgfPackage() {
   }
 }
 
-function matchesPkgOutput(file, target) {
-  let normalized = file.toLowerCase()
-  let [, runtimePlatform, runtimeArch] = target.pkg.split('-')
-  let platform = runtimePlatform === 'macos' ? 'macos' : runtimePlatform
-
-  return normalized.includes(platform) && normalized.includes(runtimeArch)
-}
-
 if (require.main === module) prepareAnalyzeSgfBinaries(process.argv.slice(2))
 
 module.exports = {
@@ -199,7 +153,6 @@ module.exports = {
   buildPkgCommand,
   copySingleTargetOutput,
   forkFeatureFiles,
-  matchesPkgOutput,
   packagePath,
   pkgCliPath,
   prepareAnalyzeSgfBinaries,

@@ -6,10 +6,11 @@ All notable changes to this project will be documented in this file.
 
 Prepares another release-pipeline rehearsal. Scopes the bundled analyze-sgf
 binaries to the package targets each distribution actually requires, so the
-Windows build no longer compiles all six pkg targets. Adds an isolated manual
-Windows packaging check workflow and makes single-target analyze-sgf output
-deterministic by passing pkg an explicit `--output` filename instead of guessing
-the generated name from platform and architecture substrings.
+Windows build no longer compiles all six pkg targets, and adds an isolated
+manual Windows packaging check workflow. Analyze-sgf packaging now builds each
+target with its own pkg invocation and an explicit deterministic `--output`
+path, removing the generated-filename guessing that broke same-platform
+multi-architecture builds.
 
 ## [Seki v0.2.0-alpha.3]
 
