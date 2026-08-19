@@ -1,6 +1,8 @@
 ---
 name: sabaki-project-context
-description: Use for any Seki-Sabaki task to recall project architecture, commands, conventions, and fork compatibility constraints.
+description:
+  Use for any Seki-Sabaki task to recall project architecture, commands,
+  conventions, and fork compatibility constraints.
 license: MIT
 compatibility: opencode
 metadata:
@@ -18,15 +20,19 @@ Use this skill at the start of non-trivial tasks in this repo.
 - Renderer entry: `src/components/App.js`.
 - Webpack output: `bundle.js` from `webpack.config.js`.
 - Central app state and operations: `src/modules/sabaki.js`.
-- Go domain modules: `src/modules/gametree.js`, `src/modules/analysis.js`, `src/modules/enginesyncer.js`, `src/modules/fileformats/*`, `src/modules/gobantransformer.js`.
+- Go domain modules: `src/modules/gametree.js`, `src/modules/analysis.js`,
+  `src/modules/enginesyncer.js`, `src/modules/fileformats/*`,
+  `src/modules/gobantransformer.js`.
 - UI components: Preact class components under `src/components/`.
 - Styling: `style/*.css`.
 
 ## Compatibility Contract
 
-- This is a fork of Sabaki. Existing Sabaki behavior is a compatibility contract unless the user explicitly asks to change it.
+- This is a fork of Sabaki. Existing Sabaki behavior is a compatibility contract
+  unless the user explicitly asks to change it.
 - Prefer minimal, localized changes.
-- Do not add compatibility layers unless persisted data, public behavior, or explicit user requirements make them necessary.
+- Do not add compatibility layers unless persisted data, public behavior, or
+  explicit user requirements make them necessary.
 
 ## Commands
 
@@ -41,10 +47,13 @@ Use this skill at the start of non-trivial tasks in this repo.
 - Pure logic belongs in `test/*Tests.js`.
 - UI/integration belongs in `e2e/*.spec.js`.
 - Use `e2e/fixtures/electron-app.js` and `e2e/helpers.js`.
-- E2E tests should use `page.waitForFunction`, DOM expectations, or `window.__sabaki`; avoid fixed sleeps.
+- E2E tests should use `page.waitForFunction`, DOM expectations, or
+  `window.__sabaki`; avoid fixed sleeps.
 
 ## Style
 
 - Node version is `24` from `.nvmrc`.
-- Prettier config: no semicolons, single quotes, no bracket spacing, trailing commas.
-- Preserve Preact class component patterns unless a local file already uses another pattern.
+- Prettier config: no semicolons, single quotes, no bracket spacing, trailing
+  commas.
+- Preserve Preact class component patterns unless a local file already uses
+  another pattern.

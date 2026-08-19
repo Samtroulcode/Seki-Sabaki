@@ -1,6 +1,8 @@
 ---
 name: ogs-research-first
-description: Use for all Online-Go.com, OGS, online play, WebSocket, OAuth, live game sync, and multiplayer feature work; forces verified sources before design or code.
+description:
+  Use for all Online-Go.com, OGS, online play, WebSocket, OAuth, live game sync,
+  and multiplayer feature work; forces verified sources before design or code.
 license: MIT
 compatibility: opencode
 metadata:
@@ -13,7 +15,9 @@ Use this skill before designing or implementing OGS integration.
 
 ## Non-Negotiable Rule
 
-Do not rely on memory for OGS API, WebSocket, OAuth, or protocol details. Verify from official OGS documentation, source code, or another clearly identified and recent source before using a claim in design or code.
+Do not rely on memory for OGS API, WebSocket, OAuth, or protocol details. Verify
+from official OGS documentation, source code, or another clearly identified and
+recent source before using a claim in design or code.
 
 ## Evidence Requirements
 
@@ -40,12 +44,15 @@ Use the question tool when unclear:
 
 - Which OGS login method is acceptable?
 - Should login persist across app restarts?
-- What is the first supported workflow: observe, correspondence, live play, review import, or chat?
+- What is the first supported workflow: observe, correspondence, live play,
+  review import, or chat?
 - Should tests ever hit OGS, or only fakes?
 - Is a backend/proxy allowed, or must the Electron app talk directly to OGS?
 
 ## Testing Rules
 
 - Automated tests should not require a real OGS account.
-- Network code should be adapter-driven so fake transports can drive deterministic tests.
-- Reconnect, stale events, auth failure, and clock drift should be explicit test cases once live play is implemented.
+- Network code should be adapter-driven so fake transports can drive
+  deterministic tests.
+- Reconnect, stale events, auth failure, and clock drift should be explicit test
+  cases once live play is implemented.
