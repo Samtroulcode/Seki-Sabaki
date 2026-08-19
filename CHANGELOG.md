@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.2.0-alpha.2]
+
+Prepares another release-pipeline rehearsal and fixes native Flatpak
+architecture selection: the Flatpak build no longer forces an x64 package, so
+the ARM64 runner builds an arm64 Flatpak on its native architecture. The ARM64
+Flatpak and the complete release pipeline have not been validated yet.
+
 ## [Seki v0.2.0-alpha.1]
 
 A production-hardening alpha following the first functional milestone, focused

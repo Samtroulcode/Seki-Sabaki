@@ -1,7 +1,7 @@
 {
   "name": "seki",
   "productName": "Seki",
-  "version": "0.2.0-alpha.1",
+  "version": "0.2.0-alpha.2",
   "description": "An elegant Go/Baduk/Weiqi board and SGF editor with OGS integration and AI-powered analysis.",
   "author": "Duarte Adrien <contact@samda.net>",
   "homepage": "https://github.com/Samtroulcode/Seki-Sabaki",
@@ -189,7 +189,7 @@
     "dist:linux": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --x64 --publish never",
     "dist:linux:arm64": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --arm64 --publish never",
     "dist:linux:all": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l AppImage --x64 --arm64 --publish never",
-    "dist:flatpak": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l flatpak --x64 --publish never",
+    "dist:flatpak": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -l flatpak --publish never",
     "dist:macos": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -m --x64 --arm64 --publish never",
     "dist:win64": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w nsis --x64 --publish never && node ./ci/mv.js ./dist/seki-vx.x.x-windows.exe ./dist/seki-vx.x.x-windows-x64-setup.exe",
     "dist:win64-portable": "npm run bundle && npm run prepare:analyze-sgf && electron-builder -w portable --x64 --publish never && node ./ci/mv.js ./dist/seki-vx.x.x-windows.exe ./dist/seki-vx.x.x-windows-x64-portable.exe",
