@@ -9,9 +9,7 @@ import TripleSplitContainer from './helpers/TripleSplitContainer.js'
 import ThemeManager from './ThemeManager.js'
 import MainMenu from './MainMenu.js'
 import AppTabs from './AppTabs.js'
-import HomeView from './HomeView.js'
-import MainView from './MainView.js'
-import OnlineGameView from './OnlineGameView.js'
+import WorkspaceView from './WorkspaceView.js'
 import LeftSidebar from './LeftSidebar.js'
 import Sidebar from './Sidebar.js'
 import DrawerManager from './DrawerManager.js'
@@ -19,10 +17,6 @@ import InputBox from './InputBox.js'
 import BusyScreen from './BusyScreen.js'
 import InfoOverlay from './InfoOverlay.js'
 import MatchmakingToast from './MatchmakingToast.js'
-import LibraryPanel from './LibraryPanel.js'
-import TsumegoPanel from './TsumegoPanel.js'
-import AnalysisPanel from './sidebars/AnalysisPanel.js'
-import OgsPanel from './sidebars/OgsPanel.js'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
@@ -486,7 +480,7 @@ class App extends Component {
 
         beginSideContent:
           state.activeWorkspace === 'board' ? h(LeftSidebar, state) : null,
-        mainContent: renderWorkspace(state),
+        mainContent: h(WorkspaceView, state),
         endSideContent:
           state.activeWorkspace === 'board' ? h(Sidebar, state) : null,
 
@@ -511,44 +505,6 @@ class App extends Component {
       }),
     )
   }
-}
-
-function renderWorkspace(state) {
-  switch (state.activeWorkspace) {
-    case 'home':
-      return h(HomeView, state)
-    case 'online':
-      return h(HomeView, {...state, homeSection: 'ogs'})
-    case 'sgf-explorer':
-      return h(HomeView, {...state, homeSection: 'library'})
-    case 'analysis':
-      return h(HomeView, {...state, homeSection: 'analysis'})
-    case 'tsumego':
-      return h(HomeView, {...state, homeSection: 'tsumego'})
-    case 'board':
-      return h(MainView, state)
-    case 'online-game':
-      return h(OnlineGameView, state)
-    case 'workspace-tab':
-      return renderWorkspaceTab(state)
-    default:
-      return h(MainView, state)
-  }
-}
-
-function renderWorkspaceTab(state) {
-  let tab = state.workspaceTabs?.find(
-    (candidate) => candidate.id === state.activeWorkspaceTabId,
-  )
-  if (tab?.type === 'ogs') return h(OgsPanel)
-  if (tab?.type === 'analysis') return h(AnalysisPanel)
-  if (tab?.type === 'library') {
-    return h(LibraryPanel, {request: tab.libraryRequest})
-  }
-  if (tab?.type === 'tsumego') {
-    return h(TsumegoPanel, {request: tab.tsumegoRequest})
-  }
-  return h(HomeView, {...state, homeSection: 'dashboard'})
 }
 
 // Render
