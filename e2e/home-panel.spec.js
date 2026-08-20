@@ -582,4 +582,28 @@ test.describe('Home panel navigation', () => {
       card.getByRole('button', {name: 'Browse Tsumego'}),
     ).toBeVisible()
   })
+
+  test('keeps the native application menu mounted across Home/Board navigation', async ({
+    page,
+    electronApp,
+  }) => {
+    // The home-panel fixture starts on Home.
+    await expect(page.locator('#home')).toBeVisible()
+
+    let menuIsNonNull = () =>
+      electronApp.evaluate(({Menu}) => Menu.getApplicationMenu() != null)
+
+    // The application menu is built while on Home.
+    await expect.poll(menuIsNonNull).toBe(true)
+
+    // Home → Board: the menu must not be torn down and rebuilt.
+    await page.getByRole('button', {name: /^New board/}).click()
+    await expect(page.locator('#goban')).toBeVisible()
+    await expect.poll(menuIsNonNull).toBe(true)
+
+    // Board → Home: the menu must remain mounted.
+    await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await expect.poll(menuIsNonNull).toBe(true)
+  })
 })
