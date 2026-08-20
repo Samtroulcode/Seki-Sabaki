@@ -39,11 +39,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Pinned macOS version for reproducible release builds; both mac
-          # arches cross-package on the arm64 runner. Alpha rehearsals use the
-          # unsigned path (no Developer ID credentials configured).
-          - os: macos-15
-            dist: dist:macos:unsigned
+          # Public prebuilt releases cover Windows and Linux (AppImage).
+          # macOS packaging is diagnostic-only and handled separately by the
+          # manual "macOS Package Check" workflow, not by this release matrix.
           - os: windows-latest
             dist: dist:win
           - os: ubuntu-latest
@@ -63,14 +61,9 @@ jobs:
         run: npm test
         env:
           CI: true
-      # Alpha rehearsal: macOS builds are unsigned/unnotarized because no Apple
-      # Developer ID credentials are configured. The production dist:macos path
-      # remains for future signing.
-      - name: Build distributables (macOS)
-        if: runner.os == 'macOS'
-        run: npm run ${{ matrix.dist }}
+      # Public release builds: Windows and Linux AppImage. macOS diagnostic
+      # packaging runs in the separate manual "macOS Package Check" workflow.
       - name: Build distributables
-        if: runner.os != 'macOS'
         run: npm run ${{ matrix.dist }}
       # No auto-update client ships yet. --glob: Windows runners use
       # PowerShell, which does not expand wildcards.

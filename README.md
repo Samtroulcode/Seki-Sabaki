@@ -31,6 +31,15 @@ packaging and release distribution are still being hardened.
 Stable downloads are not advertised here yet. For development and testing, Seki
 can be run from source.
 
+### Platform availability
+
+- Windows: public prebuilt releases are available.
+- Linux: public AppImage releases are available.
+- Flatpak: beta.
+- macOS: experimental and build-from-source for now; no official prebuilt macOS
+  release is currently provided. macOS packaging and compatibility work
+  continues.
+
 ## Development
 
 Seki currently uses Node.js 24.
