@@ -1,7 +1,7 @@
 import influence from '@sabaki/influence'
 
-import gametree from './gametree.js'
-import utils from './utils.js'
+import * as gametree from './gametree.js'
+import * as utils from './utils.js'
 import {getOgsReviewAnalysis} from './ogsreviewanalysis.js'
 
 export function deriveBoardRenderState(state, inferredState) {
