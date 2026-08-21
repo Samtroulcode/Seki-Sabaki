@@ -21,8 +21,8 @@
 // the variation). The player to move is the color of that first move. A
 // `PL` on the starting position must agree with that color; if it contradicts
 // it, the problem is considered unreliable and `analyzeProblem` returns
-// `null`. If no reliable marker is found, `analyzeProblem` returns `null`
-// rather than guessing.
+// `null`. If no positive marker is found, a unique non-negative branch may be
+// inferred only when every sibling candidate but one is explicitly negative.
 //
 // Move classification is conservative by default: without a proven-correct
 // move at the decision point, an explicitly present variation is only `wrong`
@@ -293,6 +293,98 @@ function getBranchResult(node, tree, startNode, allowTe = false) {
   return null
 }
 
+// Returns the first move of each branch from a decision point, without walking
+// through another position-defining node. Descriptive prefixes are transparent.
+function getDecisionPointCandidates(node, depth) {
+  let candidates = []
+  let stack = node.children
+    .map((child) => ({node: child, depth: depth + 1}))
+    .reverse()
+  while (stack.length) {
+    let candidate = stack.pop()
+    if (hasMove(candidate.node)) candidates.push(candidate)
+    else if (!isPositionNode(candidate.node)) {
+      for (let child of [...candidate.node.children].reverse()) {
+        stack.push({node: child, depth: candidate.depth + 1})
+      }
+    }
+  }
+  return candidates
+}
+
+// When positive-marker detection fails, infer a solution only at a decision
+// point where at least one sibling is explicitly wrong and exactly one sibling
+// of the same color remains non-negative.
+function getInferredMoveCandidate(tree, allowTe) {
+  let inferred = []
+  let mainLine = new Set([...tree.listMainNodes()].map((node) => node.id))
+  let stack = [{node: tree.root, depth: 0}]
+  while (stack.length) {
+    let {node, depth} = stack.pop()
+
+    if (node === tree.root || isPositionNode(node)) {
+      let byColor = new Map()
+      for (let candidate of getDecisionPointCandidates(node, depth)) {
+        let color = getMoveColor(candidate.node)
+        let vertex = getMoveVertex(candidate.node)
+        if (vertex == null || vertex[0] < 0 || vertex[1] < 0) continue
+        let key = `${vertex}`
+        if (!byColor.has(color)) byColor.set(color, new Map())
+        let byVertex = byColor.get(color)
+        if (!byVertex.has(key)) byVertex.set(key, [])
+        byVertex.get(key).push(candidate)
+      }
+
+      for (let byVertex of byColor.values()) {
+        let candidates = [...byVertex.values()].map((variations) => {
+          let results = variations.map((candidate) =>
+            getBranchResult(candidate.node, tree, node, allowTe),
+          )
+          return {
+            result: results.every((result) => result === 'wrong')
+              ? 'wrong'
+              : null,
+            candidate:
+              variations.find(
+                (candidate, index) =>
+                  results[index] !== 'wrong' && mainLine.has(candidate.node.id),
+              ) ??
+              variations[results.findIndex((result) => result !== 'wrong')] ??
+              variations[0],
+          }
+        })
+        let negativeCount = candidates.filter(
+          ({result}) => result === 'wrong',
+        ).length
+        let remaining = candidates.filter(({result}) => result !== 'wrong')
+        if (negativeCount > 0 && remaining.length === 1) {
+          inferred.push({
+            ...remaining[0].candidate,
+            startNodeId: node.id,
+          })
+        }
+      }
+    }
+
+    for (let child of node.children) stack.push({node: child, depth: depth + 1})
+  }
+
+  if (inferred.length === 0) return null
+
+  let best = inferred[0]
+  for (let candidate of inferred) {
+    if (
+      candidate.depth < best.depth ||
+      (candidate.depth === best.depth &&
+        mainLine.has(candidate.node.id) &&
+        !mainLine.has(best.node.id))
+    ) {
+      best = candidate
+    }
+  }
+  return best
+}
+
 // Returns `{startNodeId, playerToMove, firstMove, allowTeFallback}` or `null`
 // when no reliable solution marker is found. `firstMove` is a live reference
 // into the tree's node objects; callers must not mutate it. `allowTeFallback`
@@ -330,8 +422,6 @@ export function analyzeProblem(tree, options = {}) {
     : allowTeFallback
       ? teCandidates
       : []
-  if (pool.length === 0) return null
-
   // Map each marked node to the first solver move of its branch, deduplicated
   // by node id: several markers in the same branch (e.g. "Correct" and "Also
   // correct") must not create competing candidates.
@@ -343,23 +433,27 @@ export function analyzeProblem(tree, options = {}) {
       candidates.set(candidate.node.id, candidate)
     }
   }
-  if (candidates.size === 0) return null
-
-  // Pick the shallowest first solver move, preferring the main line (the
-  // first-child chain from the root) to break ties between equal-depth
-  // branches.
-  let mainLine = new Set([...tree.listMainNodes()].map((node) => node.id))
-  let best = candidates.values().next().value
-  for (let candidate of candidates.values()) {
-    if (
-      candidate.depth < best.depth ||
-      (candidate.depth === best.depth &&
-        mainLine.has(candidate.node.id) &&
-        !mainLine.has(best.node.id))
-    ) {
-      best = candidate
+  let best
+  if (candidates.size > 0) {
+    // Pick the shallowest first solver move, preferring the main line (the
+    // first-child chain from the root) to break ties between equal-depth
+    // branches.
+    let mainLine = new Set([...tree.listMainNodes()].map((node) => node.id))
+    best = candidates.values().next().value
+    for (let candidate of candidates.values()) {
+      if (
+        candidate.depth < best.depth ||
+        (candidate.depth === best.depth &&
+          mainLine.has(candidate.node.id) &&
+          !mainLine.has(best.node.id))
+      ) {
+        best = candidate
+      }
     }
+  } else {
+    best = getInferredMoveCandidate(tree, allowTeFallback)
   }
+  if (best == null) return null
 
   let startNodeId = best.startNodeId
   let playerToMove = getMoveColor(best.node)

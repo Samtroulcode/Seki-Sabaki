@@ -4,6 +4,11 @@ import {
   validateTsumegoContent,
   validateTsumegoTree,
 } from '../src/modules/tsumegovalidator.js'
+import {
+  advanceSolution,
+  classifyMove,
+  resolveMove,
+} from '../src/modules/tsumego.js'
 
 const REAL_PROBLEM =
   '(;GM[1]SZ[9]PL[B]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))'
@@ -13,6 +18,12 @@ const REAL_PROBLEM_NO_PL =
   '(;GM[1]SZ[9]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))'
 const SETUP_ONLY = '(;GM[1]SZ[9]AB[aa][bb]AW[cc]PL[B])'
 const MOVES_NO_MARKER = '(;GM[1]SZ[9]PL[B];B[aa];W[bb])'
+const GOWRITE_NEGATIVE_BRANCH_PROBLEM = `(;
+AP[GOWrite:2.0.07]FF[4]SZ[13]GM[1]FG[259:]GN[ ]C[Problem 13. Black to play.
+How can Black capture some white stones?]AW[gd][ge][hf][ec][dd][fg][gf][fd][ee]PB[ ]PM[1]PW[ ]AB[if][fc][ff][hg][gg][he][hd][fe][gc]
+(;B[ed]C[Black can capture five stones by playing at 1.])
+(;B[ef]C[Wrong Answer
+If Black plays 1...];C[...White plays at 2 and his stones are saved.]W[ed]))`
 
 function codes(result) {
   return result.errors.map((error) => error.code)
@@ -56,6 +67,40 @@ describe('tsumegoValidator', () => {
       assert.strictEqual(result.valid, true)
       assert(result.problem != null)
       assert.strictEqual(result.problem.playerToMove, 'B')
+      assert.deepStrictEqual(codes(result), [])
+    })
+
+    it('accepts a GoWrite problem that marks only the losing branch', () => {
+      let result = validateTsumegoContent(GOWRITE_NEGATIVE_BRANCH_PROBLEM)
+
+      assert.strictEqual(result.valid, true)
+      assert(result.problem != null)
+      assert.strictEqual(result.problem.playerToMove, 'B')
+      assert.strictEqual(result.problem.firstMove.data.B[0], 'ed')
+      assert.strictEqual(
+        classifyMove(result.gameTree, result.problem, 'ed'),
+        'correct',
+      )
+      assert.strictEqual(
+        resolveMove(result.gameTree, result.problem, 'ed').status,
+        'correct',
+      )
+      assert.strictEqual(
+        classifyMove(result.gameTree, result.problem, 'ef'),
+        'wrong',
+      )
+      assert.strictEqual(
+        resolveMove(result.gameTree, result.problem, 'ef').status,
+        'wrong',
+      )
+      assert.strictEqual(
+        advanceSolution(
+          result.gameTree,
+          result.problem,
+          result.problem.firstMove,
+        ).solved,
+        true,
+      )
       assert.deepStrictEqual(codes(result), [])
     })
 

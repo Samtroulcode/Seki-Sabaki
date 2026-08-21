@@ -56,6 +56,125 @@ describe('analyzeProblem', () => {
     assert.strictEqual(analyzeProblem(tree), null)
   })
 
+  it('infers the only unmarked branch when its sibling is negative', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'bb')
+    assert.strictEqual(classifyMove(tree, result, 'bb'), 'correct')
+    assert.strictEqual(resolveMove(tree, result, 'bb').status, 'correct')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'wrong')
+    assert.strictEqual(resolveMove(tree, result, 'aa').status, 'wrong')
+  })
+
+  it('infers one unmarked branch from two negative siblings', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['bb'], N: ['不正解']})
+      draft.appendNode(draft.root.id, {B: ['cc']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'cc')
+  })
+
+  it('keeps one negative and two unmarked branches ambiguous', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+      draft.appendNode(draft.root.id, {B: ['cc']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('does not infer a solution without a negative branch', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('uses a first-move BM marker for negative-branch inference', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], BM: ['1']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'bb')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'wrong')
+  })
+
+  it('does not infer from conflicting duplicate move branches', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['aa']}, {disableMerging: true})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('does not infer a pass as the solution', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('uses the mainline node for duplicate inferred coordinates', () => {
+    let mainline
+    let tree = gametree.new().mutate((draft) => {
+      mainline = draft.appendNode(draft.root.id, {B: ['aa']})
+      draft.appendNode(draft.root.id, {B: ['aa']}, {disableMerging: true})
+      draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong Answer']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.id, mainline)
+  })
+
+  it('uses the local mainline node at an off-mainline decision point', () => {
+    let localMainline
+    let setup
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {W: ['zz']})
+      setup = draft.appendNode(draft.root.id, {PL: ['B']})
+      localMainline = draft.appendNode(setup, {B: ['aa']})
+      draft.appendNode(setup, {B: ['aa']}, {disableMerging: true})
+      draft.appendNode(setup, {B: ['bb'], C: ['Wrong Answer']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.startNodeId, setup)
+    assert.strictEqual(result.firstMove.id, localMainline)
+  })
+
+  it('keeps explicit positive markers ahead of negative-branch inference', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['cc']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+    assert.strictEqual(classifyMove(tree, result, 'cc'), 'wrong')
+  })
+
   it('returns null when the only marker sits on a setup node without a move', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.updateProperty(draft.root.id, 'AB', ['dd'])
