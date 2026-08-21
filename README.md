@@ -1,3 +1,5 @@
+![Seki Ban](docs/images/seki-ban.png)
+
 # Seki
 
 **A desktop Go/Baduk workspace for playing, editing, analyzing, and studying
