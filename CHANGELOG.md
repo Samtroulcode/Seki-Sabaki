@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.2.0-alpha.6]
+
+- Improves Linux release reliability by fixing packaged startup on native
+  Wayland and adding an isolated Linux AppImage package-check workflow.
+- Fixes the Home ↔ Board window-geometry regression by keeping the native
+  application menu mounted across workspace navigation, with new e2e regression
+  coverage.
+- Cleans up Seki's Help/public identity and update flow: repository and issue
+  links now target Seki, optional Ko-fi support is available from Help, and
+  prerelease builds can discover newer Seki prereleases with
+  platform-appropriate downloads.
+- Aligns public distribution with the current platform policy: Windows and Linux
+  AppImage are public prebuilts, Flatpak remains beta, and macOS remains
+  experimental/build-from-source with diagnostic unsigned packaging only.
+- Refreshes Seki's public documentation and identity with the Seki-focused
+  README, project screenshots, community-support information, and updated
+  logo/banner assets.
+
 ## [Seki v0.2.0-alpha.5]
 
 Prepares another release-pipeline rehearsal. Replaces analyze-sgf multi-target
