@@ -53,25 +53,20 @@
   color: var(--ui-text);
   box-shadow: inset 0 -3px 0 var(--ui-accent);
 }
-#apptabs .app-board-tab.selected,
-#apptabs .app-online-game-tab.selected,
-#apptabs .app-workspace-tab.selected {
-  background: var(--ui-surface-2);
-}
 #apptabs .app-home-tab {
   flex: 0 0 auto;
   gap: 0.4rem;
   font-weight: bold;
 }
 #apptabs .app-home-tab-icon {
-  color: #8cdcda;
+  color: var(--ui-accent);
 }
 #apptabs .app-tab-separator {
   flex: 0 0 1px;
   align-self: center;
   height: 22px;
   margin: 0 0.45rem;
-  background: #33363a;
+  background: var(--ui-border);
 }
 #apptabs .app-activity-tabs {
   display: flex;
@@ -112,7 +107,15 @@
   margin: 0;
   padding: 0;
   border-radius: 0 5px 0 0;
-  color: #aaa;
+  color: var(--ui-text-muted);
+}
+#apptabs .app-board-tab-close:hover,
+#apptabs .app-board-tab-close:focus,
+#apptabs .app-online-game-tab-close:hover,
+#apptabs .app-online-game-tab-close:focus,
+#apptabs .app-workspace-tab-close:hover,
+#apptabs .app-workspace-tab-close:focus {
+  color: white;
 }
 #apptabs .app-board-tab-close:hover,
 #apptabs .app-board-tab-close:focus,
@@ -142,7 +145,7 @@
   overflow: hidden;
 }
 #apptabs .app-activity-tab-meta {
-  color: #8cdcda;
+  color: var(--ui-accent);
   font-size: 0.85rem;
 }
 
