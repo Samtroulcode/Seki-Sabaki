@@ -1,8 +1,49 @@
 @import url('../node_modules/pikaday/css/pikaday.css');
 
 /**
- * Provides general styles for native app like behavior.
+ * Semantic UI foundation for Seki.
+ * Dark-first "Quiet Studio" atmosphere with restrained blue/petrol accents.
+ * Tokens remain semantic (not dark-specific) so a light theme can provide
+ * different values later.
  */
+
+:root {
+  --ui-bg: #0B151B;
+  --ui-workspace: #101B21;
+  --ui-surface-1: #162229;
+  --ui-surface-2: #1B2931;
+  --ui-surface-3: #22323A;
+
+  --ui-border-subtle: #26363E;
+  --ui-border: #354750;
+
+  --ui-text: #E6EEF1;
+  --ui-text-muted: #9DADB5;
+  --ui-text-disabled: #68777E;
+
+  --ui-accent: #5797A8;
+  --ui-accent-hover: #69AABA;
+  --ui-accent-active: #477F8E;
+  --ui-focus: #79BDCC;
+
+  --ui-success: #609873;
+  --ui-warning: #C69A57;
+  --ui-danger: #C96868;
+}
+
+/* Spacing / radius vocabulary */
+:root {
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  --radius-small: 4px;
+  --radius-normal: 6px;
+  --radius-large: 8px;
+}
 
 * {
   margin: 0;
@@ -12,7 +53,7 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  background: #111;
+  background: var(--ui-bg);
 }
 
 body, input, button, select, option, textarea {
@@ -46,7 +87,6 @@ pre, code {
 h2 {
   font-size: 1.7em;
   font-weight: normal;
-  text-transform: lowercase;
 }
 
 a, img {
@@ -86,8 +126,8 @@ img {
     left: 50%;
     width: 400px;
     padding: 5px;
-    background: rgba(38, 41, 44, .97);
-    color: #eee;
+    background: rgba(22, 34, 41, .97);
+    color: var(--ui-text);
     transform: translateY(-100%);
     transition: transform .1s;
   }
@@ -100,13 +140,13 @@ img {
   }
   #input-box input {
     box-sizing: border-box;
-    background: #111;
-    color: #eee;
+    background: var(--ui-bg);
+    color: var(--ui-text);
     width: 100%;
   }
   #input-box input:focus {
     background: #1a1a1a;
-}
+  }
 
 form p, form ul li {
     margin-bottom: 7px;
@@ -145,11 +185,24 @@ form p, form ul li {
     opacity: 1;
   }
   input, button, select, textarea {
-    border: 0;
+    border: 1px solid var(--ui-border-subtle);
     padding: 5px 10px;
+    background: var(--ui-bg);
+    color: var(--ui-text);
   }
   button {
     padding: 5px 20px;
+    background: transparent;
+    color: var(--ui-text);
+  }
+  button:hover:not(:disabled),
+  button:focus-visible:not(:disabled) {
+    background: var(--ui-surface-2);
+  }
+  button:disabled,
+  select:disabled,
+  textarea:disabled {
+    opacity: .5;
   }
   button.dropdown {
     position: relative;
@@ -167,15 +220,16 @@ form p, form ul li {
     background: url('../node_modules/@primer/octicons/build/svg/chevron-down-16.svg') center / auto 16px no-repeat;
     filter: invert(100%);
   }
-  input:focus, button:focus, select:focus, textarea:focus {
-    outline: none;
-  }
-  input:disabled, select:disabled, button:disabled, textarea:disabled {
-    opacity: .5;
+  input:focus-visible,
+  button:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: -2px;
   }
   form > p:last-child {
     text-align: right;
-}
+  }
 
 /**
  * Scrollbars
@@ -194,7 +248,7 @@ form p, form ul li {
   }
   ::-webkit-scrollbar-corner {
     background: transparent;
-}
+  }
 
 /**
  * Pikaday
@@ -233,7 +287,7 @@ form p, form ul li {
   }
   .pika-next {
     background-image: url('../node_modules/@primer/octicons/build/svg/chevron-right-16.svg');
-}
+  }
 
 .pika-table th {
   color: #999;
@@ -247,7 +301,7 @@ form p, form ul li {
   }
   .pika-button:active, .pika-prev:active, .pika-next:active {
     position: static;
-}
+  }
 
 .pika-week { color: #999; }
 
