@@ -115,15 +115,7 @@
 #apptabs .app-online-game-tab-close:focus,
 #apptabs .app-workspace-tab-close:hover,
 #apptabs .app-workspace-tab-close:focus {
-  color: white;
-}
-#apptabs .app-board-tab-close:hover,
-#apptabs .app-board-tab-close:focus,
-#apptabs .app-online-game-tab-close:hover,
-#apptabs .app-online-game-tab-close:focus,
-#apptabs .app-workspace-tab-close:hover,
-#apptabs .app-workspace-tab-close:focus {
-  color: white;
+  color: var(--ui-text);
 }
 
 #apptabs .app-activity-tab {
