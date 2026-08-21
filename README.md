@@ -37,8 +37,21 @@ can be run from source.
 - Linux: public AppImage releases are available.
 - Flatpak: beta.
 - macOS: experimental and build-from-source for now; no official prebuilt macOS
-  release is currently provided. macOS packaging and compatibility work
-  continues.
+  release is currently provided. Restoring signed and notarized public macOS
+  builds is a funding-dependent goal; see [Support Seki](#support-seki).
+
+## Support Seki
+
+Seki is free and open source, and donations are entirely optional. Supporting
+the project does not unlock features or provide a different version of Seki.
+
+If you'd like to help with ongoing project costs, you can
+[support Seki on Ko-fi](https://ko-fi.com/samda).
+
+The first concrete funding goal is to make official macOS distribution practical
+again. Properly signed and notarized macOS releases require Apple Developer
+Program membership, which costs about US$100 per year. If community support can
+cover that recurring cost, official macOS builds can be reconsidered.
 
 ## Development
 
