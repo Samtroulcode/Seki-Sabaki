@@ -132,8 +132,11 @@ jobs:
           subject-path: dist/seki-*
       - name: Extract release notes
         run: node ./ci/releaseNotes.js > release-notes.md
-      # Prerelease on purpose: the in-app updater polls /releases/latest,
-      # which ignores prereleases. Promoting the release is the go-live switch.
+      # Prerelease on purpose: Seki is currently in alpha and releases are
+      # created as prereleases. The in-app updater now queries the releases
+      # list and allows a running prerelease build to discover newer
+      # prerelease builds. Future stable builds will ignore prereleases and
+      # only offer stable updates.
       - name: Create prerelease
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag --prerelease \

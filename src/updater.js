@@ -67,11 +67,234 @@ function compareVersions(a, b) {
   return 0
 }
 
+// Exposes parseVersion and compareVersions for use by tests and other modules.
 exports.parseVersion = parseVersion
 exports.compareVersions = compareVersions
 
+// Exposes pure release-selection and asset-selection helpers for unit tests.
+exports.isSekiRelease = isSekiRelease
+exports.getEligibleReleases = getEligibleReleases
+exports.selectLatestRelease = selectLatestRelease
+exports.selectPlatformDownloadUrl = selectPlatformDownloadUrl
+
+// --- Pure release selection helpers ---
+
+/**
+ * Determines if a GitHub release belongs to the Seki project.
+ * A release is considered Seki if:
+ *   - Its tag_name starts with 'v' followed by a valid SemVer
+ *   - Its title starts with 'Seki '
+ *   - At least one asset name contains 'seki-'
+ * Drafts, malformed tags, and unrelated releases are excluded.
+ */
+function isSekiRelease(release) {
+  if (!release || !release.tag_name) return false
+  if (release.draft === true) return false
+
+  let tag = release.tag_name
+  // Tag must start with 'v' followed by SemVer pattern
+  if (!/^v\d+\.\d+\.\d+/.test(tag)) return false
+  // Title must start with 'Seki '
+  if (!release.title || !release.title.startsWith('Seki ')) return false
+  // Must have at least one asset, and some must include 'seki-' in the name
+  if (!release.assets || release.assets.length === 0) return false
+  return release.assets.some((a) => a.name && a.name.includes('seki-'))
+}
+
+/**
+ * Extracts the SemVer string from a release tag (removes leading 'v').
+ */
+function getReleaseVersionStr(release) {
+  let tag = release.tag_name
+  if (tag.startsWith('v')) tag = tag.slice(1)
+  return tag
+}
+
+/**
+ * Checks if a version string represents a prerelease.
+ * Returns true if the version has a non-empty prerelease segment.
+ */
+function isPrereleaseVersion(versionStr) {
+  let parts = versionStr.split('-')
+  return parts.length > 1 && parts[1].length > 0
+}
+
+/**
+ * Filters a list of GitHub releases to those eligible for updates,
+ * based on the currently installed version.
+ *
+ * If the current version is a prerelease, eligible releases include
+ * both newer prereleases and stable releases.
+ * If the current version is stable, only stable releases (no prerelease)
+ * are eligible; prereleases are ignored.
+ */
+function getEligibleReleases(allReleases, currentVersion) {
+  // Filter to Seki releases only
+  let sekiReleases = allReleases.filter(isSekiRelease)
+
+  if (sekiReleases.length === 0) return []
+
+  // Parse current version to determine update channel
+  let currentVer
+  try {
+    currentVer = parseVersion(currentVersion)
+  } catch {
+    // If we can't parse the current version, return all Seki releases
+    return sekiReleases
+  }
+
+  let currentIsPrerelease =
+    currentVer.prerelease.length > 0 || isPrereleaseVersion(currentVersion)
+
+  return sekiReleases.filter((release) => {
+    let releaseVerStr = getReleaseVersionStr(release)
+    let releaseVer
+    try {
+      releaseVer = parseVersion(releaseVerStr)
+    } catch {
+      return false // malformed tag, ignore
+    }
+
+    // If current is stable, ignore prereleases
+    if (!currentIsPrerelease && releaseVer.prerelease.length > 0) {
+      return false
+    }
+
+    // If current is prerelease, allow prereleases and stable
+    return true
+  })
+}
+
+/**
+ * Selects the highest SemVer release from a list of eligible releases.
+ * Uses the existing compareVersions logic for precedence.
+ * Returns null if the list is empty.
+ */
+function selectLatestRelease(eligibleReleases) {
+  if (eligibleReleases.length === 0) return null
+
+  let latest = eligibleReleases[0]
+  let latestVer = getReleaseVersionStr(latest)
+
+  for (let i = 1; i < eligibleReleases.length; i++) {
+    let candidateVer = getReleaseVersionStr(eligibleReleases[i])
+    let cmp = compareVersions(candidateVer, latestVer)
+    if (cmp > 0) {
+      latest = eligibleReleases[i]
+      latestVer = candidateVer
+    }
+  }
+  return latest
+}
+
+// --- Asset selection helpers ---
+
+/**
+ * Selects the direct download URL for the current platform from a release's assets.
+ * Uses asset name matching rather than broad URL substring rules.
+ *
+ * Priority per platform:
+ *   - Linux: AppImage (never Flatpak beta)
+ *   - Windows: setup executable (not portable)
+ *   - macOS: may be absent (product policy)
+ *
+ * Returns the browser_download_url string, or undefined if no matching artifact.
+ */
+function selectPlatformDownloadUrl(release, platform, arch) {
+  if (!release || !release.assets) return undefined
+
+  // macOS has no official public prebuilt artifact.
+  if (platform === 'darwin') return undefined
+
+  let needles = {
+    linux: ['linux'],
+    win32: ['win'],
+  }[platform]
+
+  if (!needles) return undefined
+
+  let archAliases = {
+    x64: ['x64', 'x86_64'],
+    x86_64: ['x64', 'x86_64'],
+    arm64: ['arm64', 'aarch64'],
+    aarch64: ['arm64', 'aarch64'],
+  }
+
+  let archNeedles = arch ? archAliases[arch.toLowerCase()] : null
+
+  let matchingAssets = release.assets.filter((a) => {
+    if (!a.browser_download_url || !a.name) return false
+
+    let nameLower = a.name.toLowerCase()
+
+    // Match platform (case-insensitive)
+    if (!needles.every((needle) => nameLower.includes(needle))) return false
+
+    // Match architecture when requested (case-insensitive, with aliases)
+    if (
+      archNeedles &&
+      !archNeedles.some((needle) => nameLower.includes(needle))
+    ) {
+      return false
+    }
+
+    return true
+  })
+
+  if (matchingAssets.length === 0) return undefined
+
+  // Linux: prefer AppImage, never select Flatpak beta as the direct update.
+  if (platform === 'linux') {
+    let appimage = matchingAssets.find(
+      (a) =>
+        a.name.toLowerCase().includes('appimage') &&
+        !a.name.toLowerCase().includes('flatpak'),
+    )
+    if (appimage) return appimage.browser_download_url
+
+    return matchingAssets[0].browser_download_url
+  }
+
+  // Windows: prefer setup executable, never portable.
+  if (platform === 'win32') {
+    let setup = matchingAssets.find((a) =>
+      a.name.toLowerCase().includes('setup'),
+    )
+    if (setup) return setup.browser_download_url
+
+    return matchingAssets[0].browser_download_url
+  }
+
+  return undefined
+}
+
+// --- Main check function ---
+
+/**
+ * Checks GitHub for available Seki updates.
+ *
+ * Fetches the full releases list (excluding /releases/latest which ignores
+ * prereleases) and applies the Seki release selection policy:
+ *   - Only releases clearly belonging to Seki (title "Seki <tag>", assets with
+ *     'seki-' namespace) are considered
+ *   - Drafts, malformed tags, and unrelated releases are ignored
+ *   - Prerelease-channel behavior depends on the currently installed version:
+ *     * If running a prerelease (e.g. 0.2.0-alpha.5): newer prereleases and
+ *       stable releases are eligible
+ *     * If running stable: only stable releases are eligible; prereleases are
+ *       ignored
+ *   - Among eligible releases, the highest SemVer is selected using
+ *     compareVersions (not creation order)
+ *   - The selected release's actual html_url is returned as the release page
+ *     URL
+ *   - Platform-specific direct download URLs are selected via
+ *     selectPlatformDownloadUrl
+ *
+ * @param {string} repo - GitHub repository in 'owner/name' format
+ * @returns {Promise<Object>} - Information about the latest release
+ */
 exports.check = async function (repo) {
-  let address = `https://api.github.com/repos/${repo}/releases/latest`
+  let address = `https://api.github.com/repos/${repo}/releases?per_page=100`
 
   let response = await new Promise((resolve, reject) => {
     let request = net.request(address)
@@ -94,29 +317,31 @@ exports.check = async function (repo) {
   })
 
   let data = JSON.parse(response)
-  if (!('tag_name' in data) || !('assets' in data))
-    throw new Error('No version information found.')
+  if (!Array.isArray(data)) throw new Error('No version information found.')
 
-  let latestVersion = data.tag_name.slice(1)
   let currentVersion = app.getVersion()
-  let downloadUrls = data.assets.map((x) => x.browser_download_url)
 
-  let arch = os.arch()
-  let needles = {
-    linux: ['linux'],
-    win32: ['win', 'setup'],
-    darwin: ['mac'],
-  }[os.platform()]
+  // Filter to eligible Seki releases based on current version channel
+  let eligible = getEligibleReleases(data, currentVersion)
+
+  let latestRelease = selectLatestRelease(eligible)
+
+  if (!latestRelease) {
+    throw new Error('No version information found.')
+  }
+
+  let latestVersion = getReleaseVersionStr(latestRelease)
+  let downloadUrl = selectPlatformDownloadUrl(
+    latestRelease,
+    os.platform(),
+    os.arch(),
+  )
 
   return {
-    url: `https://github.com/${repo}/releases/latest`,
-    downloadUrl:
-      arch &&
-      needles &&
-      downloadUrls.find(
-        (url) =>
-          url.includes(arch) && needles.every((needle) => url.includes(needle)),
-      ),
+    url:
+      latestRelease.html_url ||
+      `https://github.com/${repo}/releases/${latestRelease.tag_name}`,
+    downloadUrl,
     latestVersion,
     hasUpdates: compareVersions(latestVersion, currentVersion) > 0,
   }

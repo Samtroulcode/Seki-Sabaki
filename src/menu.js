@@ -3,7 +3,7 @@ const nativeRequire = eval('require')
 const {shell, clipboard} = require('electron')
 const isRenderer = typeof window !== 'undefined' && window.sabaki != null
 const {app} = isRenderer
-  ? {app: {name: 'Sabaki', getVersion: () => ''}}
+  ? {app: {name: 'Seki', getVersion: () => ''}}
   : require('electron')
 
 const i18n = require('./i18n')
@@ -917,14 +917,19 @@ exports.get = function (props = {}) {
         {
           label: i18n.t('menu.help', 'GitHub &Repository'),
           click: () =>
-            shell.openExternal(`https://github.com/SabakiHQ/${sabaki.appName}`),
+            shell.openExternal('https://github.com/Samtroulcode/Seki-Sabaki'),
         },
         {
           label: i18n.t('menu.help', 'Report &Issue'),
           click: () =>
             shell.openExternal(
-              `https://github.com/SabakiHQ/${sabaki.appName}/issues`,
+              'https://github.com/Samtroulcode/Seki-Sabaki/issues',
             ),
+        },
+        {type: 'separator'},
+        {
+          label: i18n.t('menu.help', 'Support Seki'),
+          click: () => shell.openExternal('https://ko-fi.com/samda'),
         },
       ],
     },
