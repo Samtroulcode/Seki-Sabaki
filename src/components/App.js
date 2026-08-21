@@ -3,8 +3,6 @@ import {h, render, Component} from 'preact'
 import classNames from 'classnames'
 import fixPath from 'fix-path'
 
-import influence from '@sabaki/influence'
-
 import TripleSplitContainer from './helpers/TripleSplitContainer.js'
 import ThemeManager from './ThemeManager.js'
 import MainMenu from './MainMenu.js'
@@ -20,11 +18,10 @@ import MatchmakingToast from './MatchmakingToast.js'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
+import {deriveBoardRenderState} from '../modules/boardrenderstate.js'
 import * as gametree from '../modules/gametree.js'
 import * as gtplogger from '../modules/gtplogger.js'
 import * as helper from '../modules/helper.js'
-import * as utils from '../modules/utils.js'
-import {getOgsReviewAnalysis} from '../modules/ogsreviewanalysis.js'
 import onlineStore from '../modules/onlinestore.js'
 import {
   OgsOnlineController,
@@ -362,64 +359,7 @@ class App extends Component {
   // Render
 
   render(_, state) {
-    // Calculate some inferred values
-
-    let inferredState = sabaki.inferredState
-    let tree = inferredState.gameTree
-    let scoreBoard, areaMap
-
-    if (['scoring', 'estimator'].includes(state.mode)) {
-      // Calculate area map
-
-      scoreBoard = gametree.getBoard(tree, state.treePosition).clone()
-
-      for (let vertex of state.deadStones) {
-        let sign = scoreBoard.get(vertex)
-        if (sign === 0) continue
-
-        scoreBoard.setCaptures(-sign, (x) => x + 1)
-        scoreBoard.set(vertex, 0)
-      }
-
-      areaMap =
-        state.mode === 'estimator'
-          ? influence.map(scoreBoard.signMap, {discrete: true})
-          : influence.areaMap(scoreBoard.signMap)
-
-      for (let key in state.estimateOverrides) {
-        let [x, y] = key.split(',').map(Number)
-        areaMap[y][x] = utils.cycleAreaValue(
-          areaMap[y][x],
-          state.estimateOverrides[key],
-        )
-      }
-    }
-
-    let activeReview = Object.values(state.ogsReviewState?.reviews || {})[0]
-    let rootSource = String(gametree.getRootProperty(tree, 'SO', '') || '')
-    let reviewMatchesBoard =
-      activeReview != null &&
-      (state.onlineGameId === activeReview.gameId ||
-        new RegExp(`/game/${activeReview.gameId}(?:/|$)`).test(rootSource))
-    let ogsAnalysis = getOgsReviewAnalysis(
-      reviewMatchesBoard ? state.ogsReviewState : null,
-      tree,
-      state.treePosition,
-    )
-    let hasOgsReview = reviewMatchesBoard
-    state = {
-      ...state,
-      ...inferredState,
-      scoreBoard,
-      areaMap,
-      analysis: hasOgsReview ? ogsAnalysis : state.analysis,
-      analysisTreePosition: hasOgsReview
-        ? ogsAnalysis
-          ? state.treePosition
-          : null
-        : state.analysisTreePosition,
-      showAnalysis: hasOgsReview ? ogsAnalysis != null : state.showAnalysis,
-    }
+    state = deriveBoardRenderState(state, sabaki.inferredState)
 
     return h(
       'section',
