@@ -199,6 +199,7 @@ form p, form ul li {
   button:focus-visible:not(:disabled) {
     background: var(--ui-surface-2);
   }
+  input:disabled,
   button:disabled,
   select:disabled,
   textarea:disabled {

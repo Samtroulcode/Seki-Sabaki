@@ -58,32 +58,6 @@
 #apptabs .app-workspace-tab.selected {
   background: var(--ui-surface-2);
 }
-#apptabs button {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  height: 32px;
-  margin: 4px 0;
-  padding: 0 0.75rem;
-  border: 0;
-  border-radius: 5px 5px 0 0;
-  background: transparent;
-  color: #b5b5b5;
-  cursor: default;
-}
-#apptabs button:hover,
-#apptabs button:focus,
-#apptabs button.selected {
-  background: #292a2d;
-  color: white;
-}
-#apptabs button:focus-visible {
-  outline: 2px solid #8cdcda;
-  outline-offset: -2px;
-}
-#apptabs button.selected {
-  box-shadow: inset 0 -3px 0 #0082f0;
-}
 #apptabs .app-home-tab {
   flex: 0 0 auto;
   gap: 0.4rem;
@@ -148,14 +122,7 @@
 #apptabs .app-workspace-tab-close:focus {
   color: white;
 }
-#apptabs .app-online-game-tab.selected {
-}
-#apptabs .app-workspace-tab.type-ogs.selected {
-}
-#apptabs .app-workspace-tab.type-analysis.selected {
-}
-#apptabs .app-workspace-tab.type-tsumego.selected {
-}
+
 #apptabs .app-activity-tab {
   gap: 0.5rem;
   max-width: 18rem;
