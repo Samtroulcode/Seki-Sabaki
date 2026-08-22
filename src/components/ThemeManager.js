@@ -176,7 +176,9 @@ export default class ThemeManager extends Component {
         backgroundPath != null &&
           // Match theme selectors such as `#main main` so the user-selected
           // background wins by source order instead of losing on specificity.
-          `#main main {
+          // Scope to the actual board surface to avoid painting Home/other
+          // workspaces with a board background.
+          `#main > main, .board-main-surface {
                     background-image: url('${backgroundPath.replace(
                       /\\/g,
                       '/',

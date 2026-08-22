@@ -132,7 +132,7 @@ export default class MainView extends Component {
 
       h(
         'main',
-        {ref: (el) => (this.mainElement = el)},
+        {class: 'board-main-surface', ref: (el) => (this.mainElement = el)},
 
         h(Goban, {
           gameTree,

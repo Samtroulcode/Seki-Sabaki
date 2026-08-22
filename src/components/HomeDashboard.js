@@ -74,7 +74,7 @@ export default class HomeDashboard extends Component {
         'div',
         {class: 'home-layout'},
         h(
-          'main',
+          'div',
           {class: 'home-main-column'},
           resumeTarget != null &&
             h(
