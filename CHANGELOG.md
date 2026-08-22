@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Seki v0.2.0-alpha.7]
+
+### Profile Isolation
+
+- Seki now uses its own deterministic profile namespace for preferences, themes,
+  Library configuration, Tsumego progress, and session data, including Windows
+  portable builds. It no longer implicitly reads from or writes to a Sabaki
+  profile.
+
+### Library And Tsumego Reliability
+
+- Built-in Tsumego collections now resolve consistently from repository
+  resources during development and shipped resources in packaged builds.
+- Fresh Seki profiles remain able to configure My Library through the native
+  folder picker, persist the selected root, and browse its `Tsumego`
+  collections.
+
+### Tsumego SGF Compatibility
+
+- Expanded guarded support for real-world problem conventions: solution
+  inference from explicitly negative alternatives, a safe structural main-line
+  fallback, terminal EasyGo `Right` markers, and Hactar `WV` negative
+  variations. Negative evidence is scoped to the relevant decision point to
+  avoid misclassifying unrelated branches.
+
+### Seki Identity
+
+- The initial application document now identifies itself as Seki, removing the
+  remaining brief Sabaki title during startup.
+
+### UI And Architecture Foundations
+
+- Cleaned up workspace routing and board render-state derivation while
+  preserving existing behavior.
+- Added the initial semantic dark-first UI foundation and applied it to the
+  existing AppTabs, including clearer interaction and keyboard-focus states.
+  This is groundwork for the future UI redesign, not the completed redesign.
+
+### Upgrade Note
+
+Users coming from earlier alphas may need to reconfigure preferences and My
+Library because Seki now deliberately uses its own profile instead of Sabaki's.
+Sabaki profiles remain untouched and are not migrated automatically.
+
 ## [Seki v0.2.0-alpha.6]
 
 - Improves Linux release reliability by fixing packaged startup on native

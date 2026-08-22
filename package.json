@@ -1,7 +1,7 @@
 {
   "name": "seki",
   "productName": "Seki",
-  "version": "0.2.0-alpha.6",
+  "version": "0.2.0-alpha.7",
   "description": "An elegant Go/Baduk/Weiqi board and SGF editor with OGS integration and AI-powered analysis.",
   "author": "Duarte Adrien <contact@samda.net>",
   "homepage": "https://github.com/Samtroulcode/Seki-Sabaki",
