@@ -283,12 +283,57 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   display: block;
   height: 100%;
   box-sizing: border-box;
-  padding: var(--space-32) var(--space-40);
+  padding: calc(var(--space-32) + var(--space-8)) calc(var(--space-32) + var(--space-16));
   background: var(--ui-workspace);
   color: var(--ui-text);
   overflow: auto;
 }
 .home-view .home-content {
+  width: 100%;
+  min-width: 0;
+}
+.home-view .home-inner {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1220px;
+  margin-inline: auto;
+}
+.home-view .home-dashboard {
+  position: relative;
+  display: grid;
+  gap: var(--space-24);
+  width: 100%;
+  min-width: 0;
+}
+.home-identity {
+  position: static;
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+  margin-bottom: var(--space-32);
+}
+.home-layout {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 380px);
+  gap: var(--space-32);
+  align-items: start;
+  width: 100%;
+}
+.home-main-column {
+  position: static;
+  inset: auto;
+  display: grid;
+  gap: var(--space-24);
+  width: auto;
+  height: auto;
+  min-width: 0;
+}
+.home-study-column {
+  position: static;
+  display: grid;
+  gap: var(--space-24);
   min-width: 0;
 }
 .home-view .home-inner {
@@ -514,7 +559,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 @media (max-width: 800px) {
   .home-view {
-    padding: var(--space-20) var(--space-24);
+    padding: var(--space-24);
   }
   .home-identity h1 {
     font-size: 1.75rem;
