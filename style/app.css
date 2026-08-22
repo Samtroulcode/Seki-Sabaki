@@ -24,11 +24,13 @@
   --ui-accent: #5797A8;
   --ui-accent-hover: #69AABA;
   --ui-accent-active: #477F8E;
+  --ui-text-on-accent: #000;
   --ui-focus: #79BDCC;
 
   --ui-success: #609873;
   --ui-warning: #C69A57;
   --ui-danger: #C96868;
+  --ui-text-on-danger: #000;
 }
 
 /* Spacing / radius vocabulary */
@@ -231,6 +233,144 @@ form p, form ul li {
   form > p:last-child {
     text-align: right;
   }
+
+/**
+ * Opt-in action primitives.
+ *
+ * The repeated class specificity intentionally beats legacy panel-level button
+ * rules in index.css even though app.css is loaded first. Existing controls are
+ * unaffected until they explicitly adopt these classes.
+ */
+
+button.ui-button.ui-button {
+  position: static;
+  top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  box-sizing: border-box;
+  min-height: 34px;
+  padding: var(--space-4) var(--space-12);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-normal);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  line-height: 1.2;
+}
+
+button.ui-button.ui-button:hover:not(:disabled),
+button.ui-button.ui-button:focus-visible:not(:disabled),
+button.ui-button.ui-button-secondary:hover:not(:disabled),
+button.ui-button.ui-button-secondary:focus-visible:not(:disabled) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-3);
+  color: var(--ui-text);
+}
+
+button.ui-button.ui-button:active:not(:disabled),
+button.ui-button.ui-button-secondary:active:not(:disabled) {
+  position: static;
+  top: auto;
+  background: var(--ui-surface-1);
+}
+
+button.ui-button.ui-button-primary {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+}
+
+button.ui-button.ui-button-primary:hover:not(:disabled),
+button.ui-button.ui-button-primary:focus-visible:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+  color: var(--ui-text-on-accent);
+}
+
+button.ui-button.ui-button-primary:active:not(:disabled) {
+  border-color: var(--ui-accent-active);
+  background: var(--ui-accent-active);
+  color: var(--ui-text-on-accent);
+}
+
+button.ui-button.ui-button-secondary {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+
+button.ui-button.ui-button-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ui-text-muted);
+}
+
+button.ui-button.ui-button-ghost:hover:not(:disabled),
+button.ui-button.ui-button-ghost:focus-visible:not(:disabled) {
+  border-color: transparent;
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+
+button.ui-button.ui-button-ghost:active:not(:disabled) {
+  background: var(--ui-surface-3);
+  color: var(--ui-text);
+}
+
+button.ui-button.ui-button-danger {
+  border-color: var(--ui-danger);
+  background: var(--ui-surface-1);
+  color: var(--ui-text);
+}
+
+button.ui-button.ui-button-danger:hover:not(:disabled),
+button.ui-button.ui-button-danger:focus-visible:not(:disabled) {
+  border-color: var(--ui-danger);
+  background: var(--ui-surface-3);
+  color: var(--ui-text);
+}
+
+button.ui-button.ui-button-danger:active:not(:disabled) {
+  border-color: var(--ui-danger);
+  background: var(--ui-danger);
+  color: var(--ui-text-on-danger);
+}
+
+button.ui-button.ui-icon-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+button.ui-button.ui-button[aria-pressed='true']:not(:disabled) {
+  border-color: var(--ui-accent);
+  background: var(--ui-surface-3);
+  color: var(--ui-text);
+  box-shadow: inset 0 -2px 0 var(--ui-accent);
+}
+
+button.ui-button.ui-button[aria-pressed='true']:active:not(:disabled) {
+  background: var(--ui-surface-1);
+}
+
+button.ui-button.ui-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+button.ui-button.ui-button:disabled {
+  border-color: var(--ui-border-subtle);
+  background: var(--ui-surface-1);
+  color: var(--ui-text-disabled);
+  opacity: 1;
+}
+
+button.ui-button.ui-button-ghost:disabled {
+  border-color: transparent;
+  background: transparent;
+}
 
 /**
  * Scrollbars
