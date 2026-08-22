@@ -273,16 +273,10 @@ function resolveBuiltinRoot({
   isPackaged = false,
   resourcesPath = process.resourcesPath,
   appPath = path.resolve(__dirname, '..'),
-  exists = fs.existsSync,
 } = {}) {
-  let candidates = []
-  if (typeof resourcesPath === 'string' && resourcesPath !== '') {
-    let bundledPath = path.join(resourcesPath, 'library')
-    if (isPackaged || exists(bundledPath)) {
-      candidates.push(bundledPath)
-    }
-  }
-  candidates.push(path.join(appPath, 'resources', 'library'))
+  let candidates = isPackaged
+    ? [path.join(resourcesPath, 'library')]
+    : [path.join(appPath, 'resources', 'library')]
 
   for (let candidate of candidates) {
     let result = canonicalizeRoot(candidate)

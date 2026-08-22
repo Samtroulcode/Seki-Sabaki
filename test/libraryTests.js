@@ -241,9 +241,8 @@ describe('built-in library', () => {
     assert.strictEqual(api.openBuiltin('builtin.sgf').source, 'builtin')
   })
 
-  it('resolves the built-in library without options, like main.js does', () => {
-    // create() is called by main.js without a builtin option, so the default
-    // resolver must find the repository resources/library in development.
+  it('resolves the built-in library with development defaults', () => {
+    // Keep direct create() callers compatible with repository development.
     let values = {'library.root': ''}
     let setting = {
       get: (key) => values[key],
@@ -285,6 +284,27 @@ describe('built-in library root resolution', () => {
     assert.strictEqual(result.root, join(appPath, 'resources', 'library'))
   })
 
+  it('ignores an Electron resources library in development', () => {
+    let appPath = join(directory, 'app')
+    let resourcesPath = join(directory, 'electron-resources')
+    let developmentRoot = join(appPath, 'resources', 'library')
+    mkdirSync(developmentRoot, {recursive: true})
+    mkdirSync(join(resourcesPath, 'library'), {recursive: true})
+
+    let result = resolveBuiltinRoot({isPackaged: false, resourcesPath, appPath})
+    assert.strictEqual(result.ok, true)
+    assert.strictEqual(result.root, developmentRoot)
+  })
+
+  it('does not fall back to Electron resources in development', () => {
+    let appPath = join(directory, 'app')
+    let resourcesPath = join(directory, 'electron-resources')
+    mkdirSync(join(resourcesPath, 'library'), {recursive: true})
+
+    let result = resolveBuiltinRoot({isPackaged: false, resourcesPath, appPath})
+    assert.deepStrictEqual(result, {ok: false, code: 'builtin-unavailable'})
+  })
+
   it('resolves to the packaged resources when shipped', () => {
     let appPath = join(directory, 'app')
     let resourcesPath = join(directory, 'electron-resources')
@@ -294,6 +314,15 @@ describe('built-in library root resolution', () => {
     let result = resolveBuiltinRoot({isPackaged: true, resourcesPath, appPath})
     assert.strictEqual(result.ok, true)
     assert.strictEqual(result.root, join(resourcesPath, 'library'))
+  })
+
+  it('does not fall back to repository resources when packaged', () => {
+    let appPath = join(directory, 'app')
+    let resourcesPath = join(directory, 'electron-resources')
+    mkdirSync(join(appPath, 'resources', 'library'), {recursive: true})
+
+    let result = resolveBuiltinRoot({isPackaged: true, resourcesPath, appPath})
+    assert.deepStrictEqual(result, {ok: false, code: 'builtin-unavailable'})
   })
 
   it('reports unavailable when no built-in library exists', () => {

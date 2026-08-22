@@ -380,7 +380,13 @@ function setupIpcHandlers() {
   })
 
   let recentFilesApi = recentFiles.create(setting)
-  let libraryApi = library.create(setting, dialog)
+  let libraryApi = library.create(setting, dialog, {
+    builtin: {
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+    },
+  })
   ipcMain.handle('recentFiles:list', (e) => {
     if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
     return recentFilesApi.list()

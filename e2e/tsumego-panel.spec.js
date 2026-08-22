@@ -163,6 +163,54 @@ test.describe('Tsumego workspace', () => {
     }
   })
 
+  test('configures My Library through the native folder picker', async ({
+    page,
+    electronApp,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-configure-e2e-'))
+    let collection = path.join(root, 'Tsumego', 'Chosen Set')
+    mkdirSync(collection, {recursive: true})
+    writeFileSync(
+      path.join(collection, '001.sgf'),
+      '(;GM[1]SZ[9]C[Correct];B[aa])',
+    )
+
+    try {
+      await electronApp.evaluate(({dialog}, selectedRoot) => {
+        dialog.showOpenDialog = async (_window, options) =>
+          options.properties?.includes('openDirectory')
+            ? {canceled: false, filePaths: [selectedRoot]}
+            : {canceled: true, filePaths: []}
+      }, root)
+
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await expect(
+        page.getByRole('button', {name: 'Configure Library'}),
+      ).toBeVisible()
+      await page.getByRole('button', {name: 'Configure Library'}).click()
+
+      await expect(page.locator('.tsumego-entry-directory')).toContainText(
+        'Chosen Set',
+      )
+      await page.locator('.tsumego-entry-directory').click()
+      await expect(page.locator('.tsumego-entry-file')).toContainText('001.sgf')
+
+      let persisted = await page.evaluate(() => ({
+        root: window.sabaki.setting.get('library.root'),
+        settingsPath: `${window.sabaki.setting.userDataDirectory}/settings.json`,
+      }))
+      expect(persisted.root).toBe(root)
+      expect(
+        JSON.parse(readFileSync(persisted.settingsPath, 'utf8'))[
+          'library.root'
+        ],
+      ).toBe(root)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
   test('records progress only after the auto-reply completes', async ({
     page,
     electronApp,
