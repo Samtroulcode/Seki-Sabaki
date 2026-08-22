@@ -74,7 +74,7 @@ export default class HomeDashboard extends Component {
         'div',
         {class: 'home-layout'},
         h(
-          'div',
+          'main',
           {class: 'home-main-column'},
           resumeTarget != null &&
             h(
@@ -109,45 +109,49 @@ export default class HomeDashboard extends Component {
             h('h2', {}, t('Start')),
             h(
               'div',
-              {class: 'home-start-actions'},
+              {class: 'home-start-surface'},
               h(
-                'button',
-                {
-                  type: 'button',
-                  class: 'ui-button ui-button-primary',
-                  onClick: this.handleNewGameButtonClick,
-                },
-                t('New board'),
-              ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  class: 'ui-button ui-button-secondary',
-                  onClick: this.handleBrowseLibrary,
-                },
-                t('Browse Library'),
-              ),
-            ),
-            h(
-              'div',
-              {
-                class: 'home-size-options',
-                role: 'group',
-                'aria-label': t('Board size'),
-              },
-              h('span', {class: 'home-control-label'}, t('Board size')),
-              [9, 13, 19].map((size) =>
+                'div',
+                {class: 'home-start-actions'},
                 h(
                   'button',
                   {
-                    key: size,
                     type: 'button',
-                    class: 'ui-button ui-button-ghost',
-                    'aria-pressed': selectedBoardSize === size,
-                    onClick: () => this.setState({selectedBoardSize: size}),
+                    class: 'ui-button ui-button-primary',
+                    onClick: this.handleNewGameButtonClick,
                   },
-                  `${size}x${size}`,
+                  t('New board'),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'ui-button ui-button-secondary',
+                    onClick: this.handleBrowseLibrary,
+                  },
+                  t('Browse Library'),
+                ),
+              ),
+              h(
+                'div',
+                {
+                  class: 'home-size-options',
+                  role: 'group',
+                  'aria-label': t('Board size'),
+                },
+                h('span', {class: 'home-control-label'}, t('Board size')),
+                [9, 13, 19].map((size) =>
+                  h(
+                    'button',
+                    {
+                      key: size,
+                      type: 'button',
+                      class: 'ui-button ui-button-ghost home-size-button',
+                      'aria-pressed': selectedBoardSize === size,
+                      onClick: () => this.setState({selectedBoardSize: size}),
+                    },
+                    `${size}x${size}`,
+                  ),
                 ),
               ),
             ),

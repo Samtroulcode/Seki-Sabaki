@@ -226,9 +226,8 @@ export default class HomeTsumegoCard extends Component {
     return h(
       'article',
       {class: 'home-study-surface home-card-tsumego'},
-      h('h3', {}, t('Continue Tsumego')),
       busy
-        ? h('p', {class: 'home-tsumego-status'}, t('Loading Tsumego…'))
+        ? h('p', {class: 'home-tsumego-status'}, t('Loading Tsumego\u2026'))
         : error != null
           ? h(
               'div',

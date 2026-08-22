@@ -21,7 +21,11 @@ export default class HomeView extends Component {
       h(
         'div',
         {class: 'home-content'},
-        renderHomeSection(activeSection, props),
+        h(
+          'div',
+          {class: 'home-inner'},
+          renderHomeSection(activeSection, props),
+        ),
       ),
     )
   }
