@@ -14,6 +14,20 @@ test.describe('Smoke Tests', () => {
     expect(title).toContain('Seki')
   })
 
+  test('explicit profile isolates user and session data', async ({
+    electronApp,
+  }) => {
+    const paths = await electronApp.evaluate(({app}) => ({
+      explicit: app.commandLine.getSwitchValue('user-data-dir'),
+      userData: app.getPath('userData'),
+      sessionData: app.getPath('sessionData'),
+    }))
+
+    expect(paths.userData).toBe(paths.explicit)
+    expect(paths.sessionData).toBe(paths.explicit)
+    expect(path.basename(paths.userData)).not.toBe('Sabaki')
+  })
+
   test('no black screen — home renders and goban remains reachable', async ({
     page,
   }) => {

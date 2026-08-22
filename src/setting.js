@@ -3,12 +3,8 @@ const fs = require('fs')
 const path = require('path')
 const {app, BrowserWindow} = require('electron')
 
-const portableDir = process.env.PORTABLE_EXECUTABLE_DIR
-
 for (let dir of [
-  (exports.userDataDirectory = portableDir
-    ? path.join(portableDir, 'Sabaki')
-    : app.getPath('userData')),
+  (exports.userDataDirectory = app.getPath('userData')),
   (exports.themesDirectory = path.join(exports.userDataDirectory, 'themes')),
 ]) {
   try {

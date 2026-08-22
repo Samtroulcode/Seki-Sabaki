@@ -34,6 +34,15 @@ describe('main-process module boundary', () => {
   })
 })
 
+describe('application identity', () => {
+  it('keeps the Seki package and build identities aligned', () => {
+    assert.strictEqual(packageJson.name, 'seki')
+    assert.strictEqual(packageJson.productName, 'Seki')
+    assert.strictEqual(packageJson.build.productName, 'Seki')
+    assert.strictEqual(packageJson.build.appId, 'net.samda.seki')
+  })
+})
+
 describe('analyze-sgf packaging', () => {
   it('ships analyze-sgf resources without bundling KataGo', () => {
     assert.deepStrictEqual(packageJson.build.extraResources, [

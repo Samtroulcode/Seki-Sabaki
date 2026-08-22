@@ -10,6 +10,10 @@ const {
 } = require('electron')
 const {resolve} = require('path')
 const {pathToFileURL} = require('url')
+const {configureUserDataDirectory} = require('./userdata')
+
+configureUserDataDirectory({app, env: process.env})
+
 const i18n = require('./i18n')
 const setting = require('./setting')
 const updater = require('./updater')
