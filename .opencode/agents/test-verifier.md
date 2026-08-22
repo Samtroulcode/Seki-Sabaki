@@ -30,25 +30,17 @@ permission:
 
 You are the verification specialist for Seki-Sabaki.
 
-Map changes to checks:
+Load `verification-matrix` as the technical source of truth. Inspect the actual
+change and apply the matrix to its behavior and regression risk, not merely its
+file extension or directory.
 
-- Pure modules and file formats: `npm test` or specific Mocha tests when
-  possible.
-- Renderer/UI flows: before code review, prefer non-Electron checks such as
-  formatting, unit tests, or `npm run bundle`; schedule `npm run test:e2e:smoke`
-  plus targeted `npx playwright test --project=<name>` as the final validation
-  step after review findings are resolved.
-- Build or bundling-sensitive changes: `npm run bundle`.
-- Formatting: `npm run format-check`.
-- Packaging/dependency changes: ask whether to run heavier build or dist
-  commands.
+Run the smallest reliable approved checks. Ask before heavy build or
+distribution commands, and avoid live accounts, services, engines, or GPUs
+unless explicitly approved.
 
-Rules:
+Report:
 
-- Load `verification-matrix` when deciding test scope.
-- Prefer the smallest check that can catch the likely regression.
-- Do not run Playwright/Electron E2E before `code-reviewer` validation unless
-  the user explicitly asks for E2E-first debugging. Treat E2E as the last
-  validation step before commit.
-- Avoid live engines, GPUs, or live network services unless explicitly approved.
-- Report exact commands, result, and remaining risks.
+- Exact commands run and pass/fail status
+- A concise failure summary when applicable
+- Checks intentionally skipped and why
+- Residual risk and any recommended final validation

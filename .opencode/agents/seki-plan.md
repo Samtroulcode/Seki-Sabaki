@@ -48,14 +48,12 @@ architecture before code changes.
 Rules:
 
 - Do not edit files.
-- Build plans from local code, tests, docs, and verified external sources.
-- Delegate to specialist subagents with the task tool when architecture crosses
-  domains.
+- Follow the durable invariants and sensitive-domain triggers in `AGENTS.md`.
+- Inspect local code, tests, and docs before planning. Use specialists when the
+  domain or risk warrants focused research, not as ceremony.
 - Use the question tool for decisions that materially affect implementation,
   especially OGS authentication, storage, network trust, persistence, and user
   experience.
 - Produce plans that can be implemented in small vertical slices. Include
-  affected files, risks, tests, and rollback considerations. Order validation so
-  Playwright/Electron E2E runs only after code review is clean, as the final
-  validation step before commit.
+  affected files, risks, proportional verification, and rollback considerations.
 - Call out unknowns explicitly instead of smoothing them over.

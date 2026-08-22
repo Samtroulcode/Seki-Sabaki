@@ -13,43 +13,50 @@ metadata:
 
 Use this skill before finalizing implementation or when asked to verify changes.
 
-## Commands
+## Selection Principles
 
-- `npm test`: unit tests and pure domain logic.
-- `npm run format-check`: formatting compliance.
-- `npm run bundle`: production webpack build and renderer bundling.
-- `npm run test:e2e:smoke`: app launch and core Electron rendering; run as final
-  validation after code review unless explicitly requested earlier.
-- `npm run test:e2e`: full Playwright Electron suite; run as final validation
-  after code review unless explicitly requested earlier.
-- `npx playwright test --project=<name>`: targeted E2E project after a bundle
-  exists; run as final validation after code review unless explicitly requested
-  earlier.
+- Match checks to changed behavior and likely regression, not filenames alone.
+- Start with the cheapest targeted check that can fail for the suspected defect.
+- Expand only when integration boundaries or residual risk justify it.
+- Use deterministic fixtures, fake transports, and fake engines instead of live
+  services or hardware unless explicitly approved.
+- If Electron/Playwright E2E is warranted, run the smallest relevant project as
+  final validation after applicable review findings are resolved.
 
-## Mapping
+## Risk-To-Check Mapping
 
-- `src/modules/analysis.js`, `gametree.js`, `fileformats/*`,
-  `gobantransformer.js`: start with `npm test`.
-- `src/modules/enginesyncer.js` or engine lifecycle: `npm test` plus targeted
-  E2E if renderer/main integration changes.
-- `src/components/**` or `style/**`: use cheap checks first; after code review
-  is clean, run `npm run test:e2e:smoke` and add targeted Playwright project for
-  changed behavior.
-- `src/main.js` or `src/preload.js`: use cheap checks first; add security review
-  for IPC/shell/network changes; after review is clean, run
-  `npm run test:e2e:smoke`.
-- `webpack.config.js` or imports/bundling: `npm run bundle`.
-- `package.json`, `package-lock.json`, `ci/*`, packaging config:
-  `npm run bundle`; ask before heavy dist commands.
-- Docs-only changes: `npm run format-check` if Markdown formatting may be
-  affected.
+- **Formatting or docs only:** run targeted Prettier or `npm run format-check`
+  when formatting may be affected. No application test is required without a
+  behavioral or generated-output risk.
+- **Pure/domain logic:** run the closest Mocha test or `npm test`. This includes
+  SGF parsing/writing, gametree operations, analysis transforms, Go coordinates,
+  rules, and other deterministic modules.
+- **Engine logic:** prefer unit tests and deterministic fake engines or golden
+  transcripts. Add targeted E2E only when process, renderer, or gameplay
+  integration changed.
+- **Renderer modules, components, or styles:** use formatting, focused unit
+  tests, or `npm run bundle` when syntax, imports, or bundling are at risk. Use
+  targeted Playwright only when the changed interaction or rendered behavior
+  needs a running Electron app; CSS or component location alone does not require
+  E2E.
+- **Main process, preload, IPC, shell, or networking:** run focused unit checks
+  where seams exist and `npm run bundle` when imports/build output are affected.
+  Add security review for privileged boundaries. Use smoke or targeted E2E only
+  when launch or cross-process behavior must be exercised.
+- **Webpack or renderer import graph:** run `npm run bundle`.
+- **OGS synchronization or online behavior:** use deterministic adapter/store
+  tests without real accounts or live OGS. Add targeted E2E only for renderer or
+  Electron integration that cannot be covered below that boundary.
+- **Dependencies, packaging, native assets, or release scripts:** check the
+  relevant scripts and run `npm run bundle` when applicable. Ask before heavy
+  build or distribution commands; run them only when packaging risk warrants it.
 
-## Reporting
+## Available Project Checks
 
-Always report:
-
-- Exact command run.
-- Pass/fail status.
-- Failure summary if failed.
-- Checks intentionally skipped and why.
-- Residual risk after verification.
+- `npm test`: Mocha unit suite
+- `npm run format-check`: repository formatting
+- `npm run bundle`: production renderer bundle
+- `npm run test:e2e:smoke`: Electron launch and core rendering
+- `npx playwright test --project=<name>`: targeted Electron behavior
+- `npm run test:e2e`: full Electron E2E suite; reserve for broad cross-feature
+  risk
