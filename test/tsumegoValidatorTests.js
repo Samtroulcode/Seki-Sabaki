@@ -20,6 +20,10 @@ const SETUP_ONLY = '(;GM[1]SZ[9]AB[aa][bb]AW[cc]PL[B])'
 const MOVES_NO_MARKER = '(;GM[1]SZ[9]PL[B];B[aa];W[bb])'
 const MAIN_LINE_PROBLEM =
   '(;GM[1]SZ[9]PL[B]C[Black to play.](;B[aa];W[cc])(;B[bb]))'
+const EASYGO_RIGHT_PROBLEM =
+  '(;GM[1]SZ[9]PL[B]C[Black to play.](;B[aa])(;B[bb]C[Right]))'
+const HACTAR_WV_PROBLEM =
+  '(;GM[1]SZ[9]PL[B]C[Black to play.](;B[aa]WV[])(;B[bb]))'
 const GOWRITE_NEGATIVE_BRANCH_PROBLEM = `(;
 AP[GOWrite:2.0.07]FF[4]SZ[13]GM[1]FG[259:]GN[ ]C[Problem 13. Black to play.
 How can Black capture some white stones?]AW[gd][ge][hf][ec][dd][fg][gf][fd][ee]PB[ ]PM[1]PW[ ]AB[if][fc][ff][hg][gg][he][hd][fe][gc]
@@ -95,6 +99,26 @@ describe('tsumegoValidator', () => {
 
       assert.strictEqual(result.valid, false)
       assert.deepStrictEqual(codes(result), ['NO_PLAYABLE_SOLUTION'])
+    })
+
+    it('parses an EasyGo Right solution off the main line', () => {
+      let result = validateTsumegoContent(EASYGO_RIGHT_PROBLEM)
+
+      assert.strictEqual(result.valid, true)
+      assert(result.problem != null)
+      assert.strictEqual(result.problem.firstMove.data.B[0], 'bb')
+    })
+
+    it('parses Hactar WV for negative-branch inference', () => {
+      let result = validateTsumegoContent(HACTAR_WV_PROBLEM)
+
+      assert.strictEqual(result.valid, true)
+      assert(result.problem != null)
+      assert.strictEqual(result.problem.firstMove.data.B[0], 'bb')
+      assert.strictEqual(
+        classifyMove(result.gameTree, result.problem, 'aa'),
+        'wrong',
+      )
     })
 
     it('accepts a GoWrite problem that marks only the losing branch', () => {

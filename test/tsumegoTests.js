@@ -56,6 +56,51 @@ describe('analyzeProblem', () => {
     assert.strictEqual(analyzeProblem(tree), null)
   })
 
+  it('accepts EasyGo Right on a terminal move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Right']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'correct')
+  })
+
+  it('matches terminal EasyGo Right case-insensitively', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {W: ['aa'], C: ['This is rIgHt.']})
+      draft.appendNode(draft.root.id, {W: ['bb']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.W[0], 'aa')
+  })
+
+  it('ignores directional right prose outside a terminal result', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Play on the right side.'])
+      let candidate = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Continue on the right side.'],
+      })
+      draft.appendNode(candidate, {W: ['cc']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+  })
+
+  it('keeps Correct comment detection unchanged', () => {
+    let tree = buildTree([['B', 'aa', 'Correct Answer']])
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+  })
+
   it('infers the only unmarked branch when its sibling is negative', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
@@ -362,6 +407,80 @@ describe('analyzeProblem', () => {
     assert(result != null)
     assert.strictEqual(result.firstMove.data.B[0], 'bb')
     assert.strictEqual(classifyMove(tree, result, 'aa'), 'wrong')
+  })
+
+  it('classifies a WV-marked candidate variation as wrong', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['bb'], WV: ['']})
+    })
+    let problem = {
+      startNodeId: tree.root.id,
+      playerToMove: 'B',
+      firstMove: {
+        id: 'ghost',
+        data: {B: ['aa']},
+        parentId: tree.root.id,
+        children: [],
+      },
+    }
+
+    assert.strictEqual(classifyMove(tree, problem, 'bb'), 'wrong')
+  })
+
+  it('uses WV for unique-survivor negative inference', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], WV: ['']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    let result = analyzeProblem(tree)
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'bb')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'wrong')
+  })
+
+  it('keeps WV below a later branch scoped to that decision', () => {
+    let response
+    let canonical
+    let tree = gametree.new().mutate((draft) => {
+      let initial = draft.appendNode(draft.root.id, {B: ['aa']})
+      response = draft.appendNode(initial, {W: ['bb']})
+      canonical = draft.appendNode(response, {B: ['cc']})
+      draft.appendNode(response, {B: ['dd'], WV: ['']})
+      draft.appendNode(draft.root.id, {B: ['ee']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+
+    let laterInference = analyzeProblem(tree)
+    assert(laterInference != null)
+    assert.strictEqual(laterInference.startNodeId, response)
+    assert.strictEqual(laterInference.firstMove.id, canonical)
+
+    let advanced = advanceSolution(tree, result, result.firstMove)
+    assert(advanced != null)
+    assert.strictEqual(advanced.nextPlayerMove.id, canonical)
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        result,
+        'dd',
+        advanced.decisionPointId,
+        advanced.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('does not interpret TR markup as negative evidence', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], TR: ['cc']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
   })
 
   it('does not infer from conflicting duplicate move branches', () => {

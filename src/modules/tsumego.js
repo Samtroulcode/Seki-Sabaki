@@ -11,7 +11,9 @@
 // Result markers are read from node comments (`C`) containing "correct" (e.g.
 // "Correct Answer", "Correct.", "Also correct") or "wrong" (e.g. "Wrong
 // Answer", "Wrong."), and from node names (`N`) containing 正解 (solution) or
-// 失败 (failure). A marker may sit on the move node itself, on a descendant
+// 失败 (failure). EasyGo's "right" is accepted only on a terminal move, and
+// Hactar's `WV` is negative evidence. A marker may sit on the move node itself,
+// on a descendant
 // after the move, or on a non-move prefix before the branch's first move (a
 // node describing the variation, e.g. N[正解图]). The first solver move is the
 // first move of the solver's color on the path from the root to a marked move
@@ -42,6 +44,7 @@ import {parseVertex} from '@sabaki/sgf'
 // known trade-off of the documented marker vocabulary; a node carrying both
 // words is treated as positive (positive wins).
 const CORRECT_RE = /\bcorrect\b/i
+const RIGHT_RE = /\bright\b/i
 const WRONG_RE = /\bwrong\b/i
 
 function hasMove(node) {
@@ -106,6 +109,23 @@ function hasCorrectCommentMarker(node) {
   return values.some((value) => CORRECT_RE.test(value))
 }
 
+// EasyGo accepts "right" as a result annotation. Since the word is common in
+// directional prose, trust it only on a move with no later move descendants.
+function hasEasyGoRightMarker(node) {
+  if (!hasMove(node) || node.data == null) return false
+  let values = node.data.C
+  if (!Array.isArray(values)) return false
+  if (!values.some((value) => RIGHT_RE.test(value))) return false
+
+  let stack = [...node.children]
+  while (stack.length) {
+    let current = stack.pop()
+    if (hasMove(current)) return false
+    for (let child of current.children) stack.push(child)
+  }
+  return true
+}
+
 function hasWrongCommentMarker(node) {
   if (node.data == null) return false
   let values = node.data.C
@@ -140,16 +160,26 @@ function hasWrongNameMarker(node) {
   )
 }
 
-// A node carries a positive result when its comment says "correct" or its
-// node name marks the branch as the solution (正解).
+// A node carries a positive result when its comment says "correct", a terminal
+// move comment uses EasyGo's "right", or its node name marks the solution (正解).
 function hasPositiveResultMarker(node) {
-  return hasCorrectCommentMarker(node) || hasCorrectNameMarker(node)
+  return (
+    hasCorrectCommentMarker(node) ||
+    hasEasyGoRightMarker(node) ||
+    hasCorrectNameMarker(node)
+  )
 }
 
-// A node carries a negative result when its comment says "wrong" or its node
-// name marks the branch as a failure (失败).
+function hasWvMarker(node) {
+  return node.data != null && node.data.WV != null
+}
+
+// A node carries a negative result when its comment says "wrong", its node
+// name marks failure (失败), or Hactar's `WV` property is present.
 function hasNegativeResultMarker(node) {
-  return hasWrongCommentMarker(node) || hasWrongNameMarker(node)
+  return (
+    hasWrongCommentMarker(node) || hasWrongNameMarker(node) || hasWvMarker(node)
+  )
 }
 
 function hasTeMarker(node) {
@@ -655,10 +685,11 @@ export function analyzeProblem(tree, options = {}) {
 // Returns:
 // - `'correct'` when the move matches the expected correct move, or when a
 //   matching variation carries a positive result marker anywhere in its branch
-//   (a comment containing "correct", a node name containing 正解, or — when the
-//   problem was detected with the TE fallback — a `TE` property);
+//   (a comment containing "correct", EasyGo's terminal "right", a node name
+//   containing 正解, or — when the problem was detected with the TE fallback —
+//   a `TE` property);
 // - `'wrong'` when every matching variation carries a negative result marker
-//   (a comment containing "wrong", a node name containing 失败, or a `BM`
+//   (a comment containing "wrong", a node name containing 失败, `WV`, or a `BM`
 //   property on the variation's first move — the same `BM` → 'bad' convention
 //   used in gametree.js), or when at least one variation at the decision point
 //   carries a reliable positive proof — a marked branch, or the expected move
