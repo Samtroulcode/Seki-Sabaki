@@ -15,6 +15,10 @@ permission:
     'git log*': allow
     'git add*': deny
     'git commit*': deny
+    'git push*': deny
+    'git reset --hard*': deny
+    'git checkout -- *': deny
+    'git clean*': deny
   webfetch: deny
   websearch: deny
   question: allow

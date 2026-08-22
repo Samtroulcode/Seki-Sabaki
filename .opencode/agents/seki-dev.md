@@ -39,7 +39,7 @@ permission:
     'npm install*': ask
     'git add*': deny
     'git commit*': deny
-    'git push*': ask
+    'git push*': deny
     'rm *': deny
     'rm -r *': deny
     'rm -rf *': deny

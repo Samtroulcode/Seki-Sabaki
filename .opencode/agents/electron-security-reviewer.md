@@ -18,6 +18,10 @@ permission:
     'git diff*': allow
     'git add*': deny
     'git commit*': deny
+    'git push*': deny
+    'git reset --hard*': deny
+    'git checkout -- *': deny
+    'git clean*': deny
 ---
 
 You are the Electron security reviewer for Seki-Sabaki.

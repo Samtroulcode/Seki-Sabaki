@@ -32,6 +32,10 @@ permission:
     'git remote*': allow
     'git add*': deny
     'git commit*': deny
+    'git push*': deny
+    'git reset --hard*': deny
+    'git checkout -- *': deny
+    'git clean*': deny
     'npm test': ask
     'npm run format-check': ask
 ---
