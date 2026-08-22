@@ -293,22 +293,20 @@ function getMarkedMoveCandidate(tree, node, depth) {
   return {...firstMove, startNodeId: startNode.id}
 }
 
-// Returns 'correct' | 'wrong' | null for the branch starting at `node`, based
-// on result markers anywhere in the branch's subtree and on the non-move
-// prefix between the starting position and the branch's first move. A `BM` on
-// the branch's first move marks it wrong (the existing BM convention).
-// Positive markers win over negative ones when both are present. `allowTe`
-// counts `TE` markers as positive proof, mirroring analyzeProblem's TE
-// fallback gate: `TE` is only trusted when the caller opted into it.
+// Returns 'correct' | 'wrong' | null for the branch starting at `node`.
+// Positive markers are existential and may occur anywhere in the subtree.
+// Negative evidence is scoped to this decision: candidate/prefix markers and
+// the forced single-child continuation count, but a marker below a later branch
+// point does not poison the ancestor move. Positive markers win when both are
+// present. `allowTe` counts `TE` as positive proof when explicitly enabled.
 function getBranchResult(node, tree, startNode, allowTe = false) {
   let hasPositive = false
-  let hasNegative = hasBmMarker(node)
+  let hasNegative = hasNegativeResultAtDecision(node, tree, startNode)
   let stack = [node]
   while (stack.length) {
     let current = stack.pop()
     if (hasPositiveResultMarker(current)) hasPositive = true
     if (allowTe && hasTeMarker(current)) hasPositive = true
-    if (hasNegativeResultMarker(current)) hasNegative = true
     for (let child of current.children) stack.push(child)
   }
 
@@ -319,7 +317,6 @@ function getBranchResult(node, tree, startNode, allowTe = false) {
   while (current != null && current.id !== startNode.id && !hasMove(current)) {
     if (hasPositiveResultMarker(current)) hasPositive = true
     if (allowTe && hasTeMarker(current)) hasPositive = true
-    if (hasNegativeResultMarker(current)) hasNegative = true
     current = current.parentId != null ? tree.get(current.parentId) : null
   }
 
@@ -362,22 +359,25 @@ function getMainLineMoveCandidate(node, depth) {
   return null
 }
 
-// Unlike getBranchResult, this reports negative evidence even when the same
-// branch also carries a positive marker. Main-line fallback must never turn an
-// explicitly negative branch into the solution. Descendant BM remains excluded,
-// matching the existing convention that BM applies to the branch's first move.
-function hasExplicitNegativeBranchResult(node, tree, startNode) {
-  if (hasBmMarker(node)) return true
-
-  let stack = [node]
-  while (stack.length) {
-    let current = stack.pop()
+// Reports negative evidence attached to this decision's candidate: its first
+// move, descriptive prefix, or forced continuation. Stop at the first branch
+// split so evidence belonging to a later alternative remains local to it. BM
+// only applies on the candidate move, preserving the existing convention.
+function hasNegativeResultAtDecision(node, tree, startNode) {
+  let current = node
+  while (current != null) {
     if (hasNegativeResultMarker(current)) return true
-    for (let child of current.children) stack.push(child)
+    if (current.children.length !== 1) break
+    current = current.children[0]
   }
 
-  let current = node.parentId != null ? tree.get(node.parentId) : null
-  while (current != null && current.id !== startNode.id && !hasMove(current)) {
+  if (hasBmMarker(node)) return true
+  current = node.parentId != null ? tree.get(node.parentId) : null
+  while (
+    current != null &&
+    current.id !== startNode.id &&
+    !isPositionNode(current)
+  ) {
     if (hasNegativeResultMarker(current)) return true
     current = current.parentId != null ? tree.get(current.parentId) : null
   }
@@ -445,6 +445,7 @@ function getInferredMoveCandidate(tree, allowTe) {
           inferred.push({
             ...remaining[0].candidate,
             startNodeId: node.id,
+            decisionDepth: depth,
           })
         }
       }
@@ -503,9 +504,13 @@ function getMainLineFallbackCandidate(tree) {
 
         if (
           hasAlternative &&
-          !hasExplicitNegativeBranchResult(candidate.node, tree, node)
+          !hasNegativeResultAtDecision(candidate.node, tree, node)
         ) {
-          candidates.push({...candidate, startNodeId: node.id})
+          candidates.push({
+            ...candidate,
+            startNodeId: node.id,
+            decisionDepth: depth,
+          })
         }
       }
     }
@@ -539,8 +544,9 @@ function getMainLineFallbackCandidate(tree) {
 // solution marker. `options.allowMainLineFallback` gates the weaker convention
 // that a Tsumego's structural main variation is its solution. Both are disabled
 // by default because they are unsafe assumptions for generic game records.
-// Comment and node-name markers, TE, and negative-branch inference are always
-// preferred over the main-line fallback, in that order.
+// Comment and node-name markers and TE retain global priority. Compatibility
+// inference then prefers the earliest decision point; at the same decision,
+// negative-branch inference wins over the main-line convention.
 export function analyzeProblem(tree, options = {}) {
   let {allowTeFallback = false, allowMainLineFallback = false} = options || {}
 
@@ -597,8 +603,15 @@ export function analyzeProblem(tree, options = {}) {
     }
   } else {
     best = getInferredMoveCandidate(tree, allowTeFallback)
-    if (best == null && allowMainLineFallback) {
-      best = getMainLineFallbackCandidate(tree)
+    if (allowMainLineFallback) {
+      let mainLineFallback = getMainLineFallbackCandidate(tree)
+      if (
+        best == null ||
+        (mainLineFallback != null &&
+          mainLineFallback.decisionDepth < best.decisionDepth)
+      ) {
+        best = mainLineFallback
+      }
     }
   }
   if (best == null) return null
@@ -720,13 +733,11 @@ export function resolveMove(
   )
   if (matching.length === 0) return {status: 'absent', node: null}
 
-  // A branch's result is determined by markers anywhere in its subtree and on
-  // the non-move prefix between the decision point and the branch's first
-  // move, so a marker carried by a descendant (e.g. W[ba] C[Wrong.]) or by a
-  // prefix label (e.g. N[失败图] before W[md]) still classifies the branch's
-  // first move. `allowTeFallback` on the problem echoes analyzeProblem's TE
-  // gate so `TE` markers count as positive proof only when the caller opted
-  // into the fallback.
+  // Positive markers may occur anywhere in the branch. Negative markers are
+  // scoped to the candidate, its descriptive prefix, and its forced
+  // continuation, stopping before a later branch split. `allowTeFallback` on
+  // the problem echoes analyzeProblem's TE gate so `TE` markers count as
+  // positive proof only when the caller opted into the fallback.
   let allowTe = problem.allowTeFallback === true
   let results = matching.map((node) =>
     getBranchResult(node, tree, decisionPoint, allowTe),

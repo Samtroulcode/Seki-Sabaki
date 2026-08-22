@@ -173,6 +173,80 @@ describe('analyzeProblem', () => {
     assert.strictEqual(result.firstMove.data.B[0], 'bb')
   })
 
+  it('keeps a later negative variation scoped to its decision point', () => {
+    let response
+    let canonical
+    let wrong
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'PL', ['B'])
+      let initial = draft.appendNode(draft.root.id, {B: ['aa']})
+      response = draft.appendNode(initial, {W: ['bb']})
+      canonical = draft.appendNode(response, {B: ['cc']})
+      wrong = draft.appendNode(response, {B: ['dd'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['ee']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+    assert.notStrictEqual(result.firstMove.data.B[0], 'ee')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'correct')
+    assert.strictEqual(classifyMove(tree, result, 'ee'), 'wrong')
+
+    let laterInference = analyzeProblem(tree)
+    assert(laterInference != null)
+    assert.strictEqual(laterInference.startNodeId, response)
+    assert.strictEqual(laterInference.firstMove.id, canonical)
+
+    let advanced = advanceSolution(tree, result, result.firstMove)
+    assert(advanced != null)
+    assert.strictEqual(advanced.automaticMoves[0].id, response)
+    assert.strictEqual(advanced.nextPlayerMove.id, canonical)
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        result,
+        'cc',
+        advanced.decisionPointId,
+        advanced.nextPlayerMove,
+      ),
+      'correct',
+    )
+    assert.strictEqual(
+      resolveMove(
+        tree,
+        result,
+        'dd',
+        advanced.decisionPointId,
+        advanced.nextPlayerMove,
+      ).node.id,
+      wrong,
+    )
+    assert.strictEqual(
+      classifyMove(
+        tree,
+        result,
+        'dd',
+        advanced.decisionPointId,
+        advanced.nextPlayerMove,
+      ),
+      'wrong',
+    )
+  })
+
+  it('keeps negative evidence on a forced continuation', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let candidate = draft.appendNode(draft.root.id, {B: ['aa']})
+      draft.appendNode(candidate, {W: ['bb'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['ee']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'ee')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'wrong')
+  })
+
   it('prefers an explicit off-main-line solution', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['aa']})
