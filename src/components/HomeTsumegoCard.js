@@ -180,8 +180,10 @@ export default class HomeTsumegoCard extends Component {
     }).length
   }
 
-  // Opens the SGF and builds a read-only preview of the problem's initial
-  // position (before the player's first move), so the solution is never shown.
+  // Opens the SGF and builds a read-only preview of a tsumego's initial
+  // position from its SGF content. Unlike parseSgfPreview (which shows the
+  // last main-line node), this uses analyzeProblem's start node so the
+  // solution is never revealed.
   async parsePreview(source, relativePath) {
     try {
       let result =
@@ -247,9 +249,12 @@ export default class HomeTsumegoCard extends Component {
   }
 
   renderContent() {
-    let {collectionTitle, problems, progress, preview, complete} = this.state
-    let solved = this.countSolved(problems, progress, this.state.source)
+    let {collectionTitle, problems, progress, preview, complete, source} =
+      this.state
+    let solved = this.countSolved(problems, progress, source)
     let total = problems.length
+    let percent = total > 0 ? Math.round((solved / total) * 100) : 0
+    let sourceLabel = source === 'builtin' ? t('Built-in') : t('My Library')
 
     return h(
       'div',
@@ -271,10 +276,37 @@ export default class HomeTsumegoCard extends Component {
         {class: 'home-study-details'},
         h('strong', {class: 'home-tsumego-title'}, collectionTitle),
         h(
-          'span',
-          {class: 'home-tsumego-solved'},
-          `${solved} / ${total} ${t('solved')}`,
+          'div',
+          {class: 'home-tsumego-meta'},
+          h(
+            'span',
+            {class: 'home-tsumego-source'},
+            t('Collection: '),
+            collectionTitle,
+          ),
+          h('span', {class: 'home-tsumego-source'}, t('Source: '), sourceLabel),
+          h(
+            'span',
+            {class: 'home-tsumego-solved'},
+            `${solved} / ${total} ${t('solved')}`,
+          ),
         ),
+        total > 0 &&
+          h(
+            'div',
+            {
+              class: 'home-tsumego-progress',
+              role: 'progressbar',
+              'aria-valuenow': percent,
+              'aria-valuemin': 0,
+              'aria-valuemax': 100,
+              'aria-label': `${solved} / ${total} ${t('solved')}`,
+            },
+            h('div', {
+              class: 'home-tsumego-progress-bar',
+              style: {width: `${percent}%`},
+            }),
+          ),
         h(
           'div',
           {class: 'home-study-actions'},

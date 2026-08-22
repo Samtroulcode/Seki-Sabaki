@@ -70,96 +70,102 @@ export default class HomeDashboard extends Component {
         h('h1', {}, t('Seki')),
         h('p', {}, t('Your Go workspace')),
       ),
-      resumeTarget != null &&
+      h(
+        'div',
+        {class: 'home-layout'},
         h(
-          HomeSection,
-          {title: t('Continue'), class: 'home-continue-section'},
+          'main',
+          {class: 'home-main-column'},
+          resumeTarget != null &&
+            h(
+              'section',
+              {class: 'home-work-section home-continue-section'},
+              h('h2', {}, t('Continue')),
+              h(
+                'div',
+                {class: 'home-resume-surface'},
+                h(
+                  'div',
+                  {class: 'home-resume-details'},
+                  h('strong', {}, resumeTarget.title),
+                  resumeTarget.meta != null && h('span', {}, resumeTarget.meta),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'ui-button ui-button-primary',
+                    onClick: () => this.handleResume(resumeTarget),
+                  },
+                  resumeTarget.type === 'online-game'
+                    ? t('Continue game')
+                    : t('Continue board'),
+                ),
+              ),
+            ),
           h(
-            'div',
-            {class: 'home-resume-surface'},
+            'section',
+            {class: 'home-work-section home-start-section'},
+            h('h2', {}, t('Start')),
             h(
               'div',
-              {class: 'home-resume-details'},
-              h('strong', {}, resumeTarget.title),
-              resumeTarget.meta != null && h('span', {}, resumeTarget.meta),
+              {class: 'home-start-actions'},
+              h(
+                'button',
+                {
+                  type: 'button',
+                  class: 'ui-button ui-button-primary',
+                  onClick: this.handleNewGameButtonClick,
+                },
+                t('New board'),
+              ),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  class: 'ui-button ui-button-secondary',
+                  onClick: this.handleBrowseLibrary,
+                },
+                t('Browse Library'),
+              ),
             ),
             h(
-              'button',
+              'div',
               {
-                type: 'button',
-                class: 'ui-button ui-button-primary',
-                onClick: () => this.handleResume(resumeTarget),
+                class: 'home-size-options',
+                role: 'group',
+                'aria-label': t('Board size'),
               },
-              resumeTarget.type === 'online-game'
-                ? t('Continue game')
-                : t('Continue board'),
+              h('span', {class: 'home-control-label'}, t('Board size')),
+              [9, 13, 19].map((size) =>
+                h(
+                  'button',
+                  {
+                    key: size,
+                    type: 'button',
+                    class: 'ui-button ui-button-ghost',
+                    'aria-pressed': selectedBoardSize === size,
+                    onClick: () => this.setState({selectedBoardSize: size}),
+                  },
+                  `${size}x${size}`,
+                ),
+              ),
             ),
           ),
         ),
-      h(
-        HomeSection,
-        {title: t('Start'), class: 'home-start-section'},
         h(
-          'div',
-          {class: 'home-start-actions'},
+          'aside',
+          {class: 'home-study-column'},
           h(
-            'button',
-            {
-              type: 'button',
-              class: 'ui-button ui-button-primary',
-              onClick: this.handleNewGameButtonClick,
-            },
-            t('New board'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'ui-button ui-button-secondary',
-              onClick: this.handleBrowseLibrary,
-            },
-            t('Browse Library'),
+            'section',
+            {class: 'home-work-section home-study-section'},
+            h('h2', {}, t('Study')),
+            h(HomeTsumegoCard),
           ),
         ),
-        h(
-          'div',
-          {
-            class: 'home-size-options',
-            role: 'group',
-            'aria-label': t('Board size'),
-          },
-          h('span', {class: 'home-control-label'}, t('Board size')),
-          [9, 13, 19].map((size) =>
-            h(
-              'button',
-              {
-                key: size,
-                type: 'button',
-                class: 'ui-button ui-button-ghost',
-                'aria-pressed': selectedBoardSize === size,
-                onClick: () => this.setState({selectedBoardSize: size}),
-              },
-              `${size}x${size}`,
-            ),
-          ),
-        ),
-      ),
-      h(
-        HomeSection,
-        {title: t('Study'), class: 'home-study-section'},
-        h(HomeTsumegoCard),
       ),
     )
   }
-}
-
-function HomeSection({title, class: className, children}) {
-  return h(
-    'section',
-    {class: `home-work-section ${className || ''}`.trim()},
-    h('h2', {}, title),
-    children,
-  )
 }
 
 function getResumeTarget({
