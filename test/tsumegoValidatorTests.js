@@ -18,6 +18,8 @@ const REAL_PROBLEM_NO_PL =
   '(;GM[1]SZ[9]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))'
 const SETUP_ONLY = '(;GM[1]SZ[9]AB[aa][bb]AW[cc]PL[B])'
 const MOVES_NO_MARKER = '(;GM[1]SZ[9]PL[B];B[aa];W[bb])'
+const MAIN_LINE_PROBLEM =
+  '(;GM[1]SZ[9]PL[B]C[Black to play.](;B[aa];W[cc])(;B[bb]))'
 const GOWRITE_NEGATIVE_BRANCH_PROBLEM = `(;
 AP[GOWrite:2.0.07]FF[4]SZ[13]GM[1]FG[259:]GN[ ]C[Problem 13. Black to play.
 How can Black capture some white stones?]AW[gd][ge][hf][ec][dd][fg][gf][fd][ee]PB[ ]PM[1]PW[ ]AB[if][fc][ff][hg][gg][he][hd][fe][gc]
@@ -68,6 +70,31 @@ describe('tsumegoValidator', () => {
       assert(result.problem != null)
       assert.strictEqual(result.problem.playerToMove, 'B')
       assert.deepStrictEqual(codes(result), [])
+    })
+
+    it('enables the main-line convention for Tsumego validation', () => {
+      let result = validateTsumegoContent(MAIN_LINE_PROBLEM)
+
+      assert.strictEqual(result.valid, true)
+      assert(result.problem != null)
+      assert.strictEqual(result.problem.firstMove.data.B[0], 'aa')
+      assert.strictEqual(
+        classifyMove(result.gameTree, result.problem, 'aa'),
+        'correct',
+      )
+      assert.strictEqual(
+        classifyMove(result.gameTree, result.problem, 'bb'),
+        'wrong',
+      )
+    })
+
+    it('allows the main-line convention to be disabled explicitly', () => {
+      let result = validateTsumegoContent(MAIN_LINE_PROBLEM, {
+        allowMainLineFallback: false,
+      })
+
+      assert.strictEqual(result.valid, false)
+      assert.deepStrictEqual(codes(result), ['NO_PLAYABLE_SOLUTION'])
     })
 
     it('accepts a GoWrite problem that marks only the losing branch', () => {

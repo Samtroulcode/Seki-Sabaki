@@ -40,7 +40,7 @@ function hasMoveNode(tree) {
 // warnings}` where `valid` mirrors `analyzeProblem` exactly: a problem the
 // engine accepts is never declared invalid.
 export function validateTsumegoTree(gameTree, options = {}) {
-  let {allowTeFallback = true} = options
+  let {allowTeFallback = true, allowMainLineFallback = true} = options
   let errors = []
   let warnings = []
 
@@ -56,7 +56,10 @@ export function validateTsumegoTree(gameTree, options = {}) {
   let hasMoves = hasMoveNode(gameTree)
   if (!hasMoves) errors.push(diagnostic('NO_MOVES'))
 
-  let problem = analyzeProblem(gameTree, {allowTeFallback})
+  let problem = analyzeProblem(gameTree, {
+    allowTeFallback,
+    allowMainLineFallback,
+  })
   if (problem == null) {
     if (hasMoves) errors.push(diagnostic('NO_PLAYABLE_SOLUTION'))
   } else {

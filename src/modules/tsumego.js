@@ -23,6 +23,8 @@
 // it, the problem is considered unreliable and `analyzeProblem` returns
 // `null`. If no positive marker is found, a unique non-negative branch may be
 // inferred only when every sibling candidate but one is explicitly negative.
+// Tsumego-specific callers may additionally opt into treating the structural
+// main variation as the solution when the decision point has alternatives.
 //
 // Move classification is conservative by default: without a proven-correct
 // move at the decision point, an explicitly present variation is only `wrong`
@@ -62,6 +64,39 @@ function getMoveVertex(node) {
 
 function sameVertex(a, b) {
   return a != null && b != null && a[0] === b[0] && a[1] === b[1]
+}
+
+// Main-line fallback is intentionally stricter than legacy marker detection:
+// its evidence is only structural, so the move must be unambiguous and lie on
+// the SGF board. SZ defaults to 19 as in SGF.
+function getPlayableMoveVertex(tree, node) {
+  if (node.data == null) return null
+  let hasBlack = node.data.B != null
+  let hasWhite = node.data.W != null
+  if (hasBlack === hasWhite) return null
+
+  let values = node.data[hasBlack ? 'B' : 'W']
+  if (!Array.isArray(values) || values.length !== 1) return null
+  if (typeof values[0] !== 'string') return null
+
+  let vertex = parseVertex(values[0])
+  if (vertex[0] < 0 || vertex[1] < 0) return null
+
+  let size = tree.root.data?.SZ?.[0] ?? '19'
+  let dimensions = String(size).split(':').map(Number)
+  let width = dimensions[0]
+  let height = dimensions[dimensions.length - 1]
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    vertex[0] >= width ||
+    vertex[1] >= height
+  ) {
+    return null
+  }
+  return vertex
 }
 
 function hasCorrectCommentMarker(node) {
@@ -312,6 +347,55 @@ function getDecisionPointCandidates(node, depth) {
   return candidates
 }
 
+// Returns the structural main variation's first move from a decision point.
+// Only first children are followed, and descriptive nodes are transparent;
+// another position-defining node is a boundary rather than part of this choice.
+function getMainLineMoveCandidate(node, depth) {
+  let current = node.children[0]
+  let currentDepth = depth + 1
+  while (current != null) {
+    if (hasMove(current)) return {node: current, depth: currentDepth}
+    if (isPositionNode(current)) return null
+    current = current.children[0]
+    currentDepth++
+  }
+  return null
+}
+
+// Unlike getBranchResult, this reports negative evidence even when the same
+// branch also carries a positive marker. Main-line fallback must never turn an
+// explicitly negative branch into the solution. Descendant BM remains excluded,
+// matching the existing convention that BM applies to the branch's first move.
+function hasExplicitNegativeBranchResult(node, tree, startNode) {
+  if (hasBmMarker(node)) return true
+
+  let stack = [node]
+  while (stack.length) {
+    let current = stack.pop()
+    if (hasNegativeResultMarker(current)) return true
+    for (let child of current.children) stack.push(child)
+  }
+
+  let current = node.parentId != null ? tree.get(node.parentId) : null
+  while (current != null && current.id !== startNode.id && !hasMove(current)) {
+    if (hasNegativeResultMarker(current)) return true
+    current = current.parentId != null ? tree.get(current.parentId) : null
+  }
+  return false
+}
+
+// A later local choice cannot become a standalone problem when reaching it
+// already required entering a branch marked wrong.
+function hasNegativeAncestorPath(tree, node) {
+  let current = node
+  while (current != null && current.id !== tree.root.id) {
+    if (hasNegativeResultMarker(current)) return true
+    if (hasMove(current) && hasBmMarker(current)) return true
+    current = current.parentId != null ? tree.get(current.parentId) : null
+  }
+  return false
+}
+
 // When positive-marker detection fails, infer a solution only at a decision
 // point where at least one sibling is explicitly wrong and exactly one sibling
 // of the same color remains non-negative.
@@ -385,6 +469,66 @@ function getInferredMoveCandidate(tree, allowTe) {
   return best
 }
 
+// As the weakest compatibility convention, returns a structural main-line
+// move only when its decision point contains another distinct playable move of
+// the same color and the main branch has no explicit negative evidence.
+function getMainLineFallbackCandidate(tree) {
+  let candidates = []
+  let mainLine = new Set([...tree.listMainNodes()].map((node) => node.id))
+  let stack = [{node: tree.root, depth: 0}]
+  while (stack.length) {
+    let {node, depth} = stack.pop()
+
+    if (
+      (node === tree.root || isPositionNode(node)) &&
+      !hasNegativeAncestorPath(tree, node)
+    ) {
+      let candidate = getMainLineMoveCandidate(node, depth)
+      if (candidate != null) {
+        let color = getMoveColor(candidate.node)
+        let vertex = getPlayableMoveVertex(tree, candidate.node)
+        let hasAlternative =
+          vertex != null &&
+          getDecisionPointCandidates(node, depth).some((alternative) => {
+            let alternativeVertex = getPlayableMoveVertex(
+              tree,
+              alternative.node,
+            )
+            return (
+              getMoveColor(alternative.node) === color &&
+              alternativeVertex != null &&
+              !sameVertex(alternativeVertex, vertex)
+            )
+          })
+
+        if (
+          hasAlternative &&
+          !hasExplicitNegativeBranchResult(candidate.node, tree, node)
+        ) {
+          candidates.push({...candidate, startNodeId: node.id})
+        }
+      }
+    }
+
+    for (let child of node.children) stack.push({node: child, depth: depth + 1})
+  }
+
+  if (candidates.length === 0) return null
+
+  let best = candidates[0]
+  for (let candidate of candidates) {
+    if (
+      candidate.depth < best.depth ||
+      (candidate.depth === best.depth &&
+        mainLine.has(candidate.node.id) &&
+        !mainLine.has(best.node.id))
+    ) {
+      best = candidate
+    }
+  }
+  return best
+}
+
 // Returns `{startNodeId, playerToMove, firstMove, allowTeFallback}` or `null`
 // when no reliable solution marker is found. `firstMove` is a live reference
 // into the tree's node objects; callers must not mutate it. `allowTeFallback`
@@ -392,12 +536,13 @@ function getInferredMoveCandidate(tree, allowTe) {
 // branch results.
 //
 // `options.allowTeFallback` gates the `TE` (tesuji) property as a secondary
-// solution marker. `TE` is a generic move annotation in normal game records, so
-// it is only trusted when the caller knows it is operating on tsumego content
-// (e.g. a tsumego library). Comment and node-name markers are always preferred
-// over `TE`.
+// solution marker. `options.allowMainLineFallback` gates the weaker convention
+// that a Tsumego's structural main variation is its solution. Both are disabled
+// by default because they are unsafe assumptions for generic game records.
+// Comment and node-name markers, TE, and negative-branch inference are always
+// preferred over the main-line fallback, in that order.
 export function analyzeProblem(tree, options = {}) {
-  let {allowTeFallback = false} = options || {}
+  let {allowTeFallback = false, allowMainLineFallback = false} = options || {}
 
   // Single DFS pass tracking depth. Markers may sit on any node, move or not;
   // the first solver move is derived from the path to the marked node, or by
@@ -452,6 +597,9 @@ export function analyzeProblem(tree, options = {}) {
     }
   } else {
     best = getInferredMoveCandidate(tree, allowTeFallback)
+    if (best == null && allowMainLineFallback) {
+      best = getMainLineFallbackCandidate(tree)
+    }
   }
   if (best == null) return null
 

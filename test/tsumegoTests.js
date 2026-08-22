@@ -102,6 +102,182 @@ describe('analyzeProblem', () => {
     assert.strictEqual(analyzeProblem(tree), null)
   })
 
+  it('uses the main-line branch only when the fallback is enabled', () => {
+    let response
+    let tree = gametree.new().mutate((draft) => {
+      let main = draft.appendNode(draft.root.id, {B: ['aa']})
+      response = draft.appendNode(main, {W: ['cc']})
+      draft.appendNode(response, {B: ['dd']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    assert.strictEqual(analyzeProblem(tree), null)
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+    assert.strictEqual(classifyMove(tree, result, 'aa'), 'correct')
+    assert.strictEqual(classifyMove(tree, result, 'bb'), 'wrong')
+    assert.strictEqual(classifyMove(tree, result, 'cc'), 'absent')
+    let advanced = advanceSolution(tree, result, result.firstMove)
+    assert(advanced != null)
+    assert.strictEqual(advanced.automaticMoves[0].id, response)
+    assert.strictEqual(advanced.nextPlayerMove.data.B[0], 'dd')
+  })
+
+  it('uses the main-line branch when several alternatives exist', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {W: ['aa']})
+      draft.appendNode(draft.root.id, {W: ['bb']})
+      draft.appendNode(draft.root.id, {W: ['cc']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.W[0], 'aa')
+  })
+
+  it('follows descriptive first-child nodes to the main-line move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let prefix = draft.appendNode(draft.root.id, {C: ['variation']})
+      draft.appendNode(prefix, {B: ['aa']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.startNodeId, tree.root.id)
+    assert.strictEqual(result.firstMove.data.B[0], 'aa')
+  })
+
+  it('does not override a negative main-line branch', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+      draft.appendNode(draft.root.id, {B: ['cc']})
+    })
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
+  it('prefers negative-branch inference over main-line ordering', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong Answer']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'bb')
+  })
+
+  it('prefers an explicit off-main-line solution', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa']})
+      draft.appendNode(draft.root.id, {B: ['bb'], C: ['Correct Answer']})
+    })
+
+    let result = analyzeProblem(tree, {allowMainLineFallback: true})
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'bb')
+  })
+
+  it('prefers an off-main-line TE solution when TE is enabled', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa']})
+      draft.appendNode(draft.root.id, {B: ['bb'], TE: ['1']})
+    })
+
+    let result = analyzeProblem(tree, {
+      allowTeFallback: true,
+      allowMainLineFallback: true,
+    })
+    assert(result != null)
+    assert.strictEqual(result.firstMove.data.B[0], 'bb')
+  })
+
+  it('rejects a main-line fallback that contradicts PL', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'PL', ['W'])
+      draft.appendNode(draft.root.id, {B: ['aa']})
+      draft.appendNode(draft.root.id, {B: ['bb']})
+    })
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
+  it('rejects a pass as the main-line fallback candidate', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['']})
+      draft.appendNode(draft.root.id, {B: ['aa']})
+    })
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
+  it('rejects an off-board main-line fallback candidate', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['9'])
+      draft.appendNode(draft.root.id, {B: ['zz']})
+      draft.appendNode(draft.root.id, {B: ['aa']})
+    })
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
+  it('rejects a structurally ambiguous main-line move node', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], W: ['bb']})
+      draft.appendNode(draft.root.id, {B: ['cc']})
+    })
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
+  it('does not start inside an ancestor branch marked wrong', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let wrong = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Wrong Answer'],
+      })
+      let response = draft.appendNode(wrong, {W: ['bb']})
+      draft.appendNode(response, {B: ['cc']})
+      draft.appendNode(response, {B: ['dd']})
+    })
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
+  it('does not treat a linear unmarked game as a main-line problem', () => {
+    let tree = buildTree([
+      ['B', 'aa'],
+      ['W', 'bb'],
+      ['B', 'cc'],
+    ])
+
+    assert.strictEqual(
+      analyzeProblem(tree, {allowMainLineFallback: true}),
+      null,
+    )
+  })
+
   it('uses a first-move BM marker for negative-branch inference', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.appendNode(draft.root.id, {B: ['aa'], BM: ['1']})

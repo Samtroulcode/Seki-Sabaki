@@ -339,7 +339,10 @@ function parseTsumegoPreview(content) {
   try {
     let [tree] = sgfFileFormat.parse(content)
     if (tree == null) return null
-    let problem = analyzeProblem(tree, {allowTeFallback: true})
+    let problem = analyzeProblem(tree, {
+      allowTeFallback: true,
+      allowMainLineFallback: true,
+    })
     if (problem == null) return null
     let board = gametree.getBoard(tree, problem.startNodeId)
     return {
