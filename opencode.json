@@ -45,7 +45,7 @@
       "git remote*": "allow",
       "npm test": "allow",
       "npm run format-check": "allow",
-      "npm run test:e2e:smoke": "allow",
+      "npm run test:e2e:smoke": "ask",
       "npm run bundle": "allow",
       "npx playwright test*": "ask",
       "npm install*": "ask",

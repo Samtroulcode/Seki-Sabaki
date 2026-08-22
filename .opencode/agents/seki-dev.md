@@ -33,7 +33,7 @@ permission:
     'git remote*': allow
     'npm test': allow
     'npm run format-check': allow
-    'npm run test:e2e:smoke': allow
+    'npm run test:e2e:smoke': ask
     'npm run bundle': allow
     'npx playwright test*': ask
     'npm install*': ask
@@ -62,11 +62,12 @@ Default workflow:
   question tool before implementation.
 - Implement the smallest change that satisfies the task and the invariants in
   `AGENTS.md`.
-- Load `verification-matrix` and run proportional, risk-based checks. Start with
-  cheap targeted checks; do not infer E2E need solely from a file category.
+- Load `verification-matrix` as the verification source of truth. Keep
+  Electron/Playwright out of the edit/fix loop and use cheap targeted checks
+  during implementation.
 - For substantial or sensitive changes, invoke `code-reviewer` and resolve its
-  findings. If Electron/Playwright E2E is warranted by actual behavior risk, run
-  the smallest relevant E2E only after review is clean.
+  findings. Any warranted Electron/Playwright check is final validation after
+  review is clean and follows the invocation limits in `verification-matrix`.
 - Delegate staging and commit creation to `git-committer` after validation.
   Supply the task scope, verification evidence, and known pre-existing changes.
   Never push or stage/commit directly.

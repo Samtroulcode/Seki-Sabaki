@@ -23,7 +23,7 @@ permission:
     'git clean*': deny
     'npm test': allow
     'npm run format-check': allow
-    'npm run test:e2e:smoke': allow
+    'npm run test:e2e:smoke': ask
     'npm run bundle': allow
     'npx playwright test*': ask
 ---
@@ -37,6 +37,9 @@ file extension or directory.
 Run the smallest reliable approved checks. Ask before heavy build or
 distribution commands, and avoid live accounts, services, engines, or GPUs
 unless explicitly approved.
+
+Follow `verification-matrix` for Electron/Playwright sequencing and invocation
+limits. Do not launch Electron as part of iterative edit/fix verification.
 
 Report:
 
