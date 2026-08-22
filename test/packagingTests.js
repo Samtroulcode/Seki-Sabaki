@@ -13,6 +13,7 @@ import {dirname, join} from 'path'
 // "Process boundaries" note in CLAUDE.md.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const indexHtml = readFileSync(join(root, 'index.html'), 'utf8')
 const mainSource = readFileSync(join(root, 'src', 'main.js'), 'utf8')
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 
@@ -40,6 +41,11 @@ describe('application identity', () => {
     assert.strictEqual(packageJson.productName, 'Seki')
     assert.strictEqual(packageJson.build.productName, 'Seki')
     assert.strictEqual(packageJson.build.appId, 'net.samda.seki')
+  })
+
+  it('identifies the bootstrap document as Seki', () => {
+    assert.match(indexHtml, /<title>\s*Seki\s*<\/title>/)
+    assert.doesNotMatch(indexHtml, /<title>\s*Sabaki\s*<\/title>/)
   })
 })
 
