@@ -1,6 +1,7 @@
 # Seki UX Architecture Audit
 
-Status: product-direction audit; no UI implementation is specified here.
+Status: product-direction audit updated for the implemented Phase 1 navigation
+shell; remaining recommendations are not UI implementation specifications.
 
 ## Scope and design premise
 
@@ -11,11 +12,14 @@ This audit preserves local Sabaki board/editor work, OGS online play, post-game
 analysis, Library, and all Tsumego browser, Solver, and Creator workflows.
 
 The findings below are based on the current renderer shell and state projection,
-not component names alone. In particular, `App` renders a permanent tab strip
-above a three-way board layout (`src/components/App.js:361-446`),
-`WorkspaceView` projects route state into the center
-(`src/components/WorkspaceView.js:15-50`), and `sabaki` owns three kinds of
-activity plus their shared order (`src/modules/sabaki.js:107-130,571-704`).
+not component names alone. `App` mounts `AppSidebar` beside content containing
+`AppTabs` and the three-way board layout (`src/components/App.js:397-435`).
+`AppSidebar` exposes five destinations plus Settings
+(`src/components/AppSidebar.js:9-47`), while `AppTabs` renders only board and
+online-game activities (`src/components/AppTabs.js:41-103`). `sabaki` retains
+singleton workspace state for compatibility/request routing and normalizes
+`activityTabOrder` to board and online-game keys
+(`src/modules/sabaki.js:627-689,5111-5133`).
 
 Recommendations distinguish **information architecture** (where a workflow lives
 and how users reach it) from **visual treatment** (density, color, spacing).
@@ -26,60 +30,55 @@ action priority, or settings ownership.
 
 ### Current architecture and disposition
 
-| Mechanism                          | Current implementation                                                                                                                                                                                                                                                                               | Disposition                    | UX direction                                                                                                                                                  |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persistent Home                    | `AppTabs` always renders Home first; it is not closeable or part of `activityTabOrder` (`AppTabs.js:70-88`). Startup is Home (`sabaki.js:114-115`).                                                                                                                                                  | **KEEP**                       | Keep one stable return point and start/resume surface.                                                                                                        |
-| Board tabs                         | Each local document owns SGF state, history, engines, and analysis (`boardtabs.js:8-24`; `sabaki.js:478-565`).                                                                                                                                                                                       | **KEEP**                       | These are primary document activities. Preserve multi-document and dirty-close behavior.                                                                      |
-| Online-game tabs                   | Live games own a restricted board projection and deliberately clear local engine/analysis state (`onlinegametabs.js:8-19`; `sabaki.js:707-760`).                                                                                                                                                     | **KEEP**                       | A live game is a time-sensitive activity, not a page inside the OGS overview. Keep it independently reachable.                                                |
-| Workspace tabs                     | OGS, Analysis, Library, and Tsumego are singleton closeable tabs created by `openWorkspaceTab()` (`sabaki.js:621-667`).                                                                                                                                                                              | **SIMPLIFY**                   | Keep singleton activities, but communicate that they are tools/workspaces rather than documents. Do not allow accidental duplicate instances.                 |
-| `activityTabOrder`                 | Namespaced board, online-game, and workspace keys share one ordering and adjacent-close behavior (`sabaki.js:571-619`; `AppTabs.js:134-152`).                                                                                                                                                        | **KEEP**                       | This is the correct internal basis for one desktop activity strip. Improve overflow and keyboard behavior later, not the data model.                          |
-| `activeWorkspace`                  | Projects Home, board, online game, or workspace tab into the shell (`WorkspaceView.js:15-35`).                                                                                                                                                                                                       | **SIMPLIFY**                   | Treat it as an internal projection of the selected activity, not a second user-visible navigation concept.                                                    |
-| Legacy `activeWorkspace` routes    | `online`, `analysis`, and `sgf-explorer` are intercepted and mapped to singleton tabs; direct render cases remain (`sabaki.js:305-320`; `WorkspaceView.js:19-26`). `tsumego` still has a direct case.                                                                                                | **DEPRECATE INTERNALLY**       | Route all new calls through `openWorkspaceTab`; retain compatibility adapters until callers/tests are migrated. Old code is not itself a user-facing problem. |
-| `homeSection` workspace cases      | `HomeView` can render OGS, Analysis, Library, and Tsumego, but current Home navigation opens tabs (`HomeView.js:19-25,43-64`).                                                                                                                                                                       | **DEPRECATE INTERNALLY**       | Keep only as transitional compatibility. Home should not silently become a second workspace host.                                                             |
-| Home feature navigation            | Sticky `HomeNavigation` launches the same singleton Analysis, OGS, Library, and Tsumego activities shown in `AppTabs`; routing is already unified through `openWorkspaceTab()` (`HomeDashboard.js:343-385`; `HomeView.js:19-24`; `style/index.css:276-320`).                                         | **RESTRUCTURE**                | Keep Home-local start/open shortcuts, but reduce their rail-like visual prominence so they are not mistaken for persistent global navigation.                 |
-| Hidden AppRail                     | `#apprail` remains styled but is `display: none` (`style/index.css:144-145`).                                                                                                                                                                                                                        | **REMOVE FROM USER-FACING UX** | Do not reintroduce a second global rail. Remove dead presentation code only as a separate safe cleanup after compatibility review.                            |
-| Native menu, file drop, shortcuts  | `App` supports file drop, board undo/redo and navigation keys, Escape, and Cmd/Ctrl+Home (`App.js:128-208`); the native menu remains available.                                                                                                                                                      | **KEEP**                       | Menus and shortcuts are desktop-native secondary entry points, not competing primary navigation.                                                              |
-| Contextual cross-workflow launches | Home, OGS history, Library, and Analysis results open targeted workspaces or new board tabs (`HomeDashboard.js:41-133`; `LibraryPanel.js:141-162`; `AnalysisPanel.js:65-68`). Tsumego requests instead open a collection/problem inside its singleton workspace (`TsumegoPanel.js:123-162,318-372`). | **KEEP**                       | Preserve both transitions: ordinary SGFs/games become board documents; tools and Tsumego problems retain their specialized singleton workspace context.       |
+| Mechanism                          | Current implementation                                                                                                                                                                                                                                                                                | Disposition            | UX direction                                                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Persistent global sidebar          | `AppSidebar` renders Home, Online, Analysis, Library, and Tsumego plus a global Settings action (`AppSidebar.js:9-47`); `App` mounts it outside `appcontent` (`App.js:397-411`).                                                                                                                      | **KEEP**               | Preserve stable destination switching separately from open activities.                                                                 |
+| Board tabs                         | Each local document owns SGF state, history, engines, and analysis (`boardtabs.js:8-24`; `sabaki.js:478-565`).                                                                                                                                                                                        | **KEEP**               | These are primary document activities. Preserve multi-document and dirty-close behavior.                                               |
+| Online-game tabs                   | Live games own a restricted board projection and deliberately clear local engine/analysis state (`onlinegametabs.js:8-19`; `sabaki.js:707-760`).                                                                                                                                                      | **KEEP**               | A live game is a time-sensitive activity, not a page inside the OGS overview. Keep it independently reachable.                         |
+| Internal workspace compatibility   | `openWorkspaceTab()` retains singleton OGS, Analysis, Library, and Tsumego state and targeted requests without rendering those entries in `AppTabs` (`sabaki.js:627-689`; `AppTabs.js:41-103`).                                                                                                       | **KEEP INTERNAL**      | Preserve compatibility/request routing without exposing workspace tabs.                                                                |
+| `activityTabOrder`                 | Insertion accepts only board and online-game types, and state changes normalize ordering to existing keys of those types (`sabaki.js:571-615,5111-5133`). `AppTabs` filters the order against only those activities (`AppTabs.js:90-103`).                                                            | **KEEP**               | Continue excluding stale, duplicate, and workspace keys from user-facing activity order.                                               |
+| `activeWorkspace`                  | Projects Home, board, online game, or workspace state into the shell (`WorkspaceView.js:15-35`).                                                                                                                                                                                                      | **KEEP INTERNAL**      | Treat it as a renderer projection, not a user-visible navigation concept.                                                              |
+| Legacy `activeWorkspace` routes    | `online`, `analysis`, and `sgf-explorer` are intercepted and mapped to singleton workspace state; direct render cases remain (`sabaki.js:305-320`; `WorkspaceView.js:19-26`). `tsumego` still has a direct case.                                                                                      | **COMPATIBILITY ONLY** | Preserve request routing while the sidebar becomes the user-facing destination model.                                                  |
+| `homeSection` workspace cases      | `HomeView` retains legacy OGS, Analysis, Library, and Tsumego section rendering (`HomeView.js:30-50`), while sidebar activation normally routes through singleton workspace state (`AppSidebar.js:88-93`).                                                                                            | **COMPATIBILITY ONLY** | Keep as transitional projection, not a second Home navigation model.                                                                   |
+| Home feature navigation            | `HomeDashboard` now contains resume, New Board, Browse Library, board-size choices, and Tsumego continuation without destination launcher or preview panes (`HomeDashboard.js:31-152`).                                                                                                               | **COMPLETE**           | Keep destination switching in `AppSidebar`; preserve Home's focused start/resume role.                                                 |
+| Legacy AppRail                     | `AppSidebar` is mounted as the global shell and no `#apprail` presentation remains in the stylesheet.                                                                                                                                                                                                 | **REMOVED**            | Do not restore a competing navigation rail.                                                                                            |
+| Native menu, file drop, shortcuts  | `App` supports file drop, board undo/redo and navigation keys, Escape, and Cmd/Ctrl+Home (`App.js:128-208`); the native menu remains available.                                                                                                                                                       | **KEEP**               | Menus and shortcuts are desktop-native secondary entry points, not competing primary navigation.                                       |
+| Contextual cross-workflow launches | Home's Browse Library action routes an internal Library request; Online history, Library, and Analysis results can open board tabs, while Tsumego requests retain Tsumego context (`HomeDashboard.js:37-39`; `LibraryPanel.js:141-162`; `AnalysisPanel.js:65-68`; `TsumegoPanel.js:123-162,318-372`). | **KEEP**               | Preserve both transitions: ordinary SGFs/games become board documents; destination-specific requests retain their specialized context. |
 
 ### Target global model
 
-Seki's primary global navigation should be **a persistent Home anchor followed
-by one ordered strip of open activities**. The strip contains local board
-documents, live online games, and at most one instance of each tool workspace.
-It should remain a desktop document/activity model, not become a website-style
-section rail.
+Seki has two distinct navigation layers:
 
-Home and `AppTabs` have different jobs:
+- A persistent global sidebar contains **Home, Online, Analysis, Library, and
+  Tsumego**. **Settings** is a global action, not a destination tab.
+- The top activity strip contains only independent local board/SGF documents and
+  live online games. These activities may be opened, switched, reordered, and
+  closed without changing the destination model.
 
-- **AppTabs is global navigation**: it answers “what is open?” and supports
-  rapid switching among ongoing work.
-- **Home is a start/resume activity**: it answers “what should I begin or
-  continue?” It should not mirror every open tab or host full feature screens.
-- Home should **not** have its own persistent feature navigation. It may expose
-  concise launch shortcuts when a workspace is not already open; activation
-  should focus the existing singleton tab.
+> The sidebar says where I am in Seki. The tabs say what independent work I
+> currently have open.
 
-Users should move between Board / OGS / Analysis / Library / Tsumego by
-selecting their open activity tab, by a desktop menu/shortcut, or by a
-contextual launch from Home or another workspace. “Board” is not one singleton
-destination: each local SGF is a board tab. OGS overview, Analysis manager,
-Library, and Tsumego are singleton tool activities. Each active OGS game is its
-own online-game tab.
+Home is the quiet start/resume destination. It does not mirror the sidebar or
+host full destination screens. Online owns connection, matchmaking, and history;
+Analysis owns batch jobs; Library owns browsing; and Tsumego owns browser,
+Solver, and Creator state. Selecting a concrete SGF or completed game can open a
+board tab, while joining or returning to a live game focuses its online-game
+tab.
+
+`workspaceTabs` and `openWorkspaceTab()` may remain internal compatibility and
+request-routing mechanisms. Their names do not define user-facing tabs, and new
+features must not be documented as tabs merely because routing uses those APIs.
 
 ### Activity tabs versus contextual views
 
-Open as an **activity tab** when the task has durable independent context or is
-expected to be revisited while other work continues:
+Open in the **top activity strip** only when it is independent board-shaped
+work:
 
-- every local board/editor document;
-- every active online game;
-- OGS overview/matchmaking;
-- batch Analysis manager and queue;
-- Library browser;
-- the Tsumego browser/solver/creator workflow as one retained workspace.
+- a local board/editor document;
+- a live online game.
 
-Remain **contextual inside an activity** when the information only makes sense
-for the selected object:
+Remain **contextual inside a destination or activity** when the information only
+makes sense for that surface:
 
 - board play/edit/scoring/find/autoplay modes;
 - board engines, GTP console, graphs, game tree, and comments;
@@ -89,38 +88,38 @@ for the selected object:
 - Tsumego collection, problem, Solver, Creator, and Creator test state;
 - Preferences and short configuration dialogs/drawers.
 
-Opening an SGF from OGS history, Library, or Analysis results should continue to
-create a board activity. It should not replace the source workspace or turn the
-source into a board view.
+Opening an SGF from Online history, Library, or Analysis results should continue
+to create a board activity. It should not replace or transform the source
+destination.
 
 ## 2. Home
 
 **Intended responsibility:** Home is Seki's quiet desktop start/resume surface
 for beginning a board and returning to the most relevant ongoing work.
 
-| Current element                      | Disposition                                   | Reason and intended role                                                                                                                                                                                                                                                                 |
-| ------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hero (“Your Go workspace”)           | **SIMPLIFY**                                  | `HomeDashboard.js:200-209` consumes vertical space without adding task context. Keep restrained product identity or a compact greeting, not a dashboard masthead.                                                                                                                        |
-| `HomeNavigation`                     | **REMOVE DUPLICATION**                        | Its five-button sticky rail (`HomeDashboard.js:343-385`) uses the correct singleton routing, but its persistence and visual weight duplicate global wayfinding. Retain “Open SGF” and tool launch capability in a compact launch area, not a second-looking nav system.                  |
-| New Board                            | **KEEP ON HOME**                              | It creates a new board tab directly (`HomeDashboard.js:41-45`) and is the clearest first-run/local primary action.                                                                                                                                                                       |
-| Board-size choice                    | **SIMPLIFY**                                  | 9/13/19 is a useful quick preset (`HomeDashboard.js:260-279`), but should support rather than compete with New Board. Nonstandard dimensions remain in established board/game setup flows.                                                                                               |
-| Library preview                      | **MOVE TO WORKSPACE**                         | Home currently loads up to four user and built-in folders and repeats source browsing (`HomeLibraryPane.js:13-19,107-153`). Replace it with a concise “Open Library” or one recent/resume item; source and folder exploration belong in Library.                                         |
-| Online preview / matchmaking         | **MOVE TO WORKSPACE**                         | Home duplicates OGS login plus size, clock, preset, and Find opponent controls (`HomeOnlinePanel.js:55-103,116-240`). Match configuration belongs in OGS. Home may show connection state and one “Play online” launch.                                                                   |
-| Recent OGS games                     | **MOVE TO WORKSPACE**                         | The three-game list repeats opening and two analysis actions (`HomeDashboard.js:293-320`; `OgsGameHistory.js:110-253`). History is secondary inside OGS; Home may show at most one meaningful recent/resume link.                                                                        |
-| Tsumego card                         | **SIMPLIFY**                                  | The current card correctly selects the first unfinished problem and preserves progress (`HomeTsumegoCard.js:29-32,163-217`), making it a good resume affordance. Reduce collection metadata and secondary browsing chrome; keep “Continue” dominant.                                     |
-| Resume current board / Continue game | **KEEP ON HOME**, but correct and consolidate | Resume is core, but the current button always sets `activeWorkspace: 'board'` even when labelled for `onlineGameId` (`HomeDashboard.js:325-336`). The future action must activate the actual selected board or online-game tab and avoid competing with a separate Tsumego continuation. |
+| Current element                      | Disposition         | Reason and intended role                                                                                                                                                                     |
+| ------------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero (“Your Go workspace”)           | **SIMPLIFY LATER**  | The compact identity remains above task content (`HomeDashboard.js:68-72`). It is no longer a large dashboard hero, but can be reduced further if evidence supports it.                      |
+| Destination launcher rail            | **REMOVED**         | Home has no duplicate Online, Analysis, Library, or Tsumego navigation; `AppSidebar` owns those destinations (`HomeDashboard.js:64-152`; `AppSidebar.js:9-35`).                              |
+| New Board                            | **KEEP ON HOME**    | It creates a new board tab directly (`HomeDashboard.js:31-35,105-113`) and remains the clearest first-run/local primary action.                                                              |
+| Board-size choice                    | **KEEP / MONITOR**  | The 9/13/19 quick preset supports New Board without introducing a separate workflow (`HomeDashboard.js:23-29,125-145`).                                                                      |
+| Browse Library                       | **KEEP ON HOME**    | The secondary action routes to Library through internal request handling; Home does not browse files itself (`HomeDashboard.js:37-39,114-122`).                                              |
+| Library/Online/history previews      | **REMOVED**         | Dense destination previews are absent from `HomeDashboard`; their full capabilities remain in Library and Online.                                                                            |
+| Tsumego card                         | **KEEP / SIMPLIFY** | The card remains a focused continuation affordance rather than global navigation (`HomeDashboard.js:147-151`; `HomeTsumegoCard.js`). Reduce metadata only if it distracts from continuation. |
+| Resume current board / Continue game | **KEEP ON HOME**    | Resume selects an existing online-game or board tab through the corresponding switch API (`HomeDashboard.js:42-48,73-98`).                                                                   |
 
-The desired Home is therefore not a miniature Library + OGS + Tsumego dashboard.
-Its high-value order is: **resume urgent/ongoing activity**, **new board/open
-SGF**, then **small workspace launchers**. It should not fetch and render
-several dense feature previews merely to prove those features exist.
+The desired Home is therefore not a miniature Library + Online + Tsumego
+dashboard. Its high-value order is: **resume urgent/ongoing activity**, **New
+Board**, then a secondary **Browse Library** action. Home does not expose an
+external “Open SGF” action; native **File > Open** remains available. It should
+not repeat the five sidebar destinations or fetch dense feature previews merely
+to prove those features exist.
 
-Moving the current Home Library deep links, quick matchmaking, and recent-game
-actions changes their entry points, but not their capabilities: targeted Library
-opening, all matchmaking choices, game opening, and both analysis paths must
-remain available in their owning workspaces. Existing Home E2E assertions for
-those entry points would therefore need intentional replacement, not silent
-deletion.
+The implementation preserves destination capabilities while removing duplicate
+Home entry points. Targeted Library routing, singleton destination reuse,
+activity-order normalization, and absence of Home/workspace tabs in the top
+strip have dedicated regression coverage
+(`e2e/home-panel.spec.js:7-176,309-376`).
 
 ## 3. Common action hierarchy
 
@@ -129,7 +128,7 @@ This hierarchy defines interaction priority, not final colors or CSS.
 | Level                          | Use                                                                                                                                                   | Seki examples                                                                                                                              |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Primary action**             | The one action that advances the user's current task. Normally one per panel or decision state.                                                       | New Board on Home; Find opponent in OGS; Start analysis after selecting an SGF; Save in Creator; Accept dead stones during that OGS phase. |
-| **Secondary action**           | A common alternative or supporting action that remains visible but does not compete with the primary.                                                 | Open SGF beside New Board; choose a file before analysis; Test Problem beside Creator save; Browse Tsumego beside Continue.                |
+| **Secondary action**           | A common alternative or supporting action that remains visible but does not compete with the primary.                                                 | Browse Library beside New Board; choose a file before analysis; Test Problem beside Creator save; Browse Tsumego beside Continue.          |
 | **Ghost/subtle action**        | Navigation, refresh, reveal, or low-risk utility that should not dominate.                                                                            | Refresh history/results, Up one folder, Show in folder, Revert unchanged settings, back/previous/next controls.                            |
 | **Destructive action**         | Irreversible or session-ending action, visually and spatially separated and confirmed when consequence is substantial.                                | Resign, Disconnect game, delete Creator branch, remove engine, uninstall theme, cancel a running job. “Pass” is not destructive.           |
 | **Icon-only action**           | Compact, conventional, repeated utility where space matters; always has tooltip and accessible name, and never carries an ambiguous high-risk action. | Tab close, attach-engine toolbar, familiar graph/editor tools. Avoid icon-only Resign, Save, or Start analysis.                            |
@@ -212,14 +211,14 @@ keyboard-accessible resizing—not the three-region model.
 
 ## 5. OGS
 
-There are correctly two OGS contexts:
+There are correctly two online contexts:
 
-1. the singleton **OGS workspace** for connection and finding/reopening games
-   (`OgsPanel.js:253-390`);
-2. a dedicated **live-game activity** with Goban and game context only
+1. the persistent **Online destination** for connection and finding/reopening
+   games (`OgsPanel.js:253-390`);
+2. a dedicated **live-game tab** with Goban and game context only
    (`OnlineGameView.js:44-84`).
 
-### Desired OGS workspace hierarchy
+### Desired Online destination hierarchy
 
 1. **Connection and active state:** a compact, always legible account/socket
    indicator; if disconnected, login is the primary task.
@@ -227,10 +226,10 @@ There are correctly two OGS contexts:
    dominate. `AutomatchForm` already has a coherent size/time/handicap/rank flow
    and a single Find opponent action (`OgsPanelMatchmaking.js:79-229`).
 3. **Active online games:** currently active game tabs must be easy to return
-   to. The activity strip is the deliberate current representation; matchmaking
+   to. The top activity strip is their deliberate representation; matchmaking
    status also uses `MatchmakingToast`. Do not add a second active-games card to
-   OGS merely to imitate a web dashboard. Improve tab/toast return affordances
-   only if evidence shows they are insufficient.
+   Online merely to imitate a web dashboard. Improve tab/toast return
+   affordances only if evidence shows they are insufficient.
 4. **Completed game history:** a compact review/reopen list below play. Opening
    creates a board tab; OGS/Seki analysis choices are contextual.
 5. **Account context:** rank/statistics and friends are secondary reference
@@ -239,7 +238,7 @@ There are correctly two OGS contexts:
 What should dominate is **get connected, find a game, return to a live game**.
 The current hero says “manage your account” and devotes a full side column to
 Account, Player Statistics, and Friends (`OgsPanel.js:259-300,359-387`), which
-pulls the workspace toward a web account dashboard. Keep all information, but
+pulls the destination toward a web account dashboard. Keep all information, but
 collapse/profile-group it below or beside the play workflow with lower priority.
 
 Permanently visible actions should be Login when signed out; Find opponent or
@@ -271,8 +270,8 @@ Seki currently has two related but distinct workflows that should stay distinct:
   of `boardTabStateKeys`, overlays are rendered on Goban, and graphs are in the
   right sidebar (`boardtabs.js:17-23`; `MainView.js:143-150`;
   `Sidebar.js:138-150`).
-- **Batch/post-game SGF analysis** is the singleton Analysis manager. It starts
-  jobs, tracks queue/status, and reopens outputs as board tabs
+- **Batch/post-game SGF analysis** belongs to the Analysis destination. It
+  starts jobs, tracks queue/status, and reopens outputs as board tabs
   (`AnalysisPanel.js:108-201,525-711`).
 
 ### Information hierarchy
@@ -345,10 +344,9 @@ content, folder traversal, SGF previews, and opening into a new board tab
 source and path navigation**.
 
 - **Built-in versus My Library:** both sources exist, but `LibraryPanel` has no
-  visible switch; source is supplied by a targeted request, often from the Home
-  preview (`LibraryPanel.js:19-31`; `HomeLibraryPane.js:107-150`). Add one
-  stable source selector inside Library. Do not require users to return Home to
-  switch.
+  visible switch; source is supplied by an internal targeted request
+  (`LibraryPanel.js:19-45`). Add one stable source selector inside Library; Home
+  no longer supplies destination previews.
 - **Folder navigation:** keep direct folder cards and Up behavior. Replace the
   plain `currentPath` text with a navigable breadcrumb/current-location model;
   retain a clear parent action for keyboard users.
@@ -370,7 +368,7 @@ source and path navigation**.
 
 ## 8. Tsumego
 
-The implemented workflow is one coherent singleton activity:
+The implemented workflow is one coherent Tsumego destination:
 
 ```text
 Browser → Collection folder → Problem → Solver
@@ -457,7 +455,7 @@ anything in this task.
 | Max visits, variations, SGF rules/komi fallback, language, comment/annotation style | **ANALYSIS-SPECIFIC**                     | Per-analysis options with remembered defaults; advanced output remains disclosed.                                     |
 | Current SGF input, queue, current job, log, analyzed results                        | **CONTEXTUAL / SHOULD STAY IN WORKSPACE** | Analysis manager.                                                                                                     |
 | OGS credentials/session and socket state                                            | **OGS-SPECIFIC**                          | OGS connection flow; never generic Preferences.                                                                       |
-| Matchmaking size/time/handicap/rank choices                                         | **OGS-SPECIFIC**                          | OGS workspace; remembered values are OGS defaults.                                                                    |
+| Matchmaking size/time/handicap/rank choices                                         | **OGS-SPECIFIC**                          | Online destination; remembered values are OGS defaults.                                                               |
 | Live clocks, chat, pass/resign/dead-stone actions                                   | **CONTEXTUAL / SHOULD STAY IN WORKSPACE** | Live online-game activity.                                                                                            |
 | Library root folder                                                                 | **CONTEXTUAL / SHOULD STAY IN WORKSPACE** | Library setup/settings because the path defines that workspace's content.                                             |
 | Tsumego source, collection, progress, Creator save path                             | **CONTEXTUAL / SHOULD STAY IN WORKSPACE** | Tsumego and Library workflows.                                                                                        |
@@ -473,12 +471,12 @@ global navigation system.
 
 - Global inputs/buttons/selects/textareas have visible `:focus-visible`
   treatment (`style/app.css:187-230`).
-- `AppTabs` and Home navigation are labelled; activity controls have accessible
-  names and close labels (`AppTabs.js:70-86,154-269`;
-  `HomeDashboard.js:343-385`).
-- Grouped size/time controls use `aria-pressed`; Tsumego sources use tab roles
-  (`HomeDashboard.js:260-279`; `HomeOnlinePanel.js:165-223`;
-  `TsumegoPanel.js:525-548`).
+- `AppSidebar` exposes labelled destination navigation, selected-page state, and
+  Settings expansion state (`AppSidebar.js:20-85`). `AppTabs` labels the open
+  activities and gives board/live-game controls accessible names and close
+  labels (`AppTabs.js:55-86,106-180`).
+- Grouped board-size controls use `aria-pressed`; Tsumego sources use tab roles
+  (`HomeDashboard.js:125-145`; `TsumegoPanel.js:525-548`).
 - OGS status is an `aria-live` region and Analysis errors use `role="alert"`
   (`OgsGameContextPanel.js:205-220`; `AnalysisPanel.js:170`).
 - OGS history's custom clickable cards implement Enter/Space behavior
@@ -489,10 +487,10 @@ global navigation system.
 
 **Keyboard navigation and focus order**
 
-- The global activity strip is a labelled nav of ordinary buttons, but has no
-  tab-list arrow-key model, tab cycling, reordering, or close shortcut
-  (`AppTabs.js`). Add a desktop-consistent keyboard contract before adding more
-  tab chrome; preserve normal Tab access as a fallback.
+- `AppSidebar` and `AppTabs` now separate destinations from activities, but both
+  still rely on ordinary button Tab order rather than complete sidebar/tab-list
+  arrow-key, reordering, and close-shortcut contracts. Preserve normal Tab
+  access while those distinct models are designed and tested.
 - Goban and `GameGraph` are primarily pointer surfaces; `SplitContainer` exposes
   a mouse-only `<div>` resizer (`SplitContainer.js:7-43,78-93`). Board
   interaction accessibility needs a scoped design, while splitter keyboard
@@ -512,9 +510,9 @@ global navigation system.
 - Library/Tsumego folder cards have names, but plain path strings are not
   navigable. Breadcrumbs should expose hierarchy and reduce repeated Back/Up
   clicks.
-- App tab type is partly encoded through title/meta; online tabs say “Online
-  game,” while workspace tabs only show names (`AppTabs.js:197-257`). Use
-  restrained, non-color-only type cues and preserve full accessible labels.
+- Board and online-game type is partly encoded through title/meta; online tabs
+  explicitly say “Online game” (`AppTabs.js:106-180`). Keep restrained,
+  non-color-only cues and full accessible labels for both types.
 
 **Target sizes and hover dependence**
 
@@ -528,9 +526,9 @@ global navigation system.
 
 **Click cost and information density**
 
-- Home currently asks users to scan/focus through local setup, Library folders,
-  complete online matchmaking, history actions, Tsumego, and resume. Removing
-  duplicated feature previews reduces both tab stops and cognitive load.
+- Home now limits focus order to resume when available, local board setup,
+  Browse Library, and Tsumego continuation (`HomeDashboard.js:64-152`). Preserve
+  that reduction in tab stops and cognitive load.
 - Library's large preview grid is low-density for long sessions; Analysis's
   expanded infrastructure form is high-density in the wrong place. Density
   should follow task frequency rather than one universal card layout.
@@ -544,18 +542,17 @@ global navigation system.
   than expanding reliance on `window.confirm` in Creator
   (`TsumegoCreator.js:116-127,186-202,346-405`).
 - Preferences can remain secondary, but the fixed 400px drawer and missing focus
-  management make long engine/theme configuration tiring. A later settings
-  surface may grow, but it should not become an activity tab without a stronger
-  workflow reason.
+  management make long engine/theme configuration tiring. A later Settings
+  surface may grow as a global action, not as an activity tab.
 - Resign, disconnect, cancel analysis, delete branch, remove engine, and
   uninstall theme need consistent destructive hierarchy and consequence text.
 
 **Long-session ergonomics**
 
 - Preserve resizable, persisted board sidebars (`App.js:339-357`;
-  `Sidebar.js:47-71`) and the horizontally scrollable activity strip
-  (`style/index.css:71-88`). Add discoverable overflow and active-tab visibility
-  rather than replacing tabs with a dashboard.
+  `Sidebar.js:47-71`) and horizontal overflow for open board/live-game tabs
+  (`style/index.css:71-88`). Keep the active tab visible without turning
+  destinations into overflow activities.
 - Keep quiet backgrounds, stable layouts, compact rows, and limited animation.
   Avoid large heroes, repeated cards, and shifting controls in the board,
   live-game, Solver, queue, and Library surfaces.
@@ -564,71 +561,59 @@ global navigation system.
 
 ```text
 Seki
-├── Home (persistent start/resume anchor)
-├── Board activities (0..n local SGF documents)
-│   ├── Goban + active mode bar
-│   ├── Contextual engines / GTP
-│   └── Contextual graph / comments / analysis
-├── Online game activities (0..n live OGS games)
-│   ├── Goban
-│   └── Clocks / players / phase actions / chat
-├── OGS workspace (singleton)
-│   ├── Connection + matchmaking
-│   ├── Return to live games via activity tabs / toast
-│   └── History + account/friends/statistics
-├── Analysis workspace (singleton)
-│   ├── New job + per-analysis options
-│   ├── Queue / status
-│   └── Results + secondary Analysis Settings
-├── Library workspace (singleton)
-│   ├── Built-in
-│   └── My Library
-└── Tsumego workspace (singleton)
-    ├── Browser / Collection
-    ├── Solver
-    └── Creator / Test Solver
-
-Global secondary surfaces
-├── Native menus and shortcuts
-├── Preferences (Application / Appearance / Board / Engines / Analysis)
-└── Existing focused drawers and confirmations
+├── Global sidebar
+│   ├── Home (start/resume)
+│   ├── Online (connection, matchmaking, history)
+│   ├── Analysis (jobs, queue, results)
+│   ├── Library (Built-in and My Library)
+│   ├── Tsumego (Browser, Solver, Creator)
+│   └── Settings (global action)
+├── Top activity tabs
+│   ├── Board documents (0..n local SGFs)
+│   │   └── Goban + contextual modes, engines, graph, and comments
+│   └── Online games (0..n live OGS games)
+│       └── Goban + clocks, players, phase actions, and chat
+└── Secondary surfaces
+    ├── Native menus and shortcuts
+    └── Existing focused drawers and confirmations
 ```
 
 ### Top-level contracts
 
 | Area                     | Purpose                                                 | Primary user action                                               | Secondary actions                                                          | Must not live there                                                                                               |
 | ------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Home**                 | Start or resume work.                                   | Resume the most relevant activity, or New Board when none exists. | Open SGF; launch OGS, Analysis, Library, Tsumego.                          | Full matchmaking, game history, folder browser, Analysis configuration, account dashboard.                        |
+| **Home**                 | Start or resume work.                                   | Resume the most relevant activity, or New Board when none exists. | Browse Library; native File/Open remains available.                        | Repeated destination launchers, full matchmaking, game history, folder browser, Analysis configuration.           |
 | **Board activity**       | Play, edit, review, and analyze one local SGF document. | Interact with Goban/current mode.                                 | Navigate tree; comments; engines; scoring; save/export.                    | Global OGS account/history, batch queue management, Library browsing, Tsumego progress.                           |
 | **Online-game activity** | Play one live OGS game safely and with focus.           | Play a move or perform the current phase action.                  | Pass, chat, inspect game context; open a local review board when finished. | Local editing/engine controls during live play, account statistics, completed-game history, batch Analysis setup. |
-| **OGS workspace**        | Connect and enter/return to online play.                | Login or Find opponent/return to active game.                     | History/review, friends, profile/statistics, logout.                       | Embedded live boards, local SGF editing, KataGo infrastructure fields.                                            |
-| **Analysis workspace**   | Run and manage post-game SGF analysis.                  | Start a configured analysis or open a finished result.            | Queue control, per-run options, logs, Analysis Settings.                   | Full board review/editor, OGS account management, general engine attachment.                                      |
-| **Library workspace**    | Browse built-in and user SGFs and open documents.       | Open a folder or SGF.                                             | Switch source, navigate path, configure user root.                         | Editing SGFs in place, Tsumego solving/creation, account or analysis configuration.                               |
-| **Tsumego workspace**    | Browse, solve, track, and create Go problems.           | Continue/open a problem; Save while creating.                     | Source/collection navigation, previous/next, Create, Test.                 | General SGF editor controls, OGS play, batch-analysis queue.                                                      |
+| **Online destination**   | Connect and enter/return to online play.                | Login or Find opponent/return to active game.                     | History/review, friends, profile/statistics, logout.                       | Embedded live boards, local SGF editing, KataGo infrastructure fields.                                            |
+| **Analysis destination** | Run and manage post-game SGF analysis.                  | Start a configured analysis or open a finished result.            | Queue control, per-run options, logs, Analysis Settings.                   | Full board review/editor, OGS account management, general engine attachment.                                      |
+| **Library destination**  | Browse built-in and user SGFs and open documents.       | Open a folder or SGF.                                             | Switch source, navigate path, configure user root.                         | Editing SGFs in place, Tsumego solving/creation, account or analysis configuration.                               |
+| **Tsumego destination**  | Browse, solve, track, and create Go problems.           | Continue/open a problem; Save while creating.                     | Source/collection navigation, previous/next, Create, Test.                 | General SGF editor controls, OGS play, batch-analysis queue.                                                      |
 
 ## 12. Prioritized redesign plan
 
-1. **Lock the navigation contract.** Document Home + ordered activities as the
-   only global model; route all new navigation through board/online/workspace
-   tab APIs. Inventory legacy `activeWorkspace`/`homeSection` callers before
-   deprecating internals. This prevents each screen redesign from inventing a
-   new navigation pattern.
+1. **Lock the navigation contract.** Implement the persistent Home / Online /
+   Analysis / Library / Tsumego sidebar, global Settings action, and a top strip
+   limited to board documents and live online games. Inventory legacy
+   `workspaceTabs`, `openWorkspaceTab()`, `activeWorkspace`, and `homeSection`
+   callers before changing compatibility routing.
 2. **Define shared action and accessibility primitives.** Establish primary,
    secondary, subtle, destructive, icon-only, overflow, focus, and keyboard
    behavior. Apply contracts to tabs, buttons, menus, dialogs, and splitters
    before screen-specific visual polish.
-3. **Reduce Home to start/resume.** Fix activity-aware resume, retain New Board
-   and Open SGF, keep a compact Tsumego continuation, and replace duplicated
-   Library/OGS previews and sticky Home navigation with quiet launchers.
-   Preserve every underlying Library, matchmaking, history, and analysis
-   capability in its owning workspace, and intentionally update tests for
-   changed entry-point contracts. This depends on stage 1's destination rules.
-4. **Rebalance OGS and live-game hierarchy.** Make connection and matchmaking
-   dominant in OGS, and make return-to-live-game affordances clear through the
-   existing activity tabs/toast rather than an OGS dashboard card. Demote
-   account dashboard material, make history actions contextual, and separate
-   destructive live-game actions. Preserve all online protocols and dedicated
-   online-game tabs.
+3. **Reduce Home to start/resume.** Fix activity-aware resume, retain New Board,
+   use Browse Library instead of an external Open SGF action, keep a compact
+   Tsumego continuation, and remove duplicated destination navigation and dense
+   Library/Online previews. Native File/Open remains available. Preserve every
+   underlying Library, matchmaking, history, and analysis capability in its
+   owning destination, and intentionally update tests for changed entry-point
+   contracts. This depends on stage 1's destination rules.
+4. **Rebalance Online and live-game hierarchy.** Make connection and matchmaking
+   dominant in Online, and make return-to-live-game affordances clear through
+   the top tabs/toast rather than an Online dashboard card. Demote account
+   dashboard material, make history actions contextual, and separate destructive
+   live-game actions. Preserve all online protocols and dedicated online-game
+   tabs.
 5. **Restructure Analysis around execution and status.** Separate per-run
    options from KataGo infrastructure, retain queue/results, and define an
    Analysis Settings secondary surface. Do this before redesigning Preferences

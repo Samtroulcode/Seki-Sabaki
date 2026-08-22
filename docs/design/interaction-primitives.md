@@ -193,14 +193,17 @@ this task:
   trigger. Tab closes the menu and continues normal focus order.
 - This is a future contract; this task adds no menu component.
 
-### Activity tabs
+### Top activity tabs
 
-- Current `AppTabs` provides labelled buttons, accessible close names, and
-  `aria-current`, but not a complete desktop tab keyboard model.
-- Future behavior: Tab enters the activity strip; Left/Right move focus among
-  activities; Home/End move to the first/last; Enter/Space activate; a
-  documented close command closes closeable activities; focus moves
-  deterministically after close. Home remains non-closeable.
+- The top tab strip contains only local board/SGF documents and live online
+  games. Global sidebar destinations and Settings do not participate in this
+  keyboard model.
+- Current `AppTabs` provides labelled board/live-game buttons, accessible close
+  names, and `aria-current`, but lacks a complete desktop tab keyboard model.
+- Future behavior: Tab enters the top strip; Left/Right move focus among open
+  board and live-game tabs; Home/End move to the first/last; Enter/Space
+  activate; a documented close command closes the focused activity; focus moves
+  deterministically after close.
 - Roving focus versus activation-on-focus must be chosen and tested during the
   later navigation accessibility pass. No behavior changes in this task.
 

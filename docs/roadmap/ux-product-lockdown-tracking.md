@@ -3,16 +3,18 @@
 This file tracks the active state of the UX product lockdown effort. Update it
 whenever a phase starts, a decision is made, or a tracked task is completed.
 
-Companion roadmap: [`ux-product-lockdown.md`](./ux-product-lockdown.md)
+Historical companion roadmap (non-normative):
+[`ux-product-lockdown.md`](./ux-product-lockdown.md)
 
 ## Current Phase
 
-Phase 2 — Navigation Tabs Foundation complete; Phase 3 — Library MVP is next
+Superseding Phase 1 — Global Navigation Shell
 
 ## Active Goal
 
-Prepare the Library MVP after completing Home, local board tabs, board-owned
-engine/analysis state, and dedicated OGS online-game activity tabs.
+Establish the persistent global sidebar for Home, Online, Analysis, Library, and
+Tsumego; expose Settings as a global action; and limit the top activity strip to
+local board/SGF documents and live online games.
 
 ## Working Branch
 
@@ -20,46 +22,44 @@ engine/analysis state, and dedicated OGS online-game activity tabs.
 
 ## Decisions
 
-- Home is the central product hub.
-- Target navigation model: Home is permanent and non-closeable; every other
-  workspace or activity is an ordinary closeable tab.
-- Home remains a lightweight dashboard with quick actions, recent games,
-  continuation paths, and service summaries.
-- OGS, Library, and Analysis open as full ordinary tabs. Concrete boards, online
-  games, and reports remain ordinary activity tabs as well.
+- The persistent global sidebar destinations are Home, Online, Analysis,
+  Library, and Tsumego. Settings is a global action.
+- The top activity strip contains only local board/SGF documents and live online
+  games.
+- Home is a quiet start/resume destination, not a tab, discovery hub, or second
+  destination launcher. It prioritizes resume, New Board, and a secondary Browse
+  Library action.
+- Home does not provide an external Open SGF action; native File/Open remains.
+- Online owns OGS connection, matchmaking, history, and account context.
+  Analysis, Library, and Tsumego own their complete destination workflows.
+- `workspaceTabs` and `openWorkspaceTab()` may remain internal compatibility or
+  request-routing mechanisms, but they do not define user-facing tabs.
 - Manage Games remains a board-internal SGF collection tool, not an app-level
   tab system. Its UI should be clarified so users understand those mini-gobans
   are games inside the current board document.
-- Target Phase D board tabs should be real activity tabs: New Board creates a
-  new board tab; opening SGF from Home/Library creates a new board tab; opening
-  SGF from an active board replaces that board tab after save/discard/cancel if
-  needed.
+- Board tabs are real document activities: New Board creates a new board tab;
+  opening an SGF from Library, Analysis results, or Online history creates a new
+  board tab; opening an SGF from an active board follows the established
+  replacement and save/discard/cancel flow.
 - Attached live engines and live board analysis belong to their board tab;
   engine configuration remains global.
 - OGS live games should become dedicated online-game tabs, not local board tabs
   with restrictions layered on top.
-- OGS Overview should move into Home as an internal section; only concrete OGS
-  activities such as live games, chats, communities, profiles, or study rooms
-  should become app tabs.
-- Future OGS chat/community/profile/study workflows can become tabs when they
-  represent concrete user activities.
-- Seki's first polished product promise is a Go game hub: play locally, surface
-  online game status and continuation paths, find saved games, and
-  analyze/review games from one coherent starting point.
-- AppRail navigation is transitional. It should not be deepened as the final
-  product navigation; replace it only after the staged tab model is safe.
-- UI should move toward reusable modules mounted in Home first, then reused in
-  Library, Analysis, Board, or OGS surfaces.
-- Initial Home dashboard MVP order is: quick actions, continue/resume, Library
-  preview, Analysis status, OGS status.
-- Home modules should speak in user intents first: play, continue, find,
-  analyze, connect. Implementation details such as file paths, logs, engines,
-  sockets, and protocol state should be secondary or advanced information.
+- Live OGS games use dedicated online-game tabs. OGS chats, communities,
+  profiles, and other future features are not tabs without a later explicit
+  product decision.
+- Seki's first polished product promise remains a Go studio for local play,
+  online games, saved games, analysis/review, and Tsumego, with stable global
+  wayfinding and focused independent activities.
+- The legacy AppRail has been replaced by `AppSidebar`; preserve the locked
+  destination model rather than reintroducing a competing rail.
+- Reusable modules belong primarily to their owning destination. Home may resume
+  specific work but does not summarize every service or destination.
 - Analysis polish target is a four-step workflow: setup, queue, results, report.
   The first pass should keep existing analyzer/backend behavior stable and make
   technical KataGo paths, logs, and SGF output controls secondary or advanced.
-- Library should start as a standalone workspace/module before becoming an
-  optional Board side panel.
+- Library remains a standalone global destination; any future Board integration
+  requires a separate decision.
 - Live OGS play should eventually move away from unrestricted local Board
   editing/review behavior.
 - README/product identity rewrite is deferred until the UX direction is stable
@@ -70,51 +70,42 @@ engine/analysis state, and dedicated OGS online-game activity tabs.
 
 - Choose the first Library root location and whether it is user-configurable in
   the MVP or only later.
-- Decide which Analysis pieces belong on Home, in the Analysis workspace, and in
-  reusable Library/Board modules.
-- Decide how far the first dedicated Online Game workspace should go before the
+- Decide which Analysis pieces can be reused contextually from Library or Board
+  without duplicating the Analysis destination.
+- Decide how far the first dedicated Online Game activity should go before the
   broader OGS panel polish phase.
-- Decide the final ordering and visual grouping of workspace and activity tabs.
-- Decide startup restoration policy for tabs: Home only, previous tabs, or later
-  user preference.
+- Decide the detailed sidebar grouping and placement of the global Settings
+  action without changing the locked destination order.
+- Decide startup restoration policy for board/live-game tabs and the selected
+  global destination.
 - Decide the final user-facing label for Manage Games: `Games in this file`,
   `SGF Collection`, or `Games in this collection`.
 - Decide exact close behavior for board-owned engines: stop immediately, prompt,
   or move future long-running work to an analysis queue.
 
-## Navigation Tabs Target
+## Global Navigation and Activity Target
 
 Companion spec: [`navigation-tabs.md`](./navigation-tabs.md)
 
 Product rule:
 
-> Home is the permanent hub. Tabs are open activities.
+> The sidebar says where I am in Seki. The tabs say what independent work I
+> currently have open.
 
-Home is the permanent hub, while full OGS, Library, and Analysis workflows open
-in ordinary closeable tabs. A specific OGS game still opens its own online-game
-activity tab.
-
-This means Seki should not simply move the existing AppRail entries into a top
-tab bar. Tabs should eventually represent user work objects, for example:
-
-- Home;
-- Untitled Board;
-- opened SGF file or named game;
-- OGS game;
-- analysis report.
+The sidebar persistently exposes Home, Online, Analysis, Library, and Tsumego.
+Settings is a global action. The top strip contains board documents and live
+online games only; destinations and analysis reports are not activity tabs.
 
 ### Staged Navigation Migration
 
-1. Keep the current `activeWorkspace` implementation stable while the tab model
-   is documented.
-2. Introduce a top TabBar shell only as a transitional UI if it still maps to
-   singleton workspaces internally.
-3. Add Home plus one board activity tab before attempting true multi-board
-   behavior.
-4. Move board document state behind tab-owned state only when save/dirty state,
-   file paths, engines, OGS attachment, analysis actions, menus, and sidebars
-   can safely follow the active tab.
-5. Add online-game and report tabs after their state boundaries are clearer.
+1. Add the persistent destination sidebar and global Settings action.
+2. Remove Home and compatibility workspace entries from the user-facing top
+   strip without discarding retained destination state.
+3. Preserve board and online-game tab state, ordering, dirty-close behavior, and
+   live-game safety.
+4. Keep `workspaceTabs`, `openWorkspaceTab()`, and `activeWorkspace` only where
+   compatibility or request routing still requires them.
+5. Add distinct keyboard and focus contracts for the sidebar and activity strip.
 
 ### Navigation Risks
 
@@ -122,14 +113,14 @@ tab bar. Tabs should eventually represent user work objects, for example:
   active SGF collection.
 - The current Manage Games drawer shows mini-gobans for games inside the active
   board document. It should not be treated as a competing list of open app tabs.
-- In the target true board-tabs model, New Board should always create a board
-  tab. Home/Library Open SGF should create a board tab. Board Open SGF should
-  replace the current board tab.
+- New Board creates a board tab. Library, Analysis, and Online may open SGFs or
+  completed games into board tabs. Board File/Open retains its established
+  replacement behavior.
 - Board tabs own live engines and live board analysis state.
-- OGS live games, future OGS chats, communities, profiles, study rooms, and
-  reports are valid future tab types when scoped to concrete activities.
-- OGS overview, Library, and Analysis are ordinary workspace tabs; Home only
-  carries their compact summaries and entry points.
+- OGS live games are the only online activity tabs in the current decision.
+- Online, Analysis, Library, and Tsumego are persistent destinations, not
+  closeable workspace tabs. Home does not carry their previews or entry-point
+  cards.
 - A visual-only TabBar can mislead users if it appears to support true
   multi-document behavior before the state model does.
 - Closing tabs must not lose unsaved SGF work or live OGS state.
@@ -139,13 +130,12 @@ tab bar. Tabs should eventually represent user work objects, for example:
 
 ### Home
 
-- Current Home is a navigation page with cards for Board, OGS, SGF Explorer, and
-  Analysis Manager, plus New Game and Open SGF actions. It also previews recent
-  OGS games and exposes the OGS history entry point.
-- It shows local board/online game continuation state, attached engine count,
-  OGS account status, recent OGS games, and matchmaking status.
-- Main UX gap: Library state and analysis jobs/results are not yet surfaced as
-  complete product modules, and some empty/error states still need polish.
+- Target Home is a start/resume destination with New Board and a secondary
+  Browse Library action. Native File/Open remains available.
+- Home may continue a specific board, live online game, or Tsumego problem when
+  useful; it does not mirror the sidebar or summarize destination status.
+- Main migration gap: remove destination cards, previews, and the external Open
+  SGF action without weakening the owning destinations.
 
 ### Board
 
@@ -187,73 +177,22 @@ tab bar. Tabs should eventually represent user work objects, for example:
 - Matchmaking status is now shown by a global in-app toaster, including when the
   user switches workspace or opens another tab. A newly opened online-game tab
   receives focus automatically.
-- Direction update: OGS Overview should be a Home section, not an app-level tab.
-  Opening a specific online game should create an online-game activity tab.
+- Direction update: OGS overview workflows belong to the Online destination.
+  Opening a specific online game creates or focuses an online-game activity tab.
 
-## Home Dashboard MVP Layout Draft
+## Home Target
 
-The first redesigned Home should be small, modular, and intent-based. It should
-not require the user to understand Sabaki internals.
+Home should be small, calm, and oriented around immediate continuation:
 
-### 1. Quick Actions Module
+1. Resume the most relevant open board or live online game.
+2. Create a New Board.
+3. Browse Library as a secondary content action.
+4. Continue a specific Tsumego problem when meaningful progress exists.
 
-Purpose: answer “What can I do now?”
-
-- New board / local game.
-- Open SGF.
-- Open or configure Library once the Library MVP exists.
-- Analyze a game, routed to the Analysis workspace for now.
-- Connect to OGS or open OGS depending on account state.
-
-Minimum empty state: none; quick actions are always visible.
-
-### 2. Continue Module
-
-Purpose: answer “Where was I?”
-
-- Resume current local board.
-- Continue current OGS game when one is attached.
-- Later: recent local file or recently opened library game.
-
-Minimum empty state: “No active game yet” with New Board and Open SGF actions.
-
-### 3. Recently Opened Games Module
-
-Purpose: answer “What local games did I work on recently?” without duplicating
-the full Library explorer on the Home dashboard.
-
-- Show a small bounded list of recently opened local SGFs.
-- Open a selected SGF in a new Board tab.
-- Keep the full Library explorer in the Home Library section, reached through a
-  clear `Open Library` action.
-
-Minimum empty state: “No recently opened games.” Avoid scanning or silently
-copying files from a Library root on the Home dashboard.
-
-### 4. Analysis Status Module
-
-Purpose: answer “Can Seki analyze my games?” and “Is something running?”
-
-- Show setup state: ready, not configured, needs settings, or error.
-- Show current job/queue summary when applicable.
-- Show recent analyzed games/results later.
-- Keep technical paths/logs in the Analysis workspace or advanced/debug areas,
-  not in the Home card.
-
-Minimum empty state: “Analysis is not configured yet” with an action to open
-Analysis setup.
-
-### 5. OGS Status Module
-
-Purpose: answer “Am I connected and do I have online games?”
-
-- Logged out: invite user to connect.
-- Logged in: show username/rank and connection state.
-- Active/current game: show one clear continue action.
-- Error/reconnect later: show deterministic visible states without requiring
-  live-network tests.
-
-Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
+Home does not repeat sidebar destinations, connection state, matchmaking,
+Analysis readiness or queue status, Library browsing, or OGS history. Empty Home
+states should lead with New Board and Browse Library. Native File/Open remains
+the desktop path for opening an external SGF.
 
 ## Product Frictions To Remove Gradually
 
@@ -263,7 +202,8 @@ Minimum empty state: “Not connected to OGS” with Open OGS / Sign in action.
   UX flow.
 - Keep live OGS play safe by continuing to separate online-game tabs from local
   board editing and analysis affordances.
-- Centralize workspace/card metadata so AppRail and Home do not drift.
+- Centralize destination metadata for the persistent sidebar; Home should not
+  maintain a second copy.
 - Avoid placeholder-heavy surfaces on the main path; prefer honest empty states
   with one clear next action.
 
@@ -285,9 +225,8 @@ Purpose: answer “Can Seki analyze this game?”
 - Raw KataGo executable/model/config paths, max visits, variation counts,
   language/comment settings, and SGF output details should remain available but
   move toward advanced settings.
-- Reusable target: `AnalysisSetupModule` for full Analysis setup, compact Home
-  readiness, Board “Analyze current game”, and future Library “Analyze this
-  game”.
+- Reusable target: `AnalysisSetupModule` for full Analysis setup and contextual
+  Board “Analyze current game” or Library “Analyze this game” actions.
 
 ### 2. Queue
 
@@ -299,8 +238,8 @@ Purpose: answer “What is happening now?”
   technical details hidden by default.
 - Completed/failed recent jobs should point users toward Results or a concise
   failure reason instead of foregrounding logs.
-- Reusable target: `AnalysisJobsModule` for full queue management in Analysis,
-  compact running/queued status on Home, and future Library/Board badges.
+- Reusable target: `AnalysisJobsModule` for full queue management in Analysis;
+  any future Library/Board status requires an explicit contextual need.
 
 ### 3. Results
 
@@ -312,8 +251,8 @@ Purpose: answer “What has been analyzed and what should I open?”
 - Secondary action target: Open Board.
 - Show in folder remains useful but should be secondary rather than the main
   user path.
-- Reusable target: `AnalysisResultsModule` for full results in Analysis, recent
-  analysis preview on Home, and analysis status/action rows in Library.
+- Reusable target: `AnalysisResultsModule` for full results in Analysis and
+  contextual analysis status/actions in Library where justified.
 
 ### 4. Report
 
@@ -340,98 +279,47 @@ Purpose: answer “What should I learn from this game?”
 5. Report extraction: pure helper and unit tests for summary/key moments from
    existing analyzed SGF data.
 
-## Phase Progress
+## Active Phase Progress
 
-### Phase 0 — Product Lockdown Setup
+### Superseding Phase 1 — Global Navigation Shell
 
-- [x] Create dedicated UX branch.
-- [x] Add UX product lockdown roadmap.
-- [x] Add roadmap tracking file.
-- [x] Fix smoke title mismatch (`Sabaki` vs `Seki`) or document a different
-      product-title decision.
-- [x] Inventory current Home, OGS, Analysis, and Board interactions.
-- [x] Draft Home dashboard module layout.
-- [x] Draft Analysis panel polish target: setup, queue, results, report.
+- [x] Lock the persistent sidebar destinations and board/live-game-only top tab
+      taxonomy in the navigation specifications.
+- [x] Implement persistent `AppSidebar` destinations for Home, Online, Analysis,
+      Library, and Tsumego.
+- [x] Add Settings as a global sidebar action.
+- [x] Limit `AppTabs` to board and online-game activities while preserving
+      internal workspace request routing.
+- [x] Remove Home and compatibility workspace entries from the user-facing top
+      strip while preserving internal request routing.
+- [x] Normalize `activityTabOrder` to existing board and online-game keys,
+      removing stale, duplicate, and workspace entries.
+- [x] Reduce Home to start/resume, New Board, and Browse Library; retain native
+      File/Open.
+- [ ] Define and verify distinct sidebar and activity-tab keyboard behavior.
+- [x] Add regression coverage for persistent destinations, board/live-only tabs,
+      singleton workspace compatibility, order normalization, Home actions, and
+      targeted Library routing.
+- [x] Run final implementation verification: 850 unit tests, production bundle,
+      formatting, OGS 19/19, and combined Home/Board/Tsumego 54/54 passed.
 
-### Phase 1 — Home Dashboard Redesign
+## Historical Completion Record — Non-Normative
 
-- [x] Define Home dashboard MVP layout.
-- [x] Add quick actions module/card.
-- [x] Add continue/resume module/card.
-- [x] Keep Library as a Home section entry point until the Library MVP exists.
-- [x] Add Analysis status module/card.
-- [x] Add OGS status module/card.
-- [x] Add a bounded recently opened local SGF module to Home.
-- [x] Add targeted Home dashboard E2E coverage.
+The records below describe shipped or completed work from the superseded
+roadmap. They do not define current navigation or Home behavior.
 
-### Phase 2 — Navigation Tabs Foundation
-
-- [x] Review staged navigation tab spec.
-- [x] Define the first TabBar shell UX without recreating AppRail horizontally.
-- [x] Keep Home permanent and non-closeable.
-- [x] Define how New Board and Open SGF behave in the target tab model.
-- [x] Define attached live engines and live analysis as board-tab-owned state.
-- [x] Define OGS live games as future dedicated online-game tabs.
-- [x] Define future OGS chat/community/profile tabs as concrete activity tabs.
-- [x] Add targeted navigation E2E coverage.
-- [x] Add first local board-tabs slice with active-state projection.
-- [x] Make Home New Board and Home Open SGF create local board tabs.
-- [x] Keep File menu Open SGF replacement-oriented for the active board tab.
-- [x] Move attached live engines and live board analysis fully into board-tab
-      state.
-- [x] Add dedicated online-game tabs for OGS live play.
-- [x] Keep Home permanent while making OGS, Library, and Analysis ordinary
-      closeable workspace tabs.
-
-### Phase 3 — Library MVP
-
-- [x] Define a user-selected Library root with explicit setup warning.
-- [x] Add bounded Library listing logic for folders and SGF/RSGF files.
-- [ ] Add folder and SGF metadata display.
-- [ ] Add import/copy behavior without silently moving user files.
-- [ ] Add duplicate handling.
-- [x] Add open-from-library behavior into Board tabs.
-- [ ] Cover empty, missing, invalid, and externally edited file states.
-
-### Phase 4 — Analysis Polish and Reports
-
-- [ ] Split setup, queue, results, and report responsibilities.
-- [ ] Create AnalysisJobsModule target design.
-- [ ] Create AnalysisReportModule target design.
-- [ ] Define report data source for the first implementation pass.
-- [ ] Add targeted tests for the polished Analysis UX.
-
-### Phase 5 — OGS Panel Polish
-
-- [x] Inventory current OGS panel states and user actions.
-- [x] Add recent OGS history cards with review and analysis actions.
-- [x] Remove the misleading `Active games` presentation while retaining the
-      backend state needed by live-game synchronization.
-- [x] Make matchmaking status global across workspaces and tabs.
-- [x] Focus the dedicated online-game tab when a match opens.
-- [ ] Redesign account/connection/current-game states.
-- [ ] Clarify reconnect/error states.
-- [ ] Add deterministic fake-transport tests for visible state changes.
-
-### Phase 6 — Dedicated Online Game Workspace
-
-- [x] Define online game state boundaries separate from local SGF editing.
-- [x] Identify Board rendering pieces to reuse.
-- [x] Define disabled/isolated actions during live play.
-- [ ] Define post-game save/export flow into Library.
-
-### Phase 7 — KataGo Model Management Optional Post-Lockdown
-
-- [ ] Decide if this remains post-lockdown.
-- [ ] Draft download/storage/trust model before any implementation.
-
-### Phase 8 — Product Identity and Documentation
-
-- [ ] Rewrite README around Seki's product identity.
-- [ ] Preserve Sabaki fork history, credits, license obligations, and
-      compatibility notes.
-- [ ] Update screenshots and feature descriptions after UX stabilization.
-- [ ] Align contributor docs with new Home/Library/Analysis/OGS architecture.
+- Product-lockdown setup, interaction inventory, and initial UX drafts were
+  completed.
+- The prior Home dashboard, including its cards and targeted E2E coverage, was
+  implemented. Its destination previews and launchers are superseded.
+- Multi-board state, dirty/save behavior, board-owned engines and live analysis,
+  and targeted navigation coverage were completed.
+- Dedicated restricted online-game tabs were completed and remain part of the
+  current top activity model.
+- Library root selection, bounded browsing, folder navigation, and opening SGFs
+  into board tabs were completed.
+- OGS history, global matchmaking status, and automatic focus of newly opened
+  live-game tabs were completed.
 
 ## Verification Notes
 
@@ -439,19 +327,18 @@ Purpose: answer “What should I learn from this game?”
 - Keep `npm run test:e2e:smoke` reliable before depending on larger E2E runs.
 - Avoid live OGS/network requirements in automated tests.
 
-## Last Updated
+## Historical Update Log — Non-Normative
 
-2026-08-15 — Navigation model revised: Home is the only permanent tab; OGS,
-Library, and Analysis now open as ordinary closeable workspace tabs. Library
-setup and optional OGS connection states are being built within that model.
+2026-08-22 — Navigation model superseded: Phase 1 now targets a persistent
+global destination sidebar and a top strip limited to board documents and live
+online games. Home is a destination and no longer owns destination previews.
 
 2026-08-15 — Library browser slice added: configured roots now show bounded
 folder/SGF entries, support folder navigation, and open SGFs in Board tabs.
 
-2026-08-15 — OGS panel checkpoint: recent history is available on Home, the
-misleading `Active games` card was removed, matchmaking status is global across
-workspaces, and newly opened online-game tabs receive focus. Phase 2 remains
-complete; Library MVP is still the next major roadmap phase.
+2026-08-15 — OGS panel checkpoint: the misleading `Active games` card was
+removed, matchmaking status became global, and newly opened online-game tabs
+received focus.
 
 2026-08-14 — Finished OGS games keep their online-game tab open; the result
 dialog now offers opening a separate local review board instead of starting
@@ -468,11 +355,10 @@ owned engines immediately.
 2026-08-11 — First local board-tabs slice added with active-state projection,
 Home-created board tabs, and targeted unit/E2E coverage.
 
-2026-08-11 — Phase 2 started; AppRail replaced by Home anchor plus current
-activity TabBar shell.
+2026-08-11 — The superseded Phase 2 tab-shell work started.
 
-2026-08-11 — Home dashboard MVP implemented with quick actions, continue, status
-cards, and targeted E2E coverage.
+2026-08-11 — The now-superseded Home dashboard MVP and targeted E2E coverage
+were implemented.
 
 2026-08-11 — Phase 0 completed; Phase 1 Home Dashboard Redesign started.
 

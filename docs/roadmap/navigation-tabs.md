@@ -1,136 +1,48 @@
-# Navigation Tabs Product Model
+# Phase 1 Navigation Model
 
-This document defines the target navigation model for Seki as it moves from a
-Sabaki-style feature workspace into a clearer application for everyday use.
+Status: normative. This decision supersedes the earlier model in which every
+substantial workspace became a top activity tab.
 
-## Product Decision
+## Product decision
 
-Seki should use a permanent Home tab followed by ordinary closeable workspace
-and activity tabs. Home is the discovery hub; substantial product areas such as
-Library, OGS, and Analysis become tabs when the user opens them.
+Seki uses two navigation layers:
 
-Target principle:
+1. A persistent global sidebar contains **Home, Online, Analysis, Library, and
+   Tsumego**.
+2. The top activity strip contains only independently open **local board/SGF
+   documents** and **live online games**.
 
-> Home is permanent. Every other open workspace or activity is an ordinary tab.
+**Settings** is a global action. It is not a destination tab or an activity tab.
 
-Corollary:
+> The sidebar says where I am in Seki. The tabs say what independent work I
+> currently have open.
 
-> Home stays lightweight; full workspaces live in closeable tabs.
+This separation gives stable wayfinding to protected product areas without
+turning every feature, result, profile, chat, or future workflow into a tab.
 
-Examples of good tabs:
+## Global sidebar
 
-- `Home`
-- `Untitled Board`
-- `Lee vs Kim.sgf`
-- `OGS #12345`
-- `Report: Lee vs Kim`
-- `Chat: OGS Game #12345`
-- `Community: French Go Club`
+The sidebar is persistent and owns destination switching:
 
-Examples of tabs to avoid as the only model:
+- **Home:** start or resume work;
+- **Online:** OGS connection, matchmaking, active-game return, history, and
+  account context;
+- **Analysis:** post-game SGF analysis setup, queue, status, and results;
+- **Library:** built-in and user SGF browsing;
+- **Tsumego:** browser, collections, Solver, Creator, and Creator test flow.
 
-- `Board`
-- `OGS`
-- `OGS Overview`
-- `Library`
-- `Analysis`
+These destinations retain their state as appropriate, but they are not closeable
+top tabs. Selecting a destination changes where the user is in Seki; it does not
+create another unit of independent work.
 
-These areas are ordinary tabs when opened. They are reused rather than
-duplicated in the initial implementation: one OGS, one Library, and one Analysis
-tab at a time.
+Settings remains globally reachable as a secondary action. Native menus and
+shortcuts remain valid desktop entry points.
 
-## Why This Is Better
+## Top activity tabs
 
-The AppRail makes Seki feel like a stack of features: Board, OGS, Library,
-Analysis. A tab model can make Seki feel like a workspace where the user opens,
-keeps, switches, and closes games or reports.
+Only these user-facing tab types belong in the top strip.
 
-The user should think:
-
-- “I have my Home.”
-- “I opened this game.”
-- “I am reviewing that report.”
-- “I am playing this online game.”
-
-not:
-
-- “I moved from the Board feature to the Analysis feature.”
-
-## Navigation Structure
-
-### Home
-
-- Always first.
-- Always present.
-- Not closeable.
-- The safe fallback when no other tabs are open.
-- Owns product discovery, quick actions, recent/continue cards, and module
-  previews.
-- Opens full workspaces in ordinary tabs instead of embedding their complete
-  workflows inside Home.
-
-Home can still use lightweight navigation buttons for opening workspaces such
-as:
-
-- OGS overview: account, connection, matchmaking, and history;
-- Library / SGF Explorer;
-- Analysis setup, queue, and results;
-- Engines and reusable service status.
-
-Home itself is not closeable. The opened OGS, Library, and Analysis workspaces
-are closeable ordinary tabs. Selecting a concrete item from them can still open
-an activity tab: choosing an SGF opens a `board` tab, and a live game opens an
-`online-game` tab.
-
-### Ordinary Workspace And Activity Tabs
-
-All non-Home tabs are generally closeable and should have human titles. They may
-represent a full workspace or a concrete user activity.
-
-Initial activity tab candidates:
-
-- local board tab;
-- opened SGF tab;
-- online game tab;
-- OGS workspace tab;
-- Library workspace tab;
-- Analysis workspace/report tab.
-
-Later candidates:
-
-- game info/review tab.
-- OGS chat tab;
-- OGS community/club tab;
-- player profile tab;
-- study/training tab.
-
-The system should stay activity-based as it grows. A future OGS chat, community,
-profile, or study-room tab is a good fit when it represents a clear user task. A
-generic permanent `OGS`, `Settings`, or `Analysis` feature tab is a poor fit
-unless it is scoped to a concrete activity.
-
-`OGS Overview` is specifically **not** a target app tab. It should become a Home
-section. The app tab should appear only when the user opens a concrete online
-game, chat, community page, player profile, or another repeatable OGS activity.
-
-## Tab Types
-
-### Home Tab
-
-```text
-type: home
-title: Home
-closeable: false
-```
-
-Responsibilities:
-
-- route users into their next activity;
-- summarize active work;
-- expose Library, Analysis, and OGS status without requiring permanent global
-  navigation.
-
-### Local Board Tab
+### Local board / SGF document
 
 ```text
 type: board
@@ -141,84 +53,22 @@ dirty: true | false
 
 Responsibilities:
 
-- local SGF editing/review;
-- classic Sabaki board behavior;
-- file save/load state;
-- current game tree and position.
+- local play, SGF editing, and review;
+- file save/load and dirty-close state;
+- document-owned game trees, engines, and live board analysis;
+- ordinary Sabaki board behavior.
 
-Target board tab rules once Phase D true board tabs exist:
+Rules:
 
-- **New Board** always creates a new board tab.
-- **Open SGF from Home or Library** opens a new board tab.
-- **Open SGF from an active board tab** replaces the contents of that board tab,
-  after the normal save/discard/cancel flow if needed.
-- **Close board tab** prompts save/discard/cancel when the tab has unsaved work.
-- Closing the last board tab leaves Home available.
-- Users return to existing work by selecting its tab; Seki should not silently
-  reuse another board tab for New Board.
+- **New Board** creates a new board tab.
+- Opening an SGF from Library, Analysis results, Online history, or another
+  non-board destination creates a board tab.
+- Opening an SGF from an active board follows the established replacement and
+  save/discard/cancel flow.
+- Closing a dirty board tab must not silently lose work.
+- Closing the last board tab leaves the global destinations available.
 
-This makes multi-board behavior a core product capability, not a later extra.
-
-#### Games Inside A Board Tab
-
-Sabaki's existing **Manage Games** drawer (`Cmd/Ctrl+Shift+M`) is not an
-app-level tab system. It manages the games contained inside the current board
-document/SGF collection.
-
-This distinction is essential:
-
-```text
-App tabs
-├── Home
-├── collection.sgf        <- board tab / opened document
-└── OGS #12345            <- online-game activity
-
-Inside collection.sgf
-├── Game 1
-├── Game 2
-└── Game 3
-```
-
-Therefore:
-
-- opening an SGF from Home or the future Library should open a board activity
-  tab once true board tabs exist;
-- using **Add Existing Files…** inside Manage Games should add games to the
-  current board tab's SGF collection;
-- mini-goban previews in Manage Games are document-internal games, not app-level
-  open activities;
-- Home should summarize open activity tabs, not every game inside the current
-  SGF collection by default.
-
-Future UX copy should make this hierarchy clear. Candidate labels:
-
-- `Games in this file`;
-- `SGF Collection`;
-- `Games in this collection`.
-
-The feature should be preserved for SGF collection compatibility, but its UI
-should not compete with app-level tabs.
-
-#### Board-Owned Engines And Analysis
-
-Live engines and live board analysis should belong to the board tab they are
-attached to.
-
-Board-owned state should eventually include:
-
-- attached engine syncers;
-- selected black/white engine players;
-- active analyzer engine;
-- current live analysis data;
-- analysis tree position;
-- engine-vs-engine play state where applicable.
-
-Global state should keep engine configuration, preferences, paths, and reusable
-analysis settings. A running engine attached to a board should follow that board
-tab and should be stopped or detached when the tab is closed, unless a later
-explicit background-analysis design says otherwise.
-
-### Online Game Tab
+### Live online game
 
 ```text
 type: online-game
@@ -229,159 +79,106 @@ onlineGameId: 12345
 
 Responsibilities:
 
-- live OGS play state;
-- restricted online-game interaction model;
-- clocks, pass/resign, connection state;
-- post-game save/export path.
+- restricted live-play interaction;
+- Goban, players, clocks, captures, connection state, and chat;
+- pass, resign, scoring, and phase-specific actions;
+- post-game save/export and opening a local review board.
 
-This should eventually replace the current “OGS game attached to local Board” UX
-as the primary live-play surface.
+A live-game tab is not a local editor with OGS state attached. Local SGF
+editing, engines, and free variation editing remain unavailable during live
+play. Full post-game review opens a board tab.
 
-An online-game tab is not just a local board tab with OGS state attached. It
-should have a dedicated live-play layout:
+## Home responsibility
 
-- board in the center;
-- clocks, players, captures, and connection state;
-- pass/resign/scoring/chat actions;
-- restricted interaction model;
-- no local SGF editing, engine analysis, or free variation editing by default.
+Home is a quiet start/resume destination, not a discovery dashboard or a second
+navigation rail. It should prioritize:
 
-After a game finishes, the online-game tab can offer save/export/open-review
-actions that create or update a local board tab.
+1. resuming the most relevant open board or live game;
+2. creating a New Board;
+3. a secondary **Browse Library** action.
 
-### Analysis Report Tab
+Home does not repeat launchers for Online, Analysis, Library, and Tsumego; the
+sidebar already provides them. It does not expose an external **Open SGF**
+action. Native **File > Open** remains available, and Library is the in-app
+browsing path. Focused continuation cards may resume specific work without
+recreating global navigation.
+
+## Destination-to-activity transitions
+
+- Library files, Analysis results, and completed Online games open board tabs.
+- Matchmaking and active-game return open or focus live-game tabs.
+- Opening a tab does not replace or transform its source destination.
+- Tsumego Solver and Creator remain inside Tsumego because their interaction
+  contracts differ from the general board editor.
+- Analysis setup, queues, logs, and report summaries remain in Analysis; opening
+  a result for board review creates a board tab.
+
+Do not document a future feature as a tab merely because it is substantial or
+can retain state. It becomes a top tab only if a later explicit product decision
+classifies it as an independent board document or live online game.
+
+## Internal compatibility
+
+Current architecture may continue to use `workspaceTabs`, `openWorkspaceTab()`,
+`activeWorkspace`, and namespaced activity ordering for state projection or
+request routing. These are implementation details, not the user-facing tab
+taxonomy.
+
+Migration must preserve existing callers and tests until destination routing is
+ready. New UI copy, accessibility semantics, and product documentation must not
+describe Online, Analysis, Library, or Tsumego as closeable tabs.
+
+## Games inside a board document
+
+Sabaki's **Manage Games** drawer (`Cmd/Ctrl+Shift+M`) manages games contained in
+the current SGF collection. Those games are not application tabs.
 
 ```text
-type: analysis-report
-title: Report: filename.sgf
-closeable: true
-sourcePath: /path/to/file.sgf
+Top activity tabs
+├── collection.sgf        <- one board document
+└── OGS #12345            <- one live online game
+
+Inside collection.sgf
+├── Game 1
+├── Game 2
+└── Game 3
 ```
 
-Responsibilities:
+Adding existing files through Manage Games adds games to the current collection;
+it does not open independent board tabs. Preserve this distinction for SGF
+collection compatibility.
 
-- readable review summary;
-- key moments;
-- move quality;
-- jump/open board actions.
+## Phase 1 implementation direction
 
-The report tab should not expose raw engine logs by default.
+1. Introduce the persistent destination sidebar and global Settings action.
+2. Limit user-facing top tabs to board documents and live online games.
+3. Keep compatibility routing behind destination activation until callers can
+   migrate safely.
+4. Remove Home's duplicated destination navigation and dense destination
+   previews; use Browse Library instead of external Open SGF.
+5. Preserve native keyboard access and visible focus in Phase 1; add the
+   complete arrow-key/focus contract later without conflating sidebar and tab
+   semantics.
 
-### OGS Chat / Community Tabs
+## UX invariants
 
-```text
-type: ogs-chat | ogs-community | ogs-profile
-title: Chat: game #12345 | Community: club name | Player: username
-closeable: true
-```
+- Global destinations are always recoverable.
+- Tabs use human document or game titles, not feature-category labels.
+- Opening new independent work does not unexpectedly replace another tab.
+- Closing a tab never silently loses unsaved work or an active game.
+- The tab strip stays small and calm; Seki does not become an IDE.
+- Local board/editor, OGS online play, post-game analysis, Library, and all
+  Tsumego workflows remain protected.
 
-Responsibilities:
+## Compatibility risks
 
-- keep OGS social/community surfaces out of Home and board tabs when they become
-  substantial workflows;
-- let users keep a conversation, club/community page, or player profile open
-  while continuing local review or online play;
-- reuse OGS account/session state without mixing it with live game board state.
+- Some current rendering and menu paths still project destinations through tab-
+  named state.
+- `gameTrees` and `gameIndex` are games inside one SGF collection, not top tabs.
+- Dirty/save state, engines, analysis, sidebars, and menu actions can assume an
+  active board document.
+- Visual removal of workspace tabs must not discard retained destination state
+  or break contextual requests that currently call `openWorkspaceTab()`.
 
-These are future tabs, not Phase 2 requirements. The rule is that they must be
-concrete user activities, not permanent feature-category tabs.
-
-## Open Questions
-
-- Should Library be a closeable tab, a Home module that opens game tabs, or a
-  singleton workspace tab?
-- Should Analysis setup be a singleton tab, a Home/Library action, or part of
-  the Analysis workspace until reports exist?
-- What final label should replace or clarify `Manage Games` so users understand
-  it means games inside the current board file/collection?
-- How should tab restoration work at startup: Home only, previous tabs, or a
-  later user preference?
-- Which board-owned engine processes should be stopped immediately on tab close,
-  and which future long-running analysis jobs should move into global queue
-  state instead?
-
-## Gradual Implementation Plan
-
-### Phase A — Navigation Spec And Prototype Boundary
-
-- Keep current `activeWorkspace` implementation stable.
-- Document the target tab model.
-- Do not remove AppRail until a safe migration path is known.
-- Introduce no true multi-board state yet.
-
-### Phase B — Top TabBar Shell Without Pretending To Be True Tabs
-
-- Replace the visible AppRail only when the shell can avoid looking like a
-  horizontal copy of the old feature rail.
-- Do not present `Home`, `Board`, `OGS`, `Library`, and `Analysis` as equal
-  permanent tabs.
-- The transitional shell should show `Home` plus the current open activity, for
-  example `Untitled Board`, while product areas remain launched from Home until
-  they produce concrete activities.
-- If singleton routes still exist internally, keep that as an implementation
-  detail and avoid user-facing tab labels that imply true multi-document
-  support.
-- Preserve keyboard Home navigation and existing board behavior.
-
-### Phase C — Home + One Board Activity Tab
-
-- Introduce a minimal tab state model with Home plus one active board tab.
-- New Board may still focus/reset the single board activity in this transitional
-  phase; the locked target remains “New Board creates a new board tab” once
-  Phase D true board tabs exist.
-- Keep SGF/file state backed by existing Sabaki board state.
-- Do not support multiple independent board documents yet unless the state model
-  is ready.
-
-### Phase D — True Board Tabs
-
-- Move board document state behind tab-owned state.
-- New Board always creates a board tab.
-- Opening an SGF from Home/Library creates a board tab.
-- Opening an SGF from inside a board tab replaces that board tab after the
-  normal save/discard/cancel flow.
-- Closing a dirty tab prompts save/discard/cancel.
-- Avoid confusing this with `gameTrees` inside a single SGF collection.
-- Rename or clarify Manage Games so adding existing files to the drawer is not
-  confused with opening new app-level board tabs.
-- Move board-owned engines and live analysis state with the board tab.
-
-### Phase E — Online Game And Report Tabs
-
-- Open OGS games into online-game tabs with restricted live-play behavior.
-- Open analysis results into report tabs.
-- Home summarizes open tabs and recent work.
-
-### Phase F — OGS Social And Community Tabs
-
-- Open substantial OGS chat, community/club, and player-profile workflows as
-  concrete activity tabs.
-- Keep OGS account/session state global while keeping each social/community
-  tab's visible workflow state local to that tab.
-- Avoid turning these into permanent feature-category tabs.
-
-## UX Rules
-
-- Home is always recoverable.
-- Tabs should be named for user work, not implementation features.
-- Closing a tab must never silently lose unsaved work.
-- Opening something new should not unexpectedly replace another open activity.
-- In the true board-tabs model, New Board always means a new board tab.
-- In the true board-tabs model, Open SGF from Home/Library means a new board
-  tab; Open SGF from a board means replacing that board tab with confirmation as
-  needed.
-- Technical tools can exist, but tabs should use human labels.
-- The tab system should stay small and calm; Seki should not become an IDE.
-
-## Compatibility Risks
-
-- Current Sabaki state assumes one active board document in many places.
-- `gameTrees` and `gameIndex` represent games inside the active SGF collection,
-  not app-level tabs.
-- File dirty/save state, engines, analysis, OGS attachment, sidebars, and menu
-  actions may currently assume a singleton board.
-- A visual-only TabBar is easier but may mislead users if it looks like true
-  multi-document tabs before the state model supports that behavior.
-
-The implementation should therefore be deliberately staged and tested after each
-navigation slice.
+Implement and verify the migration in small slices; do not equate a visual
+sidebar change with permission to rewrite protected workspace behavior.

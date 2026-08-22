@@ -8,23 +8,10 @@ import OgsPanel from './sidebars/OgsPanel.js'
 import TsumegoPanel from './TsumegoPanel.js'
 
 import i18n from '../i18n.js'
-import sabaki from '../modules/sabaki.js'
 
 const t = i18n.context('HomeView')
 
 export default class HomeView extends Component {
-  constructor(props) {
-    super(props)
-
-    this.handleNavigate = (homeSection) => {
-      if (['ogs', 'analysis', 'library', 'tsumego'].includes(homeSection)) {
-        sabaki.openWorkspaceTab(homeSection)
-      } else {
-        sabaki.setState({activeWorkspace: 'home', homeSection})
-      }
-    }
-  }
-
   render(props) {
     let activeSection = props.homeSection || 'dashboard'
 
@@ -34,13 +21,13 @@ export default class HomeView extends Component {
       h(
         'div',
         {class: 'home-content'},
-        renderHomeSection(activeSection, props, this.handleNavigate),
+        renderHomeSection(activeSection, props),
       ),
     )
   }
 }
 
-function renderHomeSection(activeSection, props, onNavigate) {
+function renderHomeSection(activeSection, props) {
   switch (activeSection) {
     case 'ogs':
       return h(OgsPanel)
@@ -60,6 +47,6 @@ function renderHomeSection(activeSection, props, onNavigate) {
       })
     case 'dashboard':
     default:
-      return h(HomeDashboard, {...props, onNavigate})
+      return h(HomeDashboard, props)
   }
 }

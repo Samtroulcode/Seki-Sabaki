@@ -5,10 +5,11 @@ const path = require('path')
 const {test} = require('./fixtures/electron-app')
 
 test.describe('Home workspace', () => {
-  test('renders the quiet start workspace and opens singleton workspaces', async ({
+  test('renders persistent destinations outside the activity tabs', async ({
     page,
   }) => {
     await expect(page.locator('#home')).toBeVisible()
+    await expect(page.locator('#appsidebar')).toBeVisible()
     await expect(page.getByTitle('Home')).toHaveAttribute(
       'aria-current',
       'page',
@@ -31,41 +32,70 @@ test.describe('Home workspace', () => {
     await expect(page.locator('.home-library-pane')).toHaveCount(0)
 
     await expect(page.getByRole('button', {name: 'New board'})).toBeVisible()
-    await expect(page.getByRole('button', {name: 'Open SGF'})).toBeVisible()
+    await expect(
+      page.getByRole('button', {name: 'Browse Library'}),
+    ).toBeVisible()
+    await expect(
+      page.locator('#home').getByRole('button', {name: 'Online'}),
+    ).toHaveCount(0)
+    await expect(page.locator('#apptabs .app-home-tab')).toHaveCount(0)
+    await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
     await expect(
       page.getByRole('heading', {name: 'Continue', exact: true}),
     ).toHaveCount(0)
     await expect(page.locator('.home-work-section > h2')).toHaveText([
       'Start',
-      'Workspaces',
       'Study',
     ])
 
-    let workspaces = [
+    let destinations = [
       ['Online', '#ogs-dashboard', 'ogs'],
       ['Analysis', '#analysis-dashboard', 'analysis'],
       ['Library', '#library-dashboard', 'library'],
       ['Tsumego', '#tsumego-dashboard', 'tsumego'],
     ]
-    for (let [name, selector, type] of workspaces) {
+    for (let [name, selector, type] of destinations) {
       await page.getByTitle('Home').click()
-      await page
-        .locator('#home')
-        .getByRole('button', {name, exact: true})
-        .click()
+      await page.getByRole('button', {name, exact: true}).click()
       await expect(page.locator(selector)).toBeVisible()
-      await expect(page.locator(`.app-workspace-tab.type-${type}`)).toHaveCount(
-        1,
-      )
+      await expect(
+        page.locator(`.app-sidebar-button.type-${type}`),
+      ).toHaveAttribute('aria-current', 'page')
+      await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
+      await expect
+        .poll(() =>
+          page.evaluate(
+            (workspaceType) =>
+              window.__sabaki.state.workspaceTabs.filter(
+                (tab) => tab.type === workspaceType,
+              ).length,
+            type,
+          ),
+        )
+        .toBe(1)
       await page.getByTitle('Home').click()
-      await page
-        .locator('#home')
-        .getByRole('button', {name, exact: true})
-        .click()
-      await expect(page.locator(`.app-workspace-tab.type-${type}`)).toHaveCount(
-        1,
-      )
+      await page.getByRole('button', {name, exact: true}).click()
+      await expect
+        .poll(() =>
+          page.evaluate(
+            (workspaceType) =>
+              window.__sabaki.state.workspaceTabs.filter(
+                (tab) => tab.type === workspaceType,
+              ).length,
+            type,
+          ),
+        )
+        .toBe(1)
     }
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.__sabaki.state.activityTabOrder.every(
+            (key) => !key.startsWith('workspace:'),
+          ),
+        ),
+      )
+      .toBe(true)
   })
 
   test('keeps board-size selection and creates the selected board', async ({
@@ -87,6 +117,62 @@ test.describe('Home workspace', () => {
     await page.waitForFunction(
       () => window.__sabaki.state.gameTrees[0].root.data.SZ?.[0] === '9',
     )
+  })
+
+  test('sidebar navigation preserves activities and Settings opens globally', async ({
+    page,
+  }) => {
+    await page.getByRole('button', {name: 'New board'}).click()
+    let boardId = await page.evaluate(
+      () => window.__sabaki.state.activeBoardTabId,
+    )
+    await page.evaluate((id) => {
+      window.__sabaki.setState({
+        activityTabOrder: ['workspace:stale', `board:${id}`, `board:${id}`],
+      })
+    }, boardId)
+    await expect
+      .poll(() => page.evaluate(() => window.__sabaki.state.activityTabOrder))
+      .toEqual([`board:${boardId}`])
+    await expect(page.locator('.app-board-tab')).toHaveCount(1)
+    await expect(page.locator('#appsidebar [aria-current="page"]')).toHaveCount(
+      0,
+    )
+
+    await page.getByRole('button', {name: 'Library', exact: true}).click()
+    await expect(page.locator('#library-dashboard')).toBeVisible()
+    await expect(page.locator('.app-board-tab')).toHaveCount(1)
+    await expect(
+      page.locator('.app-sidebar-button.type-library'),
+    ).toHaveAttribute('aria-current', 'page')
+
+    await page.locator('.app-board-tab-button').click()
+    await page.waitForFunction(
+      (id) =>
+        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.activeBoardTabId === id,
+      boardId,
+    )
+    await expect(page.locator('#appsidebar [aria-current="page"]')).toHaveCount(
+      0,
+    )
+
+    await page.getByRole('button', {name: 'Settings'}).click()
+    await expect(page.locator('#preferences.show')).toBeVisible()
+    await expect(page.getByRole('button', {name: 'Settings'})).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          activeWorkspace: window.__sabaki.state.activeWorkspace,
+          boardTabs: window.__sabaki.state.boardTabs.length,
+          workspaceTabs: window.__sabaki.state.workspaceTabs.length,
+        })),
+      )
+      .toEqual({activeWorkspace: 'board', boardTabs: 1, workspaceTabs: 1})
+    await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
   })
 
   test('resumes the preferred existing board tab', async ({page}) => {
@@ -157,11 +243,86 @@ test.describe('Home workspace', () => {
     await expect(page.locator('#online-game')).toBeVisible()
   })
 
-  test('reuses Library while switching the temporary Home source bridge', async ({
+  test('closing hidden activities preserves the selected destination', async ({
     page,
   }) => {
-    await page.getByRole('button', {name: 'Library', exact: true}).click()
+    await page.evaluate(async (onlineGame) => {
+      await window.__sabaki.createNewBoardTab()
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.openWorkspaceTab('analysis')
+
+      let onlineId = window.__sabaki.state.activeOnlineGameTabId
+      window.__sabaki.closeOnlineGameTab(onlineId)
+    }, createOnlineGameFixture(42))
+    await expect(page.locator('#analysis-dashboard')).toBeVisible()
+    await expect(page.locator('.app-online-game-tab')).toHaveCount(0)
+    await expect(page.locator('.app-board-tab')).toHaveCount(1)
+
+    await page.evaluate(async () => {
+      let boardId = window.__sabaki.state.activeBoardTabId
+      await window.__sabaki.closeBoardTab(boardId)
+    })
+    await expect(page.locator('#analysis-dashboard')).toBeVisible()
+    await expect(page.locator('.app-board-tab')).toHaveCount(0)
+  })
+
+  test('closing a visible activity activates its cross-type neighbor', async ({
+    page,
+  }) => {
+    await page.evaluate(async (onlineGame) => {
+      await window.__sabaki.createNewBoardTab()
+      await window.__sabaki.loadOgsGame(onlineGame)
+      window.__sabaki.setState({activityTabOrder: ['workspace:stale']})
+    }, createOnlineGameFixture(42))
+    await expect
+      .poll(() => page.evaluate(() => window.__sabaki.state.activityTabOrder))
+      .toEqual([
+        await page.evaluate(
+          () => `board:${window.__sabaki.state.activeBoardTabId}`,
+        ),
+        await page.evaluate(
+          () => `online-game:${window.__sabaki.state.activeOnlineGameTabId}`,
+        ),
+      ])
+    await page.evaluate(() => {
+      window.__sabaki.closeOnlineGameTab(
+        window.__sabaki.state.activeOnlineGameTabId,
+      )
+    })
+    await expect
+      .poll(() => page.evaluate(() => window.__sabaki.state.activeWorkspace))
+      .toBe('board')
+    await expect(page.locator('#main')).toBeVisible()
+
+    await page.evaluate(async (onlineGame) => {
+      await window.__sabaki.loadOgsGame(onlineGame)
+      let boardId = window.__sabaki.state.activeBoardTabId
+      window.__sabaki.switchBoardTab(boardId)
+      await window.__sabaki.closeBoardTab(boardId)
+    }, createOnlineGameFixture(43))
+    await expect(page.locator('#online-game')).toBeVisible()
+    await expect
+      .poll(() => page.evaluate(() => window.__sabaki.state.onlineGameId))
+      .toBe(43)
+  })
+
+  test('preserves targeted Library routing without a workspace tab', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('library', {
+        libraryRequest: {source: 'builtin', currentPath: 'games'},
+      })
+    })
     await expect(page.locator('#library-dashboard')).toBeVisible()
+    await expect(page.locator('.library-browser-toolbar h2')).toHaveText(
+      'Built-in',
+    )
+    await expect(page.locator('.library-current-path')).toHaveText('games')
+    await expect(
+      page.locator('.app-sidebar-button.type-library'),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
     let tabId = await page.evaluate(
       () =>
         window.__sabaki.state.workspaceTabs.find(
@@ -169,16 +330,13 @@ test.describe('Home workspace', () => {
         )?.id,
     )
 
-    await page.getByTitle('Home').click()
-    await page
-      .locator('#home')
-      .getByRole('button', {name: 'Built-in Library'})
-      .click()
+    await page.getByRole('button', {name: 'Analysis', exact: true}).click()
+    await page.getByRole('button', {name: 'Library', exact: true}).click()
     await expect(page.locator('#library-dashboard')).toBeVisible()
     await expect(page.locator('.library-browser-toolbar h2')).toHaveText(
       'Built-in',
     )
-    await expect(page.locator('.app-workspace-tab.type-library')).toHaveCount(1)
+    await expect(page.locator('.library-current-path')).toHaveText('games')
     await expect
       .poll(() =>
         page.evaluate(
@@ -191,14 +349,30 @@ test.describe('Home workspace', () => {
       .toBe(tabId)
 
     await page.getByTitle('Home').click()
-    await page
-      .locator('#home')
-      .getByRole('button', {name: 'Library', exact: true})
-      .click()
+    await page.getByRole('button', {name: 'Browse Library'}).click()
     await expect(page.locator('.library-setup-card')).toContainText(
       'Choose your Library folder',
     )
-    await expect(page.locator('.app-workspace-tab.type-library')).toHaveCount(1)
+    await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
+    let firstResetId = await page.evaluate(
+      () =>
+        window.__sabaki.state.workspaceTabs.find(
+          (tab) => tab.type === 'library',
+        )?.libraryRequest?.requestId,
+    )
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('library', {libraryRequest: null})
+    })
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.__sabaki.state.workspaceTabs.find(
+              (tab) => tab.type === 'library',
+            )?.libraryRequest?.requestId,
+        ),
+      )
+      .toBe(firstResetId + 1)
   })
 
   test('browses a configured My Library folder', async ({page}) => {
@@ -213,7 +387,7 @@ test.describe('Home workspace', () => {
           window.sabaki.setting.set('library.root', libraryRoot),
         root,
       )
-      await page.getByRole('button', {name: 'Library', exact: true}).click()
+      await page.getByRole('button', {name: 'Browse Library'}).click()
       await expect(page.locator('.library-browser-toolbar h2')).toHaveText(
         'My Library',
       )
@@ -221,6 +395,11 @@ test.describe('Home workspace', () => {
         'Games',
       )
       await page.locator('.library-entry-directory').click()
+      await expect(page.locator('.library-current-path')).toHaveText('Games')
+      await page.getByRole('button', {name: 'Analysis', exact: true}).click()
+      await expect(page.locator('#analysis-dashboard')).toBeVisible()
+      await page.getByRole('button', {name: 'Library', exact: true}).click()
+      await expect(page.locator('.library-current-path')).toHaveText('Games')
       await page.locator('.library-entry-file').click()
       await expect(page.locator('#goban')).toBeVisible()
       await expect(
@@ -282,14 +461,11 @@ test.describe('Home workspace', () => {
     }).toPass({timeout: 5000})
 
     await expect(page.getByRole('button', {name: 'New board'})).toBeVisible()
-    await expect(page.getByRole('button', {name: 'Open SGF'})).toBeVisible()
+    await expect(
+      page.getByRole('button', {name: 'Browse Library'}),
+    ).toBeVisible()
+    await expect(page.locator('#appsidebar')).toBeVisible()
     let home = page.locator('#home')
-    await home.evaluate((element) => {
-      element.scrollTop = 0
-    })
-    await page
-      .getByRole('button', {name: 'Tsumego', exact: true})
-      .scrollIntoViewIfNeeded()
     await expect(
       page.getByRole('button', {name: 'Tsumego', exact: true}),
     ).toBeVisible()
@@ -298,12 +474,80 @@ test.describe('Home workspace', () => {
 
     let overflow = await home.evaluate((element) => ({
       horizontal: element.scrollWidth > element.clientWidth,
-      vertical: element.scrollHeight > element.clientHeight,
-      scrollTop: element.scrollTop,
     }))
     expect(overflow.horizontal).toBe(false)
-    expect(overflow.vertical).toBe(true)
-    expect(overflow.scrollTop).toBeGreaterThan(0)
+
+    await page.getByRole('button', {name: 'Analysis', exact: true}).click()
+    await expect(page.locator('#analysis-dashboard')).toBeVisible()
+    let analysisLayout = await page.evaluate(() => {
+      let content = document.querySelector('#appcontent')
+      let cards = [...document.querySelectorAll('.analysis-dashboard-card')]
+      return {
+        horizontal: content.scrollWidth > content.clientWidth,
+        cardLefts: cards.map((card) => card.getBoundingClientRect().left),
+      }
+    })
+    expect(analysisLayout.horizontal).toBe(false)
+    expect(new Set(analysisLayout.cardLefts.map(Math.round)).size).toBe(1)
+
+    await page.getByTitle('Home').click()
+    await page.getByRole('button', {name: 'New board'}).click()
+    await expect(page.locator('.app-board-tab')).toBeVisible()
+    await expect(page.locator('#goban')).toBeVisible()
+    let geometry = await page.evaluate(() => {
+      let sidebar = document
+        .querySelector('#appsidebar')
+        .getBoundingClientRect()
+      let tabs = document.querySelector('#apptabs').getBoundingClientRect()
+      let goban = document.querySelector('#goban').getBoundingClientRect()
+      return {
+        sidebarRight: sidebar.right,
+        tabsLeft: tabs.left,
+        gobanWidth: goban.width,
+        gobanHeight: goban.height,
+      }
+    })
+    expect(geometry.tabsLeft).toBeGreaterThanOrEqual(geometry.sidebarRight)
+    expect(geometry.gobanWidth).toBeGreaterThan(100)
+    expect(geometry.gobanHeight).toBeGreaterThan(100)
+  })
+
+  test('keeps Board usable when resized down to 800x600 while active', async ({
+    page,
+    electronApp,
+  }) => {
+    const browserWindow = await electronApp.browserWindow(page)
+    await browserWindow.evaluate((win) => win.setContentSize(1200, 800))
+    await expect(async () => {
+      const size = await browserWindow.evaluate((win) => win.getContentSize())
+      expect(size).toEqual([1200, 800])
+    }).toPass({timeout: 5000})
+
+    await page.evaluate(() => {
+      window.__sabaki.setState({
+        showLeftSidebar: true,
+        showGameGraph: true,
+      })
+    })
+    await page.getByRole('button', {name: 'New board'}).click()
+    await expect(page.locator('#leftsidebar')).toBeVisible()
+    await expect(page.locator('#sidebar')).toBeVisible()
+
+    await browserWindow.evaluate((win) => win.setContentSize(800, 600))
+    await expect(async () => {
+      const size = await browserWindow.evaluate((win) => win.getContentSize())
+      expect(size).toEqual([800, 600])
+    }).toPass({timeout: 5000})
+    await expect(page.locator('#leftsidebar')).toBeVisible()
+    await expect(page.locator('#sidebar')).toBeVisible()
+    await expect
+      .poll(() =>
+        page.locator('#goban').evaluate((goban) => {
+          let {width, height} = goban.getBoundingClientRect()
+          return Math.min(width, height)
+        }),
+      )
+      .toBeGreaterThan(100)
   })
 
   test('Tsumego continuation falls back to built-in easy', async ({page}) => {
@@ -467,3 +711,22 @@ test.describe('Home workspace', () => {
     await expect.poll(menuIsNonNull).toBe(true)
   })
 })
+
+function createOnlineGameFixture(gameId) {
+  return {
+    gameId,
+    gameName: `Activity ${gameId}`,
+    board: {width: 9, height: 9},
+    handicap: 0,
+    komi: 6.5,
+    rules: 'chinese',
+    ranked: false,
+    phase: 'play',
+    players: {
+      black: {id: 7, username: 'black'},
+      white: {id: 8, username: 'white'},
+    },
+    moves: [],
+    moveCount: 0,
+  }
+}

@@ -1,5 +1,11 @@
 # UX Product Lockdown Roadmap
 
+Status: historical and non-normative. Its Home-dashboard and everything-as-an-
+activity-tab decisions are superseded by
+[`navigation-tabs.md`](./navigation-tabs.md) and the active
+[`ux-product-lockdown-tracking.md`](./ux-product-lockdown-tracking.md). Retained
+below as planning history only.
+
 This roadmap defines the stabilization and UX direction for Seki before adding
 large new feature areas. The goal is to turn the current feature set into a
 coherent product experience centered on playing, finding, reviewing, and

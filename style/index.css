@@ -1,5 +1,91 @@
 @import url('../node_modules/@sabaki/shudan/css/goban.css');
 
+#appshell {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+#appcontent {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.workspace-view-stack,
+.workspace-view-surface,
+.workspace-view-destination {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.workspace-view-destination[hidden] {
+  display: none;
+}
+.workspace-view-surface > #main {
+  height: 100%;
+}
+#appsidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-16);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-12) var(--space-8);
+  box-sizing: border-box;
+  background: var(--ui-bg);
+  border-right: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.app-sidebar-identity {
+  padding: var(--space-4) var(--space-8);
+  color: var(--ui-text);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.app-sidebar-destinations,
+.app-sidebar-settings {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+.app-sidebar-settings {
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+button.ui-button.app-sidebar-button {
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  border-radius: var(--radius-small);
+  color: var(--ui-text-muted);
+  text-align: left;
+}
+button.ui-button.app-sidebar-button img {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+  filter: invert(1);
+}
+button.ui-button.app-sidebar-button:hover:not(:disabled),
+button.ui-button.app-sidebar-button:focus-visible:not(:disabled) {
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+button.ui-button.app-sidebar-button.selected {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
 #mainlayout {
   position: absolute;
   left: 0;
@@ -49,24 +135,10 @@
   background: var(--ui-surface-2);
   color: var(--ui-text);
 }
-#apptabs button.selected {
+#apptabs .app-board-tab.selected > .app-board-tab-button,
+#apptabs .app-online-game-tab.selected > .app-online-game-tab-button {
   color: var(--ui-text);
   box-shadow: inset 0 -3px 0 var(--ui-accent);
-}
-#apptabs .app-home-tab {
-  flex: 0 0 auto;
-  gap: 0.4rem;
-  font-weight: bold;
-}
-#apptabs .app-home-tab-icon {
-  color: var(--ui-accent);
-}
-#apptabs .app-tab-separator {
-  flex: 0 0 1px;
-  align-self: center;
-  height: 22px;
-  margin: 0 0.45rem;
-  background: var(--ui-border);
 }
 #apptabs .app-activity-tabs {
   display: flex;
@@ -77,8 +149,7 @@
   overflow-y: hidden;
 }
 #apptabs .app-board-tab,
-#apptabs .app-online-game-tab,
-#apptabs .app-workspace-tab {
+#apptabs .app-online-game-tab {
   display: flex;
   align-items: stretch;
   min-width: 8rem;
@@ -87,21 +158,18 @@
   border-radius: 5px 5px 0 0;
 }
 #apptabs .app-board-tab.selected,
-#apptabs .app-online-game-tab.selected,
-#apptabs .app-workspace-tab.selected {
+#apptabs .app-online-game-tab.selected {
   background: var(--ui-surface-2);
 }
 #apptabs .app-board-tab-button,
-#apptabs .app-online-game-tab-button,
-#apptabs .app-workspace-tab-button {
+#apptabs .app-online-game-tab-button {
   flex: 1 1 auto;
   gap: 0.5rem;
   margin: 0;
   border-radius: 5px 0 0 0;
 }
 #apptabs .app-board-tab-close,
-#apptabs .app-online-game-tab-close,
-#apptabs .app-workspace-tab-close {
+#apptabs .app-online-game-tab-close {
   flex: 0 0 auto;
   width: 1.7rem;
   margin: 0;
@@ -112,9 +180,7 @@
 #apptabs .app-board-tab-close:hover,
 #apptabs .app-board-tab-close:focus,
 #apptabs .app-online-game-tab-close:hover,
-#apptabs .app-online-game-tab-close:focus,
-#apptabs .app-workspace-tab-close:hover,
-#apptabs .app-workspace-tab-close:focus {
+#apptabs .app-online-game-tab-close:focus {
   color: var(--ui-text);
 }
 
@@ -139,49 +205,6 @@
 #apptabs .app-activity-tab-meta {
   color: var(--ui-accent);
   font-size: 0.85rem;
-}
-
-#apprail {
-  display: none;
-}
-#apprail ul {
-  display: grid;
-  gap: 0.25rem;
-  margin: 0;
-  padding: 0.35rem;
-  list-style: none;
-}
-#apprail button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: #aaa;
-  cursor: default;
-}
-#apprail button:hover,
-#apprail button:focus,
-#apprail button.selected {
-  background: #292a2d;
-  color: white;
-}
-#apprail button.selected {
-  box-shadow: inset 3px 0 0 #0082f0;
-}
-#apprail .apprail-short-label {
-  font-weight: bold;
-}
-#apprail .apprail-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
 }
 
 .online-game-workspace {
@@ -270,51 +293,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   align-items: stretch;
-}
-.home-layout {
-  display: grid;
-  grid-template-columns: 8rem minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: start;
-}
-.home-main-content {
-  display: grid;
-  gap: 1.25rem;
-  min-width: 0;
-}
-.home-navbar {
-  position: sticky;
-  top: 1rem;
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.5rem;
-  background: rgba(17, 17, 17, 0.72);
-  border: 1px solid #292a2d;
-  border-radius: 8px;
-}
-.home-nav-button {
-  display: grid;
-  justify-items: center;
-  gap: 0.35rem;
-  width: 100%;
-  padding: 0.7rem 0.3rem !important;
-  color: #c8c8c8 !important;
-  background: transparent !important;
-  border: 1px solid transparent !important;
-  font-size: 0.75rem;
-  text-align: center;
-}
-.home-nav-button img {
-  width: 1.2rem;
-  height: 1.2rem;
-  opacity: 0.82;
-  filter: invert(1);
-}
-.home-nav-button:hover,
-.home-nav-button:focus {
-  color: white !important;
-  background: #292a2d !important;
-  border-color: #45484d !important;
 }
 .home-card-local,
 .home-card-online {
@@ -786,7 +764,6 @@
   font-size: 0.85rem;
 }
 .home-start-actions,
-.home-workspace-actions,
 .home-size-options,
 .home-study-actions {
   display: flex;
@@ -800,9 +777,6 @@
 .home-control-label {
   margin-right: var(--space-4);
   font-size: 0.9rem;
-}
-.home-workspace-actions .ui-button {
-  min-width: 7.5rem;
 }
 .home-study-surface h3 {
   color: var(--ui-text);
@@ -1932,15 +1906,6 @@
 
   .home-card-body {
     grid-template-columns: 1fr;
-  }
-
-  .home-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .home-navbar {
-    position: static;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .tsumego-panel.is-problem {
@@ -4530,7 +4495,7 @@ button:active {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 920px) {
   .online-game-workspace {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(18rem, 1fr) minmax(19rem, auto);

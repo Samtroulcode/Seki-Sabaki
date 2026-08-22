@@ -19,16 +19,23 @@ test.describe('Tsumego workspace', () => {
     await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
     await expect(page.locator('#tsumego-dashboard')).toBeVisible()
     await expect(
-      page.locator('.app-workspace-tab.type-tsumego.selected'),
-    ).toHaveCount(1)
+      page.locator('.app-sidebar-button.type-tsumego'),
+    ).toHaveAttribute('aria-current', 'page')
+    await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
     await expect(page.locator('.tsumego-source-tabs')).toContainText('Built-in')
 
     await page.getByTitle('Home').click()
-    await page
-      .locator('#home')
-      .getByRole('button', {name: 'Tsumego', exact: true})
-      .click()
-    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.__sabaki.state.workspaceTabs.filter(
+              (tab) => tab.type === 'tsumego',
+            ).length,
+        ),
+      )
+      .toBe(1)
 
     await expect(page.locator('.tsumego-entry-directory').first()).toBeVisible()
     await expect(
@@ -417,7 +424,12 @@ test.describe('Tsumego workspace', () => {
     page,
   }) => {
     await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
-    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
+    let tabId = await page.evaluate(
+      () =>
+        window.__sabaki.state.workspaceTabs.find(
+          (tab) => tab.type === 'tsumego',
+        )?.id,
+    )
 
     await page.getByTitle('Home').click()
     await page.evaluate(() => {
@@ -425,8 +437,66 @@ test.describe('Tsumego workspace', () => {
         tsumegoRequest: {source: 'builtin', relativePath: 'tsumego/easy'},
       })
     })
-    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.__sabaki.state.workspaceTabs.find(
+              (tab) => tab.type === 'tsumego',
+            )?.id,
+        ),
+      )
+      .toBe(tabId)
     await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
+  })
+
+  test('reapplies repeated explicit Tsumego resets', async ({page}) => {
+    await page.evaluate(() => {
+      window.__sabaki.openWorkspaceTab('tsumego', {
+        tsumegoRequest: {source: 'builtin', relativePath: 'tsumego/easy'},
+      })
+    })
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
+
+    let requestIds = await page.evaluate(() => {
+      let getRequestId = () =>
+        window.__sabaki.state.workspaceTabs.find(
+          (tab) => tab.type === 'tsumego',
+        )?.tsumegoRequest?.requestId
+      window.__sabaki.openWorkspaceTab('tsumego', {tsumegoRequest: null})
+      let first = getRequestId()
+      window.__sabaki.openWorkspaceTab('tsumego', {tsumegoRequest: null})
+      return {first, second: getRequestId()}
+    })
+    expect(requestIds.second).toBe(requestIds.first + 1)
+    await expect(page.locator('.tsumego-breadcrumb')).toContainText(
+      'Collections',
+    )
+  })
+
+  test('preserves an unsaved Creator draft across destination switching', async ({
+    page,
+  }) => {
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page
+      .getByRole('button', {name: 'Create Problem', exact: true})
+      .click()
+    await page
+      .locator('.tsumego-creator-board .shudan-vertex[data-x="3"][data-y="3"]')
+      .click()
+    let draft = await page
+      .locator('.tsumego-creator')
+      .getAttribute('data-test-sgf')
+    expect(draft).toContain('AB[dd]')
+
+    await page.getByRole('button', {name: 'Analysis', exact: true}).click()
+    await expect(page.locator('#analysis-dashboard')).toBeVisible()
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await expect(page.locator('.tsumego-creator')).toBeVisible()
+    await expect(page.locator('.tsumego-creator')).toHaveAttribute(
+      'data-test-sgf',
+      draft,
+    )
   })
 
   test('applies a new request on an existing workspace', async ({page}) => {

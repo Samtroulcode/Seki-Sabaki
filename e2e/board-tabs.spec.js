@@ -200,6 +200,10 @@ test.describe('Board tabs', () => {
     )
 
     await expect(page.locator('.home-view')).toBeVisible()
+    await expect(page.getByTitle('Home')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     await expect(page.locator('.app-board-tab')).toHaveCount(0)
     expect(await getCurrentRootChildCount(page)).toBe(0)
   })

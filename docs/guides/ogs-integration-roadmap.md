@@ -111,7 +111,8 @@ complete.**
   - chat message received;
   - challenge received/accepted/declined;
   - automatch found.
-- Surface notifications in the OGS dashboard and with AppRail badges.
+- Surface notifications in the Online destination and, when justified, through a
+  restrained global toast or `AppSidebar` destination badge.
 - Avoid noisy notifications when the user is already on the relevant board.
 - Native OS notifications can come later behind a user preference.
 

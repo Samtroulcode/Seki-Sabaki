@@ -34,8 +34,8 @@ export default class HomeDashboard extends Component {
       })
     }
 
-    this.handleOpenFileButtonClick = async () => {
-      await sabaki.openFileInNewBoardTab()
+    this.handleBrowseLibrary = () => {
+      sabaki.openWorkspaceTab('library', {libraryRequest: null})
     }
   }
 
@@ -47,18 +47,11 @@ export default class HomeDashboard extends Component {
     }
   }
 
-  handleOpenBuiltinLibrary() {
-    sabaki.openWorkspaceTab('library', {
-      libraryRequest: {source: 'builtin', currentPath: ''},
-    })
-  }
-
   render({
     boardTabs = [],
     activeBoardTabId,
     onlineGameTabs = [],
     activeOnlineGameTabId,
-    onNavigate,
   }) {
     let resumeTarget = getResumeTarget({
       boardTabs,
@@ -123,9 +116,9 @@ export default class HomeDashboard extends Component {
             {
               type: 'button',
               class: 'ui-button ui-button-secondary',
-              onClick: this.handleOpenFileButtonClick,
+              onClick: this.handleBrowseLibrary,
             },
-            t('Open SGF'),
+            t('Browse Library'),
           ),
         ),
         h(
@@ -153,34 +146,6 @@ export default class HomeDashboard extends Component {
       ),
       h(
         HomeSection,
-        {title: t('Workspaces'), class: 'home-workspaces-section'},
-        h(
-          'div',
-          {class: 'home-workspace-actions'},
-          h(WorkspaceButton, {
-            label: t('Online'),
-            onClick: () => onNavigate('ogs'),
-          }),
-          h(WorkspaceButton, {
-            label: t('Analysis'),
-            onClick: () => onNavigate('analysis'),
-          }),
-          h(WorkspaceButton, {
-            label: t('Library'),
-            onClick: () => onNavigate('library'),
-          }),
-          h(WorkspaceButton, {
-            label: t('Built-in Library'),
-            onClick: () => this.handleOpenBuiltinLibrary(),
-          }),
-          h(WorkspaceButton, {
-            label: t('Tsumego'),
-            onClick: () => onNavigate('tsumego'),
-          }),
-        ),
-      ),
-      h(
-        HomeSection,
         {title: t('Study'), class: 'home-study-section'},
         h(HomeTsumegoCard),
       ),
@@ -194,18 +159,6 @@ function HomeSection({title, class: className, children}) {
     {class: `home-work-section ${className || ''}`.trim()},
     h('h2', {}, title),
     children,
-  )
-}
-
-function WorkspaceButton({label, onClick}) {
-  return h(
-    'button',
-    {
-      type: 'button',
-      class: 'ui-button ui-button-ghost',
-      onClick,
-    },
-    label,
   )
 }
 

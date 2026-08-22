@@ -215,7 +215,7 @@ export default class HomeTsumegoCard extends Component {
   }
 
   handleBrowseFallback() {
-    sabaki.openWorkspaceTab('tsumego')
+    sabaki.openWorkspaceTab('tsumego', {tsumegoRequest: null})
   }
 
   render() {

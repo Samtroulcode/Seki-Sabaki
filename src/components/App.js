@@ -6,6 +6,7 @@ import fixPath from 'fix-path'
 import TripleSplitContainer from './helpers/TripleSplitContainer.js'
 import ThemeManager from './ThemeManager.js'
 import MainMenu from './MainMenu.js'
+import AppSidebar from './AppSidebar.js'
 import AppTabs from './AppTabs.js'
 import WorkspaceView from './WorkspaceView.js'
 import LeftSidebar from './LeftSidebar.js'
@@ -112,6 +113,7 @@ class App extends Component {
 
     sabaki.window.on('resize', () => {
       clearTimeout(this.resizeId)
+      this.forceUpdate()
 
       this.resizeId = setTimeout(() => {
         if (
@@ -360,6 +362,11 @@ class App extends Component {
 
   render(_, state) {
     state = deriveBoardRenderState(state, sabaki.inferredState)
+    let contentWidth = window.innerWidth || sabaki.window.getContentSize()[0]
+    let compactBoardPaneWidth =
+      contentWidth <= 920
+        ? Math.max(120, Math.floor((contentWidth - 144 - 320) / 2))
+        : Infinity
 
     return h(
       'section',
@@ -393,40 +400,47 @@ class App extends Component {
         onlineGameId: state.onlineGameId,
       }),
 
-      h(AppTabs, {
-        activeWorkspace: state.activeWorkspace,
-        boardTabs: state.boardTabs,
-        activeBoardTabId: state.activeBoardTabId,
-        onlineGameTabs: state.onlineGameTabs,
-        activeOnlineGameTabId: state.activeOnlineGameTabId,
-        workspaceTabs: state.workspaceTabs,
-        activeWorkspaceTabId: state.activeWorkspaceTabId,
-        activityTabOrder: state.activityTabOrder,
-      }),
+      h(
+        'div',
+        {id: 'appshell'},
+        h(AppSidebar, state),
+        h(
+          'div',
+          {id: 'appcontent'},
+          h(AppTabs, {
+            activeWorkspace: state.activeWorkspace,
+            boardTabs: state.boardTabs,
+            activeBoardTabId: state.activeBoardTabId,
+            onlineGameTabs: state.onlineGameTabs,
+            activeOnlineGameTabId: state.activeOnlineGameTabId,
+            activityTabOrder: state.activityTabOrder,
+          }),
 
-      h(MatchmakingToast),
+          h(MatchmakingToast),
 
-      h(TripleSplitContainer, {
-        id: 'mainlayout',
+          h(TripleSplitContainer, {
+            id: 'mainlayout',
 
-        beginSideSize:
-          state.activeWorkspace === 'board' && state.showLeftSidebar
-            ? state.leftSidebarWidth
-            : 0,
-        endSideSize:
-          state.activeWorkspace === 'board' && state.showSidebar
-            ? state.sidebarWidth
-            : 0,
+            beginSideSize:
+              state.activeWorkspace === 'board' && state.showLeftSidebar
+                ? Math.min(state.leftSidebarWidth, compactBoardPaneWidth)
+                : 0,
+            endSideSize:
+              state.activeWorkspace === 'board' && state.showSidebar
+                ? Math.min(state.sidebarWidth, compactBoardPaneWidth)
+                : 0,
 
-        beginSideContent:
-          state.activeWorkspace === 'board' ? h(LeftSidebar, state) : null,
-        mainContent: h(WorkspaceView, state),
-        endSideContent:
-          state.activeWorkspace === 'board' ? h(Sidebar, state) : null,
+            beginSideContent:
+              state.activeWorkspace === 'board' ? h(LeftSidebar, state) : null,
+            mainContent: h(WorkspaceView, state),
+            endSideContent:
+              state.activeWorkspace === 'board' ? h(Sidebar, state) : null,
 
-        onChange: this.handleMainLayoutSplitChange,
-        onFinish: this.handleMainLayoutSplitFinish,
-      }),
+            onChange: this.handleMainLayoutSplitChange,
+            onFinish: this.handleMainLayoutSplitFinish,
+          }),
+        ),
+      ),
 
       h(DrawerManager, state),
 

@@ -70,6 +70,11 @@ export default class TsumegoPanel extends Component {
     let previousId = previousProps.request?.requestId ?? null
     if (nextId != null && nextId !== previousId) {
       this.applyRequest(this.props.request)
+    } else if (previousProps.request != null && this.props.request == null) {
+      this.applyRequest({
+        source: 'builtin',
+        relativePath: this.getRootPath('builtin'),
+      })
     }
   }
 

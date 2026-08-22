@@ -26,7 +26,7 @@ test.describe('OGS mock panel', () => {
     )
   })
 
-  test('opens from app rail and shows mock connection status', async ({
+  test('opens from the Online destination and shows mock connection status', async ({
     page,
   }) => {
     await page.evaluate(() => {
@@ -263,6 +263,11 @@ test.describe('OGS mock panel', () => {
     await page.getByRole('button', {name: 'Online', exact: true}).click()
 
     await expect(page.locator('.ogs-panel')).toBeVisible()
+    await expect(page.locator('.app-sidebar-button.type-ogs')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await expect(page.locator('#apptabs .app-workspace-tab')).toHaveCount(0)
     await expect(page.locator('#ogs-dashboard')).toBeVisible()
     await expect(page.locator('.ogs-dashboard-hero')).toContainText(
       'Online Go Server',
@@ -402,6 +407,10 @@ test.describe('OGS mock panel', () => {
         treePosition === [...tree.getSequence(tree.root.id)].at(-1).id
       )
     })
+    await expect(page.locator('.app-online-game-tab.selected')).toHaveCount(1)
+    await expect(page.locator('#appsidebar [aria-current="page"]')).toHaveCount(
+      0,
+    )
     await page.waitForFunction(
       () =>
         window.__sabaki.state.activeWorkspace === 'online-game' &&
@@ -628,7 +637,7 @@ test.describe('OGS mock panel', () => {
 
     await page.getByTitle('Fixture Game').click()
 
-    await expect(page.locator('.ogs-panel')).toHaveCount(0)
+    await expect(page.locator('.ogs-panel')).toBeHidden()
     await expect(page.locator('.ogs-game-context-panel')).toBeVisible()
     await expect(page.locator('.engine-peer-list')).toHaveCount(0)
     await expect(page.locator('.gtp-console')).toHaveCount(0)

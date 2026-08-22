@@ -49,6 +49,7 @@ test.describe('Smoke Tests', () => {
   })
 
   test('main layout elements present', async ({page}) => {
+    await expect(page.locator('#appsidebar')).toBeVisible()
     await expect(page.locator('#apptabs')).toBeVisible()
     await expect(page.locator('#home')).toBeVisible()
     await expect(page.locator('#mainlayout')).toBeVisible()
