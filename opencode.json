@@ -3,9 +3,6 @@
   "default_agent": "seki-dev",
   "share": "manual",
   "snapshot": true,
-  "skills": {
-    "paths": [".opencode/skills"]
-  },
   "watcher": {
     "ignore": [
       "node_modules/**",
@@ -102,37 +99,37 @@
   },
   "command": {
     "dev-task": {
-      "description": "Explore, implement, verify, review",
+      "description": "Run a Seki implementation task",
       "agent": "seki-dev",
-      "template": "Treat this as a full development task for Seki-Sabaki: $ARGUMENTS\n\nFollow the project pipeline from AGENTS.md. First gather code context, then ask blocking questions with the question tool if product or security decisions are unclear. Delegate focused research or review to relevant subagents through the task tool. Implement the smallest correct change. Run cheap non-Electron verification first, then run code-reviewer and resolve findings. Run Playwright/Electron E2E only as the final validation step after review is clean and before git-committer. Then call git-committer to create clean atomic commits. Do not push. Finish with commit hashes, changed files, and verification results."
+      "template": "Implement this Seki-Sabaki task: $ARGUMENTS"
     },
     "feature-online": {
-      "description": "Design OGS/online feature safely",
+      "description": "Plan an existing OGS/online change",
       "agent": "seki-plan",
-      "template": "Plan an online/OGS feature for Seki-Sabaki: $ARGUMENTS\n\nDo not implement yet unless explicitly asked after the plan. Load the relevant skills, verify OGS/API assumptions from source material when needed, identify Electron security implications, propose a minimal vertical slice, list affected files, tests, and unresolved product questions. Use question tool for decisions that block a correct plan."
+      "template": "Plan this change to Seki-Sabaki's existing OGS/online behavior: $ARGUMENTS"
     },
     "verify": {
       "description": "Choose and run targeted checks",
       "agent": "test-verifier",
       "subtask": true,
-      "template": "Select the smallest reliable verification matrix for the current change or request: $ARGUMENTS\n\nInspect the changed files and project scripts, run allowed checks when appropriate, and report exact commands, pass/fail status, and any remaining unverified risks."
+      "template": "Verify the current or specified change: $ARGUMENTS"
     },
     "review": {
       "description": "Strict code review",
       "agent": "code-reviewer",
       "subtask": true,
-      "template": "Review the current changes or target described here: $ARGUMENTS\n\nPrioritize bugs, regressions, security issues, missing tests, and hallucinated assumptions. Return findings first with file/line references. If no findings, say so and list residual risks."
+      "template": "Review the current or specified change: $ARGUMENTS"
     },
     "e2e-spec": {
       "description": "Add Playwright Electron coverage",
       "agent": "seki-dev",
-      "template": "Add or adjust Playwright Electron E2E coverage for: $ARGUMENTS\n\nUse existing e2e fixtures and helpers. Prefer deterministic app-state waits over sleeps. Delegate test strategy to test-verifier if scope is unclear. Implement or adjust coverage, run cheap non-Electron checks first, then run code-reviewer and resolve findings. Run the Playwright/Electron E2E command only as the final validation step after review is clean and before git-committer. Then call git-committer to create clean atomic commits. Do not push."
+      "template": "Add or adjust Electron Playwright coverage for: $ARGUMENTS"
     },
     "upstream-awareness": {
       "description": "Compare with upstream-sensitive areas",
       "agent": "repo-cartographer",
       "subtask": true,
-      "template": "Map the upstream-sensitive code areas for: $ARGUMENTS\n\nIdentify files likely inherited from Sabaki upstream, local fork changes visible from git history if relevant, and risks when modifying them. Do not edit files."
+      "template": "Map upstream-sensitive areas relevant to: $ARGUMENTS"
     }
   },
   "tool_output": {
