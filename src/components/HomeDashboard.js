@@ -1,17 +1,9 @@
+import {basename} from 'path'
 import {h, Component} from 'preact'
+
 import i18n from '../i18n.js'
-import {showMessageBox} from '../modules/dialog.js'
-import {selectBestReview} from '../ogs/review-sanitize.js'
 import sabaki from '../modules/sabaki.js'
-import onlineStore from '../modules/onlinestore.js'
-import HomeBoardPreview from './HomeBoardPreview.js'
-import HomeLibraryPane from './HomeLibraryPane.js'
-import HomeOnlinePanel from './HomeOnlinePanel.js'
 import HomeTsumegoCard from './HomeTsumegoCard.js'
-import {
-  getHistoryPreview,
-  OgsGameHistoryColumn,
-} from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -29,8 +21,6 @@ export default class HomeDashboard extends Component {
     }
 
     this.state = {
-      ...onlineStore.getState(),
-      configuredBoardDimensions: configuredDimensions,
       selectedBoardSize:
         configuredDimensions[0] === configuredDimensions[1] &&
         [9, 13, 19].includes(configuredDimensions[0])
@@ -44,343 +34,216 @@ export default class HomeDashboard extends Component {
       })
     }
 
-    this.handleBoardSizeChange = (selectedBoardSize) => {
-      this.setState({selectedBoardSize})
-    }
-
     this.handleOpenFileButtonClick = async () => {
       await sabaki.openFileInNewBoardTab()
     }
+  }
 
-    this.handleOnlineStoreState = (state) => this.setState(state)
-
-    this.handleOgsButtonClick = () => {
-      this.props.onNavigate('ogs')
-    }
-
-    this.handleOgsHistoryButtonClick = () => {
-      sabaki.openWorkspaceTab('ogs')
-    }
-
-    this.handleOgsHistoryRefresh = async () => {
-      await onlineStore.refreshGameHistory({page: 1, pageSize: 3})
-    }
-
-    this.handleOgsHistoryGameClick = async (gameId) => {
-      let result = await this.downloadOgsGame(gameId)
-
-      if (result == null) return
-
-      let success = await sabaki.openContentInNewBoardTab(result.sgf, 'sgf', {
-        gotoEnd: true,
-        representedFilename: null,
-      })
-
-      if (!success) {
-        onlineStore.setState({gameHistoryError: t('Unable to open OGS SGF.')})
-      }
-    }
-
-    this.handleAnalyzeSeki = async (gameId) => {
-      let result = await this.downloadOgsGame(gameId)
-      if (result == null) return
-
-      await sabaki.startCurrentGameSgfAnalysis({sgfContent: result.sgf})
-    }
-
-    this.handleAnalyzeOgs = async (gameId) => {
-      let result = await onlineStore.listAiReviews(gameId)
-      if (!result.ok) {
-        await showMessageBox(
-          result.error?.message || t('Unable to load OGS AI reviews.'),
-          'warning',
-        )
-        return
-      }
-
-      let review = selectBestReview(result.reviews)
-
-      if (review == null) {
-        await showMessageBox(
-          t('No OGS AI review is available for this game.'),
-          'info',
-        )
-        return
-      }
-
-      let connection = await window.sabaki.ogsReviews.connect(gameId, review)
-      if (!connection?.ok) {
-        await showMessageBox(
-          connection?.error?.message ||
-            t('Unable to connect to OGS AI review.'),
-          'warning',
-        )
-        return
-      }
-
-      let sgf = await this.downloadOgsGame(gameId)
-      if (sgf == null) {
-        await window.sabaki.ogsReviews.disconnect(review.uuid)
-        return
-      }
-
-      let success = await sabaki.openContentInNewBoardTab(sgf.sgf, 'sgf', {
-        gotoEnd: true,
-        representedFilename: null,
-        ogsGameId: gameId,
-      })
-      if (!success) await window.sabaki.ogsReviews.disconnect(review.uuid)
-    }
-
-    this.downloadOgsGame = async (gameId) => {
-      let result = await onlineStore.downloadGameSgf(gameId)
-
-      if (result.stale) return null
-
-      if (!result.ok) {
-        onlineStore.setState({
-          gameHistoryError:
-            result.error?.message || t('Unable to download SGF from OGS.'),
-        })
-        return null
-      }
-
-      return result
+  handleResume(target) {
+    if (target?.type === 'online-game') {
+      sabaki.switchOnlineGameTab(target.tab.id)
+    } else if (target?.type === 'board') {
+      sabaki.switchBoardTab(target.tab.id)
     }
   }
 
-  componentDidMount() {
-    this.mounted = true
-    this.unsubscribeOnlineStore = onlineStore.subscribe(
-      this.handleOnlineStoreState,
-    )
-    this.refreshOgsHistoryPreviewIfNeeded()
+  handleOpenBuiltinLibrary() {
+    sabaki.openWorkspaceTab('library', {
+      libraryRequest: {source: 'builtin', currentPath: ''},
+    })
   }
 
-  componentDidUpdate() {
-    this.refreshOgsHistoryPreviewIfNeeded()
-  }
-
-  componentWillUnmount() {
-    this.mounted = false
-    this.unsubscribeOnlineStore?.()
-  }
-
-  async refreshOgsHistoryPreviewIfNeeded() {
-    let state = onlineStore.getState()
-    let userId = state.user?.id ?? null
-
-    if (userId == null) this.ogsHistoryPreviewUserId = null
-
-    if (
-      !this.mounted ||
-      userId == null ||
-      state.gameHistory.length > 0 ||
-      state.gameHistoryBusy ||
-      this.ogsHistoryPreviewUserId === userId
-    ) {
-      return
-    }
-
-    this.ogsHistoryPreviewUserId = userId
-    await onlineStore.refreshGameHistory({page: 1, pageSize: 3})
-  }
-
-  render({onlineGameId, boardTabs = [], onNavigate}) {
-    let hasOnlineGame = onlineGameId != null
-    let hasBoardTabs = boardTabs.length > 0
-    let onlineState = this.state
-    let ogsAuthenticated = onlineState.socket?.status === 'authenticated'
-    let ogsHistoryPreview = getHistoryPreview(onlineState.gameHistory, 3)
+  render({
+    boardTabs = [],
+    activeBoardTabId,
+    onlineGameTabs = [],
+    activeOnlineGameTabId,
+    onNavigate,
+  }) {
+    let resumeTarget = getResumeTarget({
+      boardTabs,
+      activeBoardTabId,
+      onlineGameTabs,
+      activeOnlineGameTabId,
+    })
     let selectedBoardSize = this.state.selectedBoardSize
-    let previewDimensions = selectedBoardSize
-      ? [selectedBoardSize, selectedBoardSize]
-      : this.state.configuredBoardDimensions
 
     return h(
       'div',
       {class: 'home-dashboard'},
       h(
-        'div',
-        {class: 'home-hero'},
-        h('p', {class: 'home-kicker'}, t('Seki Sabaki')),
-        h('h1', {}, t('Your Go workspace')),
-        h('p', {}, t('Choose a board and start playing.')),
+        'header',
+        {class: 'home-identity'},
+        h('h1', {}, t('Seki')),
+        h('p', {}, t('Your Go workspace')),
       ),
-      h(
-        'div',
-        {class: 'home-layout'},
-        h(HomeNavigation, {
-          onNavigate,
-          onOpenFile: this.handleOpenFileButtonClick,
-        }),
+      resumeTarget != null &&
         h(
-          'div',
-          {class: 'home-main-content'},
+          HomeSection,
+          {title: t('Continue'), class: 'home-continue-section'},
           h(
             'div',
-            {class: 'home-cards-grid'},
+            {class: 'home-resume-surface'},
             h(
-              'section',
-              {class: 'home-card home-card-local'},
-              h('div', {class: 'home-card-heading'}, h('h2', {}, t('Local'))),
-              h(
-                'div',
-                {class: 'home-card-body'},
-                h(
-                  'section',
-                  {class: 'home-pane home-new-board-pane'},
-                  h('h3', {}, t('New board')),
-                  h(
-                    'div',
-                    {class: 'home-board-preview'},
-                    h(
-                      'div',
-                      {
-                        class: 'home-board-preview-goban',
-                        'aria-hidden': 'true',
-                      },
-                      h(HomeBoardPreview, {
-                        width: previewDimensions[0],
-                        height: previewDimensions[1],
-                      }),
-                    ),
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        class: 'home-create-board-button',
-                        onClick: this.handleNewGameButtonClick,
-                      },
-                      h('strong', {}, t('New board')),
-                      h('span', {}, t('Start a fresh game')),
-                    ),
-                  ),
-                  h(
-                    'div',
-                    {
-                      class: 'home-board-sizes',
-                      role: 'group',
-                      'aria-label': t('Board size'),
-                    },
-                    [9, 13, 19].map((size) =>
-                      h(
-                        'button',
-                        {
-                          key: size,
-                          type: 'button',
-                          class: selectedBoardSize === size ? 'selected' : '',
-                          'aria-pressed': selectedBoardSize === size,
-                          onClick: () => this.handleBoardSizeChange(size),
-                        },
-                        `${size}x${size}`,
-                      ),
-                    ),
-                  ),
-                ),
-                h(HomeLibraryPane),
-              ),
+              'div',
+              {class: 'home-resume-details'},
+              h('strong', {}, resumeTarget.title),
+              resumeTarget.meta != null && h('span', {}, resumeTarget.meta),
             ),
-            h(
-              'section',
-              {class: 'home-card home-card-online'},
-              h('div', {class: 'home-card-heading'}, h('h2', {}, t('Online'))),
-              h(
-                'div',
-                {class: 'home-card-body'},
-                h(HomeOnlinePanel),
-                h(
-                  'section',
-                  {class: 'home-pane home-recent-games-pane'},
-                  h('h3', {}, t('Recent games')),
-                  h(OgsGameHistoryColumn, {
-                    games: ogsHistoryPreview,
-                    busy: onlineState.gameHistoryBusy,
-                    error: onlineState.gameHistoryError,
-                    authenticated: ogsAuthenticated,
-                    emptyText: t('No recent OGS games loaded yet.'),
-                    onRefresh: this.handleOgsHistoryRefresh,
-                    onOpenGame: this.handleOgsHistoryGameClick,
-                    onAnalyzeOgs: this.handleAnalyzeOgs,
-                    onAnalyzeSeki: this.handleAnalyzeSeki,
-                    onOpenOgs: ogsAuthenticated
-                      ? this.handleOgsButtonClick
-                      : null,
-                  }),
-                  ogsAuthenticated &&
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        class: 'home-recent-games-all',
-                        onClick: this.handleOgsHistoryButtonClick,
-                      },
-                      t('View all OGS history'),
-                    ),
-                ),
-              ),
-            ),
-          ),
-          h(HomeTsumegoCard),
-          (hasOnlineGame || hasBoardTabs) &&
             h(
               'button',
               {
                 type: 'button',
-                class: 'home-continue-link',
-                onClick: () => sabaki.setState({activeWorkspace: 'board'}),
+                class: 'ui-button ui-button-primary',
+                onClick: () => this.handleResume(resumeTarget),
               },
-              hasOnlineGame
-                ? t('Continue game #') + String(onlineGameId)
-                : t('Resume current board'),
+              resumeTarget.type === 'online-game'
+                ? t('Continue game')
+                : t('Continue board'),
             ),
+          ),
         ),
+      h(
+        HomeSection,
+        {title: t('Start'), class: 'home-start-section'},
+        h(
+          'div',
+          {class: 'home-start-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'ui-button ui-button-primary',
+              onClick: this.handleNewGameButtonClick,
+            },
+            t('New board'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'ui-button ui-button-secondary',
+              onClick: this.handleOpenFileButtonClick,
+            },
+            t('Open SGF'),
+          ),
+        ),
+        h(
+          'div',
+          {
+            class: 'home-size-options',
+            role: 'group',
+            'aria-label': t('Board size'),
+          },
+          h('span', {class: 'home-control-label'}, t('Board size')),
+          [9, 13, 19].map((size) =>
+            h(
+              'button',
+              {
+                key: size,
+                type: 'button',
+                class: 'ui-button ui-button-ghost',
+                'aria-pressed': selectedBoardSize === size,
+                onClick: () => this.setState({selectedBoardSize: size}),
+              },
+              `${size}x${size}`,
+            ),
+          ),
+        ),
+      ),
+      h(
+        HomeSection,
+        {title: t('Workspaces'), class: 'home-workspaces-section'},
+        h(
+          'div',
+          {class: 'home-workspace-actions'},
+          h(WorkspaceButton, {
+            label: t('Online'),
+            onClick: () => onNavigate('ogs'),
+          }),
+          h(WorkspaceButton, {
+            label: t('Analysis'),
+            onClick: () => onNavigate('analysis'),
+          }),
+          h(WorkspaceButton, {
+            label: t('Library'),
+            onClick: () => onNavigate('library'),
+          }),
+          h(WorkspaceButton, {
+            label: t('Built-in Library'),
+            onClick: () => this.handleOpenBuiltinLibrary(),
+          }),
+          h(WorkspaceButton, {
+            label: t('Tsumego'),
+            onClick: () => onNavigate('tsumego'),
+          }),
+        ),
+      ),
+      h(
+        HomeSection,
+        {title: t('Study'), class: 'home-study-section'},
+        h(HomeTsumegoCard),
       ),
     )
   }
 }
 
-function HomeNavigation({onNavigate, onOpenFile}) {
+function HomeSection({title, class: className, children}) {
   return h(
-    'nav',
-    {class: 'home-navbar', 'aria-label': t('Home navigation')},
-    h(HomeNavButton, {
-      label: t('Open SGF'),
-      icon: 'file-16.svg',
-      onClick: onOpenFile,
-    }),
-    h(HomeNavButton, {
-      label: t('Analyze'),
-      icon: 'graph-16.svg',
-      onClick: () => onNavigate('analysis'),
-    }),
-    h(HomeNavButton, {
-      label: t('Online play'),
-      icon: 'globe-16.svg',
-      onClick: () => onNavigate('ogs'),
-    }),
-    h(HomeNavButton, {
-      label: t('Library'),
-      icon: 'book-16.svg',
-      onClick: () => onNavigate('library'),
-    }),
-    h(HomeNavButton, {
-      label: t('Tsumego'),
-      icon: 'mortar-board-16.svg',
-      onClick: () => onNavigate('tsumego'),
-    }),
+    'section',
+    {class: `home-work-section ${className || ''}`.trim()},
+    h('h2', {}, title),
+    children,
   )
 }
 
-function HomeNavButton({label, icon, onClick}) {
+function WorkspaceButton({label, onClick}) {
   return h(
     'button',
-    {type: 'button', class: 'home-nav-button', onClick},
-    h('img', {
-      src: `./node_modules/@primer/octicons/build/svg/${icon}`,
-      alt: '',
-      'aria-hidden': 'true',
-    }),
-    h('span', {}, label),
+    {
+      type: 'button',
+      class: 'ui-button ui-button-ghost',
+      onClick,
+    },
+    label,
   )
+}
+
+function getResumeTarget({
+  boardTabs,
+  activeBoardTabId,
+  onlineGameTabs,
+  activeOnlineGameTabId,
+}) {
+  let onlineTab =
+    onlineGameTabs.find((tab) => tab.id === activeOnlineGameTabId) ||
+    onlineGameTabs[0]
+  if (onlineTab != null) {
+    return {
+      type: 'online-game',
+      tab: onlineTab,
+      title: onlineTab.title || t('Online game'),
+      meta:
+        onlineTab.onlineGameId == null
+          ? null
+          : t('Game #') + String(onlineTab.onlineGameId),
+    }
+  }
+
+  let boardTab =
+    boardTabs.find((tab) => tab.id === activeBoardTabId) || boardTabs[0]
+  if (boardTab != null) {
+    return {
+      type: 'board',
+      tab: boardTab,
+      title:
+        boardTab.representedFilename == null ||
+        boardTab.representedFilename === ''
+          ? t('Untitled Board')
+          : basename(boardTab.representedFilename),
+      meta: t('Local board'),
+    }
+  }
+
+  return null
 }

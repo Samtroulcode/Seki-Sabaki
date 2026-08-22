@@ -260,7 +260,7 @@ test.describe('OGS mock panel', () => {
     })
 
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
 
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(page.locator('#ogs-dashboard')).toBeVisible()
@@ -374,7 +374,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('.home-matchmaking-toast')).toHaveCount(1)
     await expect(page.locator('.home-matchmaking-toast')).toBeVisible()
     await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await expect(page.locator('.home-matchmaking-toast')).toHaveCount(1)
     await expect(page.locator('.home-matchmaking-toast')).toBeVisible()
     await page.getByRole('button', {name: 'Cancel search'}).click()
@@ -458,8 +458,16 @@ test.describe('OGS mock panel', () => {
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    await expect(page.locator('#home')).toContainText('Continue game #42')
-    await page.getByRole('button', {name: /Online play/}).click()
+    await expect(page.locator('.home-resume-details')).toContainText(
+      'Fixture Game',
+    )
+    await expect(page.locator('.home-resume-details')).toContainText('Game #42')
+    await page.getByRole('button', {name: 'Continue game'}).click()
+    await page.waitForFunction(
+      () => window.__sabaki.state.activeWorkspace === 'online-game',
+    )
+    await page.getByTitle('Home').click()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await expect(page.locator('.ogs-dashboard-games-card')).toHaveCount(0)
     await page.getByTitle('Fixture Game').click()
@@ -469,7 +477,7 @@ test.describe('OGS mock panel', () => {
     await expect(page.locator('#goban')).toBeVisible()
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
 
     await page.evaluate(async () => {
@@ -577,7 +585,7 @@ test.describe('OGS mock panel', () => {
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    await page.getByRole('button', {name: /Online play/}).click()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await expect(page.locator('.ogs-panel')).toBeVisible()
     await page.getByTitle('Fixture Game').click()
     await page
@@ -644,36 +652,8 @@ test.describe('OGS mock panel', () => {
 
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
-    let columnEntry = page.locator(
-      '.home-recent-games-pane .ogs-history-column-entry',
-    )
-    await expect(columnEntry).toHaveCount(1)
-    await expect(columnEntry).toContainText('opponent')
-    await expect(columnEntry).toContainText('3k')
-    await expect(columnEntry).toContainText('You played Black')
-    await expect(columnEntry).toContainText('Won by resignation')
-    await expect(columnEntry).toContainText('9x9')
-    let compactEntryHeights = await columnEntry.evaluateAll((entries) =>
-      entries.map((entry) => entry.getBoundingClientRect().height),
-    )
-    expect(Math.max(...compactEntryHeights)).toBeLessThan(240)
-    let gobanWidth = await columnEntry
-      .locator('.ogs-mini-goban')
-      .first()
-      .evaluate((goban) => goban.getBoundingClientRect().width)
-    expect(gobanWidth).toBeGreaterThanOrEqual(80)
-    await expect(
-      columnEntry.locator('.ogs-history-column-actions button', {
-        hasText: 'Analyze OGS',
-      }),
-    ).toBeVisible()
-    await expect(
-      columnEntry.locator('.ogs-history-column-actions button', {
-        hasText: 'Analyze Seki',
-      }),
-    ).toBeVisible()
-
-    await page.getByRole('button', {name: 'View all OGS history'}).click()
+    await expect(page.locator('.home-recent-games-pane')).toHaveCount(0)
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
 
     await expect(page.locator('.ogs-history')).toContainText('OGS history')
     await expect(page.locator('.ogs-history-card')).toContainText(
@@ -704,104 +684,6 @@ test.describe('OGS mock panel', () => {
         window.__ogsDownloadedGames.includes(123) &&
         window.__sabaki.state.activeWorkspace === 'board' &&
         window.__sabaki.state.boardTabs.length === 2,
-    )
-    await expect(page.locator('#goban')).toBeVisible()
-  })
-
-  test('shows at most 3 recent games in the Home column', async ({page}) => {
-    await page.evaluate(() => {
-      window.__ogsTestSession = null
-      window.__ogsTestState = {
-        user: null,
-        socket: {status: 'authenticated', authenticated: true, error: null},
-        matchmaking: {
-          status: 'idle',
-          options: {
-            boardSizes: [19],
-            speeds: ['rapid'],
-            timeSystem: 'byoyomi',
-            lowerRankDiff: 3,
-            upperRankDiff: 3,
-            rules: {condition: 'preferred', value: 'chinese'},
-            handicap: {condition: 'no-preference', value: 'enabled'},
-          },
-          error: null,
-        },
-        onlineGame: {
-          status: 'idle',
-          gameId: null,
-          error: null,
-          gameName: null,
-          board: null,
-          phase: null,
-          players: null,
-          moves: [],
-          moveCount: 0,
-          lastMove: null,
-          clock: null,
-          chat: [],
-        },
-        activeGames: [],
-      }
-      let games = [1, 2, 3, 4].map((id) => ({
-        id,
-        name: `Game ${id}`,
-        board: {width: 9, height: 9},
-        result: 'B+R',
-        winner: 7,
-        ended: '2026-08-01T12:00:00Z',
-        black: {id: 7, username: 'sekibot', rank: '1d'},
-        white: {id: 8, username: 'opponent', rank: '3k'},
-      }))
-      window.sabaki.ogs = {
-        getSession: async () => window.__ogsTestSession,
-        getState: async () => window.__ogsTestState,
-        login: async (username) => {
-          window.__ogsTestSession = {
-            id: '7',
-            username,
-            rank: '1d',
-            iconUrl: null,
-            online: true,
-          }
-          window.__ogsTestState.user = window.__ogsTestSession
-          return {
-            ok: true,
-            user: window.__ogsTestSession,
-            state: window.__ogsTestState,
-          }
-        },
-        listGameHistory: async () => ({
-          ok: true,
-          history: {results: games, next: null, previous: null},
-        }),
-        downloadGameSgf: async () => ({
-          ok: true,
-          sgf: '(;GM[1]FF[4]SZ[9];B[aa];W[bb])',
-        }),
-      }
-    })
-
-    await page.getByTitle('Home').click()
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
-    await page.locator('.ogs-login-form input[name="username"]').fill('sekibot')
-    await page.locator('.ogs-login-form input[name="password"]').fill('secret')
-    await page.locator('.ogs-login-form button[type="submit"]').click()
-    await expect(page.locator('.ogs-status-username')).toHaveText('sekibot')
-
-    await page.getByTitle('Home').click()
-    let columnEntries = page.locator(
-      '.home-recent-games-pane .ogs-history-column-entry',
-    )
-    await expect(columnEntries).toHaveCount(3)
-
-    // Clicking a column entry opens the game.
-    await columnEntries.first().click()
-    await page.waitForFunction(
-      () =>
-        window.__sabaki.state.activeWorkspace === 'board' &&
-        window.__sabaki.state.boardTabs.length === 1,
     )
     await expect(page.locator('#goban')).toBeVisible()
   })

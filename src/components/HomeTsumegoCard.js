@@ -43,7 +43,6 @@ export default class HomeTsumegoCard extends Component {
       progress: {},
       selectedIndex: 0,
       preview: null,
-      playerToMove: null,
       complete: false,
     }
   }
@@ -98,7 +97,6 @@ export default class HomeTsumegoCard extends Component {
         selectedIndex,
         complete,
         preview: parsed?.preview || null,
-        playerToMove: parsed?.playerToMove || null,
       })
     } catch (err) {
       this.setState({busy: false, error: t('No Tsumego available')})
@@ -224,13 +222,9 @@ export default class HomeTsumegoCard extends Component {
     let {busy, error} = this.state
 
     return h(
-      'section',
-      {class: 'home-card home-card-tsumego'},
-      h(
-        'div',
-        {class: 'home-card-heading'},
-        h('h2', {}, t('Continue Tsumego')),
-      ),
+      'article',
+      {class: 'home-study-surface home-card-tsumego'},
+      h('h3', {}, t('Continue Tsumego')),
       busy
         ? h('p', {class: 'home-tsumego-status'}, t('Loading Tsumego…'))
         : error != null
@@ -240,7 +234,11 @@ export default class HomeTsumegoCard extends Component {
               h('p', {}, error),
               h(
                 'button',
-                {type: 'button', onClick: () => this.handleBrowseFallback()},
+                {
+                  type: 'button',
+                  class: 'ui-button ui-button-secondary',
+                  onClick: () => this.handleBrowseFallback(),
+                },
                 t('Browse Tsumego'),
               ),
             )
@@ -249,23 +247,9 @@ export default class HomeTsumegoCard extends Component {
   }
 
   renderContent() {
-    let {
-      source,
-      collectionTitle,
-      problems,
-      selectedIndex,
-      progress,
-      preview,
-      playerToMove,
-      complete,
-    } = this.state
-    let problem = problems[selectedIndex]
-    let solved = this.countSolved(problems, progress, source)
+    let {collectionTitle, problems, progress, preview, complete} = this.state
+    let solved = this.countSolved(problems, progress, this.state.source)
     let total = problems.length
-    let percent = total > 0 ? Math.round((solved / total) * 100) : 0
-    let sourceLabel = source === 'builtin' ? t('Built-in') : t('My Library')
-    let playerLabel =
-      playerToMove === 'W' ? t('White to play') : t('Black to play')
 
     return h(
       'div',
@@ -284,17 +268,8 @@ export default class HomeTsumegoCard extends Component {
       ),
       h(
         'div',
-        {class: 'home-tsumego-info'},
+        {class: 'home-study-details'},
         h('strong', {class: 'home-tsumego-title'}, collectionTitle),
-        h('span', {class: 'home-tsumego-source'}, sourceLabel),
-        h(
-          'span',
-          {class: 'home-tsumego-problem'},
-          `${t('Problem')} ${selectedIndex + 1} / ${total}`,
-        ),
-        h('span', {class: 'home-tsumego-turn'}, playerLabel),
-        complete &&
-          h('span', {class: 'home-tsumego-complete'}, t('Collection complete')),
         h(
           'span',
           {class: 'home-tsumego-solved'},
@@ -302,28 +277,23 @@ export default class HomeTsumegoCard extends Component {
         ),
         h(
           'div',
-          {class: 'home-tsumego-progress'},
-          h('div', {
-            class: 'home-tsumego-progress-bar',
-            style: {width: `${percent}%`},
-          }),
-        ),
-        h('span', {class: 'home-tsumego-percent'}, `${percent}%`),
-        h(
-          'div',
-          {class: 'home-tsumego-actions'},
+          {class: 'home-study-actions'},
           h(
             'button',
             {
               type: 'button',
-              class: 'home-tsumego-continue',
+              class: 'ui-button ui-button-primary',
               onClick: () => this.handleContinue(),
             },
             complete ? t('Review') : t('Continue'),
           ),
           h(
             'button',
-            {type: 'button', onClick: () => this.handleBrowse()},
+            {
+              type: 'button',
+              class: 'ui-button ui-button-secondary',
+              onClick: () => this.handleBrowse(),
+            },
             t('Browse Tsumego'),
           ),
         ),

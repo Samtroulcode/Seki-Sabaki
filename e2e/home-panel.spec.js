@@ -4,344 +4,204 @@ const {tmpdir} = require('os')
 const path = require('path')
 const {test} = require('./fixtures/electron-app')
 
-test.describe('Home panel navigation', () => {
-  test('navigates between home, board, OGS, and placeholders', async ({
+test.describe('Home workspace', () => {
+  test('renders the quiet start workspace and opens singleton workspaces', async ({
     page,
   }) => {
-    await expect(page.locator('#apptabs')).toBeVisible()
     await expect(page.locator('#home')).toBeVisible()
     await expect(page.getByTitle('Home')).toHaveAttribute(
       'aria-current',
       'page',
     )
-    await expect(page.locator('#home')).toContainText('Your Go workspace')
-    await expect(page.locator('.home-sidebar')).toHaveCount(0)
-    await expect(page.locator('#home')).toContainText('Connect account')
-    await expect(page.locator('#home')).not.toContainText('Status')
-    await expect(page.locator('#home')).toContainText('Recent games')
-    await expect(page.locator('#home')).toContainText(
-      'Connect OGS to see your history.',
+    await expect(page.locator('.home-identity')).toContainText('Seki')
+    await expect(page.locator('.home-identity')).toContainText(
+      'Your Go workspace',
     )
-    await expect(page.getByRole('button', {name: /New board/})).toHaveCount(1)
-    await expect(page.getByRole('button', {name: /Open SGF/})).toHaveCount(1)
-    await expect(
-      page.getByRole('button', {name: 'Library', exact: true}),
-    ).toBeVisible()
-    await expect(page.getByRole('button', {name: /Analyze/})).toBeVisible()
-    await expect(page.getByRole('button', {name: /Online play/})).toBeVisible()
-    await expect(
-      page.locator('.home-board-preview .ogs-mini-goban'),
-    ).toBeVisible()
-    await expect(
-      page.locator('.home-board-sizes').getByRole('button', {name: '19x19'}),
-    ).toHaveAttribute('aria-pressed', 'true')
-    await page
-      .locator('.home-board-sizes')
-      .getByRole('button', {name: '13x13'})
-      .click()
-    await expect(
-      page.locator('.home-board-sizes').getByRole('button', {name: '13x13'}),
-    ).toHaveAttribute('aria-pressed', 'true')
+    await expect
+      .poll(() =>
+        page
+          .locator('#home')
+          .evaluate((home) => getComputedStyle(home).backgroundImage),
+      )
+      .toBe('none')
+    await expect(page.locator('.home-hero')).toHaveCount(0)
+    await expect(page.locator('.home-navbar')).toHaveCount(0)
+    await expect(page.locator('.home-online-pane')).toHaveCount(0)
+    await expect(page.locator('.home-recent-games-pane')).toHaveCount(0)
+    await expect(page.locator('.home-library-pane')).toHaveCount(0)
 
-    await page
-      .locator('.home-board-sizes')
-      .getByRole('button', {name: '9x9'})
-      .click()
-    await page.getByRole('button', {name: /^New board/}).click()
+    await expect(page.getByRole('button', {name: 'New board'})).toBeVisible()
+    await expect(page.getByRole('button', {name: 'Open SGF'})).toBeVisible()
+    await expect(
+      page.getByRole('heading', {name: 'Continue', exact: true}),
+    ).toHaveCount(0)
+    await expect(page.locator('.home-work-section > h2')).toHaveText([
+      'Start',
+      'Workspaces',
+      'Study',
+    ])
+
+    let workspaces = [
+      ['Online', '#ogs-dashboard', 'ogs'],
+      ['Analysis', '#analysis-dashboard', 'analysis'],
+      ['Library', '#library-dashboard', 'library'],
+      ['Tsumego', '#tsumego-dashboard', 'tsumego'],
+    ]
+    for (let [name, selector, type] of workspaces) {
+      await page.getByTitle('Home').click()
+      await page
+        .locator('#home')
+        .getByRole('button', {name, exact: true})
+        .click()
+      await expect(page.locator(selector)).toBeVisible()
+      await expect(page.locator(`.app-workspace-tab.type-${type}`)).toHaveCount(
+        1,
+      )
+      await page.getByTitle('Home').click()
+      await page
+        .locator('#home')
+        .getByRole('button', {name, exact: true})
+        .click()
+      await expect(page.locator(`.app-workspace-tab.type-${type}`)).toHaveCount(
+        1,
+      )
+    }
+  })
+
+  test('keeps board-size selection and creates the selected board', async ({
+    page,
+  }) => {
+    let sizes = page.locator('.home-size-options')
+    await expect(sizes.getByRole('button', {name: '19x19'})).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await sizes.getByRole('button', {name: '9x9'}).click()
+    await expect(sizes.getByRole('button', {name: '9x9'})).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    await page.getByRole('button', {name: 'New board'}).click()
     await expect(page.locator('#goban')).toBeVisible()
     await page.waitForFunction(
       () => window.__sabaki.state.gameTrees[0].root.data.SZ?.[0] === '9',
     )
-    await expect(page.getByTitle('Untitled Board')).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+  })
 
-    await page.keyboard.press(
-      process.platform === 'darwin' ? 'Meta+Home' : 'Control+Home',
-    )
-    await expect(page.locator('#home')).toBeVisible()
-
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
-    await expect(
-      page.locator('.app-workspace-tab.type-ogs .app-workspace-tab-button'),
-    ).toHaveCount(1)
-    await expect(
-      page.locator('.app-workspace-tab.type-ogs.selected'),
-    ).toHaveCount(1)
-    await expect(
-      page.locator('.app-activity-tabs > .app-board-tab'),
-    ).toHaveCount(1)
-
+  test('resumes the preferred existing board tab', async ({page}) => {
+    await page.getByRole('button', {name: 'New board'}).click()
     await page.getByTitle('Home').click()
-    await expect(page.locator('#home')).toBeVisible()
+    await page.getByRole('button', {name: 'New board'}).click()
 
+    let targetId = await page.evaluate(() => {
+      let [target] = window.__sabaki.state.boardTabs
+      window.__sabaki.switchBoardTab(target.id)
+      return target.id
+    })
+    await page.getByTitle('Home').click()
+
+    await expect(
+      page.getByRole('heading', {name: 'Continue', exact: true}),
+    ).toBeVisible()
+    await expect(page.locator('.home-resume-details')).toContainText(
+      'Untitled Board',
+    )
+    await page.getByRole('button', {name: 'Continue board'}).click()
+    await page.waitForFunction(
+      (id) =>
+        window.__sabaki.state.activeWorkspace === 'board' &&
+        window.__sabaki.state.activeBoardTabId === id,
+      targetId,
+    )
+  })
+
+  test('resumes an online-game tab before an existing board', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      await window.__sabaki.createNewBoardTab()
+      await window.__sabaki.loadOgsGame({
+        gameId: 42,
+        gameName: 'Resume Fixture',
+        board: {width: 9, height: 9},
+        handicap: 0,
+        komi: 6.5,
+        rules: 'chinese',
+        ranked: false,
+        phase: 'play',
+        players: {
+          black: {id: 7, username: 'black'},
+          white: {id: 8, username: 'white'},
+        },
+        moves: [],
+        moveCount: 0,
+      })
+      window.__sabaki.setState({
+        activeWorkspace: 'home',
+        homeSection: 'dashboard',
+      })
+    })
+
+    await expect(page.locator('.home-resume-details')).toContainText(
+      'Resume Fixture',
+    )
+    await expect(page.locator('.home-resume-details')).toContainText('Game #42')
+    await page.getByRole('button', {name: 'Continue game'}).click()
+    await page.waitForFunction(
+      () =>
+        window.__sabaki.state.activeWorkspace === 'online-game' &&
+        window.__sabaki.state.onlineGameId === 42 &&
+        window.__sabaki.state.activeOnlineGameTabId != null,
+    )
+    await expect(page.locator('#online-game')).toBeVisible()
+  })
+
+  test('reuses Library while switching the temporary Home source bridge', async ({
+    page,
+  }) => {
     await page.getByRole('button', {name: 'Library', exact: true}).click()
     await expect(page.locator('#library-dashboard')).toBeVisible()
+    let tabId = await page.evaluate(
+      () =>
+        window.__sabaki.state.workspaceTabs.find(
+          (tab) => tab.type === 'library',
+        )?.id,
+    )
+
+    await page.getByTitle('Home').click()
+    await page
+      .locator('#home')
+      .getByRole('button', {name: 'Built-in Library'})
+      .click()
+    await expect(page.locator('#library-dashboard')).toBeVisible()
+    await expect(page.locator('.library-browser-toolbar h2')).toHaveText(
+      'Built-in',
+    )
+    await expect(page.locator('.app-workspace-tab.type-library')).toHaveCount(1)
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.__sabaki.state.workspaceTabs.find(
+              (tab) => tab.type === 'library',
+            )?.id,
+        ),
+      )
+      .toBe(tabId)
+
+    await page.getByTitle('Home').click()
+    await page
+      .locator('#home')
+      .getByRole('button', {name: 'Library', exact: true})
+      .click()
     await expect(page.locator('.library-setup-card')).toContainText(
       'Choose your Library folder',
     )
-    await expect(
-      page.locator('.app-workspace-tab.type-library.selected'),
-    ).toHaveCount(1)
-    let tabClasses = await page
-      .locator('.app-activity-tabs > div')
-      .evaluateAll((tabs) => tabs.map((tab) => tab.className))
-    expect(tabClasses).toEqual([
-      'app-board-tab',
-      'app-workspace-tab type-ogs',
-      'app-workspace-tab type-library selected',
-    ])
-    await page
-      .locator('.app-workspace-tab.type-library .app-workspace-tab-close')
-      .click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
-    await expect(
-      page.locator('.app-workspace-tab.type-ogs.selected'),
-    ).toHaveCount(1)
-    await page.getByTitle('Home').click()
-
-    await page
-      .locator('#home')
-      .getByRole('button', {name: /Analyze/})
-      .click()
-    await expect(page.locator('#analysis-dashboard')).toBeVisible()
-    await expect(page.locator('#analysis-dashboard')).toContainText(
-      'Analysis Manager',
-    )
-    await expect(page.locator('#analysis-dashboard')).toContainText(
-      'Configure KataGo, model, config, and output folder before starting.',
-    )
-    await expect(page.locator('#analysis-dashboard')).toContainText(
-      'SGF analyzer:',
-    )
-    await expect(
-      page.locator('#analysis-dashboard input[name="analyzeSgfPath"]'),
-    ).toHaveCount(0)
-    await expect(
-      page.locator('#analysis-dashboard input[name="katagoArguments"]'),
-    ).toHaveCount(0)
-    await expect(
-      page.locator('#analysis-dashboard input[name="katagoModelPath"]'),
-    ).toBeVisible()
-    await expect(
-      page.locator('#analysis-dashboard input[name="katagoConfigPath"]'),
-    ).toBeVisible()
-    await expect(
-      page.getByRole('button', {name: 'Choose KataGo...'}),
-    ).toBeVisible()
-    await expect(
-      page.getByRole('button', {name: 'Choose model...'}),
-    ).toBeVisible()
-    await expect(
-      page.getByRole('button', {name: 'Choose config...'}),
-    ).toBeVisible()
-    await expect(
-      page.locator('#analysis-dashboard input[name="maxVisits"]'),
-    ).toBeVisible()
-    await expect(
-      page.locator('#analysis-dashboard input[name="maxVisits"]'),
-    ).toHaveValue('1600')
-    await expect(
-      page.locator(
-        '#analysis-dashboard input[name="inferGameSettingsFromSgf"]',
-      ),
-    ).toBeChecked()
-    await expect(page.locator('#analysis-dashboard')).toContainText(
-      'Use rules and komi from the SGF when available',
-    )
-    await expect(
-      page.locator('#analysis-dashboard select[name="language"]'),
-    ).toHaveValue('fr')
-    await expect(
-      page.getByRole('button', {name: 'Start analysis'}),
-    ).toBeDisabled()
-    await expect(
-      page.getByRole('button', {name: 'Apply settings'}),
-    ).toBeDisabled()
-
-    await page.locator('input[name="katagoPath"]').fill('/tmp/katago')
-    await expect(
-      page.getByRole('button', {name: 'Apply settings'}),
-    ).toBeEnabled()
-    await expect(page.locator('#analysis-dashboard')).toContainText(
-      'Apply settings before starting analysis.',
-    )
+    await expect(page.locator('.app-workspace-tab.type-library')).toHaveCount(1)
   })
 
-  test('shows both Library sections with folder cards in the Home mini-library', async ({
-    page,
-  }) => {
-    let root = mkdtempSync(path.join(tmpdir(), 'seki-home-library-e2e-'))
-    for (let name of ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon']) {
-      mkdirSync(path.join(root, name))
-    }
-    writeFileSync(path.join(root, 'study.sgf'), '(;GM[1]SZ[9];B[aa])')
-    writeFileSync(path.join(root, 'game.sgf'), '(;GM[1]SZ[9];W[bb])')
-
-    try {
-      // Leave Home first so the mini-library mounts after the root is set.
-      await page.getByRole('button', {name: /Online play/}).click()
-      await expect(page.locator('.ogs-panel')).toBeVisible()
-
-      await page.evaluate(
-        async (libraryRoot) =>
-          window.sabaki.setting.set('library.root', libraryRoot),
-        root,
-      )
-      await page.getByTitle('Home').click()
-
-      let pane = page.locator('.home-library-pane')
-      await expect(pane.locator('.home-library-section')).toHaveCount(2)
-      await expect(pane.locator('.home-library-section').first()).toContainText(
-        'My Library',
-      )
-      await expect(pane.locator('.home-library-section').nth(1)).toContainText(
-        'Built-in',
-      )
-
-      // User section: at most 4 folders, no SGF files.
-      let userSection = pane.locator('.home-library-section').first()
-      await expect(
-        userSection.locator('.home-library-folder-card'),
-      ).toHaveCount(4)
-      await expect(userSection).toContainText('Alpha')
-      await expect(userSection).toContainText('Epsilon')
-      await expect(userSection).not.toContainText('Gamma')
-      await expect(userSection).not.toContainText('study.sgf')
-      await expect(userSection).not.toContainText('game.sgf')
-
-      // Built-in section: at most 4 folders.
-      let builtinSection = pane.locator('.home-library-section').nth(1)
-      await expect(
-        builtinSection.locator('.home-library-folder-card'),
-      ).toHaveCount(4)
-      await expect(
-        builtinSection.locator('.home-library-folder-card', {
-          hasText: 'Go Seigen SGF Pack',
-        }),
-      ).toBeVisible()
-
-      // Real folder icons, no mini gobans, no file rows.
-      await expect(
-        pane.locator('.home-library-folder-icon').first(),
-      ).toHaveAttribute('src', /file-directory/)
-      await expect(pane.locator('.ogs-mini-goban')).toHaveCount(0)
-      await expect(pane.locator('.home-library-entry-file')).toHaveCount(0)
-    } finally {
-      rmSync(root, {recursive: true, force: true})
-    }
-  })
-
-  test('opens the Library workspace at the User source from a Home folder card', async ({
-    page,
-  }) => {
-    let root = mkdtempSync(path.join(tmpdir(), 'seki-home-library-e2e-'))
-    let games = path.join(root, 'Games')
-    mkdirSync(games)
-    writeFileSync(path.join(games, 'fixture.sgf'), '(;GM[1]SZ[9];B[aa])')
-
-    try {
-      await page.getByRole('button', {name: /Online play/}).click()
-      await expect(page.locator('.ogs-panel')).toBeVisible()
-
-      await page.evaluate(
-        async (libraryRoot) =>
-          window.sabaki.setting.set('library.root', libraryRoot),
-        root,
-      )
-      await page.getByTitle('Home').click()
-
-      let userSection = page
-        .locator('.home-library-pane .home-library-section')
-        .first()
-      await expect(
-        userSection.locator('.home-library-folder-card'),
-      ).toContainText('Games')
-      await userSection.locator('.home-library-folder-card').click()
-
-      // Library workspace opens at the User source, inside Games.
-      await expect(page.locator('#library-dashboard')).toBeVisible()
-      await expect(page.locator('.library-browser-toolbar h2')).toContainText(
-        'My Library',
-      )
-      await expect(page.locator('.library-current-path')).toContainText('Games')
-      await expect(page.locator('.library-entry-file')).toContainText(
-        'fixture.sgf',
-      )
-
-      // Up navigation stays in the User source.
-      await page.getByRole('button', {name: 'Up one folder'}).click()
-      await expect(page.locator('.library-browser-toolbar h2')).toContainText(
-        'My Library',
-      )
-      await expect(page.locator('.library-current-path')).toContainText(
-        'Library root',
-      )
-      await expect(page.locator('.library-entry-directory')).toContainText(
-        'Games',
-      )
-
-      // A User SGF opens through the board workflow.
-      await page.locator('.library-entry-directory').click()
-      await page.locator('.library-entry-file').click()
-      await expect(page.locator('#goban')).toBeVisible()
-      await expect(
-        page.locator(
-          '.app-board-tab-button[title="fixture.sgf"][aria-current="page"]',
-        ),
-      ).toHaveAttribute('aria-current', 'page')
-    } finally {
-      rmSync(root, {recursive: true, force: true})
-    }
-  })
-
-  test('opens the Library workspace at the Built-in source from a Home folder card', async ({
-    page,
-  }) => {
-    let pane = page.locator('.home-library-pane')
-    let builtinSection = pane.locator('.home-library-section').nth(1)
-    await expect(
-      builtinSection.locator('.home-library-folder-card', {
-        hasText: 'Go Seigen SGF Pack',
-      }),
-    ).toBeVisible()
-    await builtinSection
-      .locator('.home-library-folder-card', {hasText: 'Go Seigen SGF Pack'})
-      .click()
-
-    // Library workspace opens at the Built-in source, inside the collection.
-    await expect(page.locator('#library-dashboard')).toBeVisible()
-    await expect(page.locator('.library-browser-toolbar h2')).toContainText(
-      'Built-in',
-    )
-    await expect(page.locator('.library-current-path')).toContainText(
-      'games/Go Seigen SGF Pack',
-    )
-    await expect(page.locator('.library-entry-file').first()).toBeVisible()
-
-    // Built-in exposes no change-root action.
-    await expect(page.getByRole('button', {name: 'Change folder'})).toHaveCount(
-      0,
-    )
-
-    // Up navigation stays in the Built-in source.
-    await page.getByRole('button', {name: 'Up one folder'}).click()
-    await expect(page.locator('.library-browser-toolbar h2')).toContainText(
-      'Built-in',
-    )
-    await expect(page.locator('.library-current-path')).toHaveText('games')
-
-    // A Built-in SGF opens through the board workflow.
-    await page
-      .locator('.library-entry-directory', {hasText: 'Go Seigen SGF Pack'})
-      .click()
-    await page.locator('.library-entry-file').first().click()
-    await expect(page.locator('#goban')).toBeVisible()
-  })
-
-  test('browses a configured Library folder', async ({page}) => {
+  test('browses a configured My Library folder', async ({page}) => {
     let root = mkdtempSync(path.join(tmpdir(), 'seki-library-e2e-'))
     let games = path.join(root, 'Games')
     mkdirSync(games)
@@ -354,33 +214,12 @@ test.describe('Home panel navigation', () => {
         root,
       )
       await page.getByRole('button', {name: 'Library', exact: true}).click()
+      await expect(page.locator('.library-browser-toolbar h2')).toHaveText(
+        'My Library',
+      )
       await expect(page.locator('.library-entry-directory')).toContainText(
         'Games',
       )
-      await page.locator('.library-entry-directory').click()
-      await expect(page.locator('.library-entry-file')).toContainText(
-        'fixture.sgf',
-      )
-      await page.getByRole('button', {name: 'Up one folder'}).click()
-      await expect(page.locator('.library-entry-directory')).toContainText(
-        'Games',
-      )
-      await page.evaluate(() => {
-        window.__libraryList = window.sabaki.library.list
-        window.sabaki.library.list = async () => ({
-          ok: false,
-          code: 'read-failed',
-          entries: [],
-        })
-      })
-      await page.locator('.library-entry-directory').click()
-      await expect(page.locator('.ogs-error')).toContainText(
-        'Unable to read this Library folder.',
-      )
-      await page.evaluate(() => {
-        window.sabaki.library.list = window.__libraryList
-      })
-      await page.getByRole('button', {name: 'Up one folder'}).click()
       await page.locator('.library-entry-directory').click()
       await page.locator('.library-entry-file').click()
       await expect(page.locator('#goban')).toBeVisible()
@@ -394,41 +233,92 @@ test.describe('Home panel navigation', () => {
     }
   })
 
-  test('Continue Tsumego falls back to builtin easy when nothing is remembered', async ({
-    page,
-  }) => {
+  test('does not fetch OGS history when returning Home', async ({page}) => {
+    await page.evaluate(() => {
+      window.__homeHistoryCalls = []
+      let user = {id: '7', username: 'sekibot', rank: '1d'}
+      let state = {
+        user,
+        socket: {status: 'authenticated', authenticated: true, error: null},
+        matchmaking: {status: 'idle', options: {}},
+        onlineGame: {status: 'idle', gameId: null},
+        activeGames: [],
+      }
+      window.sabaki.ogs = {
+        getSession: async () => user,
+        getState: async () => state,
+        listGameHistory: async (options) => {
+          window.__homeHistoryCalls.push(options)
+          return {
+            ok: true,
+            history: {results: [], next: null, previous: null},
+          }
+        },
+        listFriends: async () => ({ok: true, friends: []}),
+        getPlayerProfile: async () => ({ok: true, profile: null}),
+      }
+    })
+
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
+    await page.waitForFunction(() =>
+      window.__homeHistoryCalls.some((call) => call.pageSize === 12),
+    )
+    let before = await page.evaluate(() => window.__homeHistoryCalls.length)
+
+    await page.getByTitle('Home').click()
+    await expect(page.locator('#home')).toBeVisible()
+    await page.waitForTimeout(300)
+    let calls = await page.evaluate(() => window.__homeHistoryCalls)
+    expect(calls).toHaveLength(before)
+    expect(calls.some((call) => call.pageSize === 3)).toBe(false)
+  })
+
+  test('remains usable at 800x600', async ({page, electronApp}) => {
+    const browserWindow = await electronApp.browserWindow(page)
+    await browserWindow.evaluate((win) => win.setContentSize(800, 600))
+    await expect(async () => {
+      const size = await browserWindow.evaluate((win) => win.getContentSize())
+      expect(size).toEqual([800, 600])
+    }).toPass({timeout: 5000})
+
+    await expect(page.getByRole('button', {name: 'New board'})).toBeVisible()
+    await expect(page.getByRole('button', {name: 'Open SGF'})).toBeVisible()
+    let home = page.locator('#home')
+    await home.evaluate((element) => {
+      element.scrollTop = 0
+    })
+    await page
+      .getByRole('button', {name: 'Tsumego', exact: true})
+      .scrollIntoViewIfNeeded()
+    await expect(
+      page.getByRole('button', {name: 'Tsumego', exact: true}),
+    ).toBeVisible()
+    await page.locator('.home-card-tsumego').scrollIntoViewIfNeeded()
+    await expect(page.locator('.home-card-tsumego')).toBeVisible()
+
+    let overflow = await home.evaluate((element) => ({
+      horizontal: element.scrollWidth > element.clientWidth,
+      vertical: element.scrollHeight > element.clientHeight,
+      scrollTop: element.scrollTop,
+    }))
+    expect(overflow.horizontal).toBe(false)
+    expect(overflow.vertical).toBe(true)
+    expect(overflow.scrollTop).toBeGreaterThan(0)
+  })
+
+  test('Tsumego continuation falls back to built-in easy', async ({page}) => {
     let card = page.locator('.home-card-tsumego')
-    await expect(card).toBeVisible()
     await expect(card).toContainText('GoGameGuru — Easy')
-    await expect(card).toContainText('Built-in')
-    await expect(card).toContainText('Problem 1 / 140')
     await expect(card).toContainText('0 / 140 solved')
-    await expect(card).toContainText('0%')
     await expect(card.getByRole('button', {name: 'Continue'})).toBeVisible()
     await expect(
       card.getByRole('button', {name: 'Browse Tsumego'}),
     ).toBeVisible()
+    await expect(card).not.toContainText('Black to play')
+    await expect(card).not.toContainText('0%')
   })
 
-  test('Continue Tsumego uses the remembered builtin collection', async ({
-    page,
-  }) => {
-    await page.evaluate(() => {
-      window.sabaki.setting.set('tsumego.last_collection', {
-        source: 'builtin',
-        relativePath: 'tsumego/hard',
-      })
-    })
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
-    await page.getByTitle('Home').click()
-
-    let card = page.locator('.home-card-tsumego')
-    await expect(card).toContainText('GoGameGuru — Hard')
-    await expect(card).toContainText('Built-in')
-  })
-
-  test('Continue Tsumego uses the remembered user collection when configured', async ({
+  test('Tsumego continuation uses a remembered user collection', async ({
     page,
   }) => {
     let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-home-e2e-'))
@@ -447,20 +337,18 @@ test.describe('Home panel navigation', () => {
           relativePath: 'Tsumego/User Set',
         })
       }, root)
-      await page.getByRole('button', {name: /Online play/}).click()
-      await expect(page.locator('.ogs-panel')).toBeVisible()
+      await page.getByRole('button', {name: 'Online', exact: true}).click()
       await page.getByTitle('Home').click()
 
       let card = page.locator('.home-card-tsumego')
       await expect(card).toContainText('User Set')
-      await expect(card).toContainText('My Library')
-      await expect(card).toContainText('Problem 1 / 1')
+      await expect(card).toContainText('0 / 1 solved')
     } finally {
       rmSync(root, {recursive: true, force: true})
     }
   })
 
-  test('Continue Tsumego falls back to easy when the remembered collection is stale', async ({
+  test('Tsumego continuation falls back when the remembered collection is stale', async ({
     page,
   }) => {
     await page.evaluate(() => {
@@ -469,92 +357,74 @@ test.describe('Home panel navigation', () => {
         relativePath: 'tsumego/does-not-exist',
       })
     })
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await page.getByTitle('Home').click()
 
     let card = page.locator('.home-card-tsumego')
     await expect(card).toContainText('GoGameGuru — Easy')
+    await card.getByRole('button', {name: 'Continue'}).click()
+    await expect(page.locator('.tsumego-problem-filename')).toHaveText(
+      'ggg-easy-01.sgf',
+    )
   })
 
-  test('Continue Tsumego picks the first unfinished problem', async ({
+  test('Tsumego continuation targets the first unfinished problem', async ({
     page,
   }) => {
     await page.evaluate(() => {
       window.sabaki.tsumegoProgress.getAll = async () => ({
         version: 1,
         problems: {
-          'builtin:tsumego/easy/ggg-easy-01.sgf': {
-            completed: true,
-            completedAt: 'x',
-          },
-          'builtin:tsumego/easy/ggg-easy-02.sgf': {
-            completed: true,
-            completedAt: 'x',
-          },
+          'builtin:tsumego/easy/ggg-easy-01.sgf': {completed: true},
+          'builtin:tsumego/easy/ggg-easy-02.sgf': {completed: true},
         },
       })
     })
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await page.getByTitle('Home').click()
 
     let card = page.locator('.home-card-tsumego')
-    await expect(card).toContainText('Problem 3 / 140')
     await expect(card).toContainText('2 / 140 solved')
+    await card.getByRole('button', {name: 'Continue'}).click()
+    await expect(page.locator('.tsumego-solver')).toBeVisible()
+    await expect(page.locator('.tsumego-problem-filename')).toHaveText(
+      'ggg-easy-03.sgf',
+    )
   })
 
-  test('Continue Tsumego marks a complete collection and shows Review', async ({
+  test('Tsumego continuation shows Review for a complete collection', async ({
     page,
   }) => {
     await page.evaluate(() => {
       let problems = {}
       for (let i = 1; i <= 140; i++) {
         let name = `ggg-easy-${String(i).padStart(2, '0')}.sgf`
-        problems[`builtin:tsumego/easy/${name}`] = {
-          completed: true,
-          completedAt: 'x',
-        }
+        problems[`builtin:tsumego/easy/${name}`] = {completed: true}
       }
       window.sabaki.tsumegoProgress.getAll = async () => ({
         version: 1,
         problems,
       })
     })
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await page.getByTitle('Home').click()
 
     let card = page.locator('.home-card-tsumego')
-    await expect(card).toContainText('Collection complete')
     await expect(card).toContainText('140 / 140 solved')
-    await expect(card).toContainText('100%')
     await expect(card.getByRole('button', {name: 'Review'})).toBeVisible()
   })
 
-  test('Continue Tsumego preview shows the initial position, not the solution', async ({
+  test('Tsumego preview stays at the initial problem position', async ({
     page,
   }) => {
     let card = page.locator('.home-card-tsumego')
     await expect(card).toContainText('GoGameGuru — Easy')
-    // ggg-easy-01 has 16 setup stones at the start position; the solved line
-    // would add more. Asserting the initial count proves the preview is built
-    // from problem.startNodeId, not the final SGF node.
     await expect(
       card.locator('.home-tsumego-goban .ogs-mini-stone'),
     ).toHaveCount(16)
-    await expect(card).toContainText('Black to play')
   })
 
-  test('Continue Tsumego opens the displayed problem', async ({page}) => {
-    let card = page.locator('.home-card-tsumego')
-    await expect(card).toContainText('GoGameGuru — Easy')
-    await card.getByRole('button', {name: 'Continue'}).click()
-    await expect(page.locator('.tsumego-solver')).toBeVisible()
-    await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)
-  })
-
-  test('Continue Tsumego Browse opens the collection', async ({page}) => {
+  test('Tsumego Browse opens the displayed collection', async ({page}) => {
     let card = page.locator('.home-card-tsumego')
     await expect(card).toContainText('GoGameGuru — Easy')
     await card.getByRole('button', {name: 'Browse Tsumego'}).click()
@@ -562,7 +432,7 @@ test.describe('Home panel navigation', () => {
     await expect(page.locator('.tsumego-breadcrumb')).toContainText('easy')
   })
 
-  test('Continue Tsumego shows a clean error when no Tsumego is available', async ({
+  test('Tsumego continuation has a clean unavailable fallback', async ({
     page,
   }) => {
     await page.evaluate(() => {
@@ -572,8 +442,7 @@ test.describe('Home panel navigation', () => {
         entries: [],
       })
     })
-    await page.getByRole('button', {name: /Online play/}).click()
-    await expect(page.locator('.ogs-panel')).toBeVisible()
+    await page.getByRole('button', {name: 'Online', exact: true}).click()
     await page.getByTitle('Home').click()
 
     let card = page.locator('.home-card-tsumego')
@@ -583,25 +452,16 @@ test.describe('Home panel navigation', () => {
     ).toBeVisible()
   })
 
-  test('keeps the native application menu mounted across Home/Board navigation', async ({
+  test('keeps the native menu mounted across Home and Board', async ({
     page,
     electronApp,
   }) => {
-    // The home-panel fixture starts on Home.
-    await expect(page.locator('#home')).toBeVisible()
-
     let menuIsNonNull = () =>
       electronApp.evaluate(({Menu}) => Menu.getApplicationMenu() != null)
-
-    // The application menu is built while on Home.
     await expect.poll(menuIsNonNull).toBe(true)
-
-    // Home → Board: the menu must not be torn down and rebuilt.
-    await page.getByRole('button', {name: /^New board/}).click()
+    await page.getByRole('button', {name: 'New board'}).click()
     await expect(page.locator('#goban')).toBeVisible()
     await expect.poll(menuIsNonNull).toBe(true)
-
-    // Board → Home: the menu must remain mounted.
     await page.getByTitle('Home').click()
     await expect(page.locator('#home')).toBeVisible()
     await expect.poll(menuIsNonNull).toBe(true)

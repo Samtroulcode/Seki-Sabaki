@@ -25,7 +25,7 @@ test.describe('Tsumego workspace', () => {
 
     await page.getByTitle('Home').click()
     await page
-      .locator('.home-navbar')
+      .locator('#home')
       .getByRole('button', {name: 'Tsumego', exact: true})
       .click()
     await expect(page.locator('.app-workspace-tab.type-tsumego')).toHaveCount(1)

@@ -35,6 +35,17 @@ export default class LibraryPanel extends Component {
     this.refresh()
   }
 
+  componentDidUpdate(previousProps) {
+    if (previousProps.request === this.props.request) return
+
+    let request = this.props.request
+    let source = request?.source === 'builtin' ? 'builtin' : 'user'
+    let currentPath = request?.currentPath || ''
+    this.setState({source, currentPath, busy: true, error: null}, () => {
+      this.refresh(source, currentPath)
+    })
+  }
+
   async refresh(
     source = this.state.source,
     relativePath = this.state.currentPath,
@@ -91,6 +102,12 @@ export default class LibraryPanel extends Component {
         error: null,
       })
     } catch (err) {
+      if (
+        source !== this.state.source ||
+        relativePath !== this.state.currentPath
+      )
+        return
+
       let configured = this.state.config?.configured === true
       this.setState({
         config: configured ? this.state.config : {configured: false},
