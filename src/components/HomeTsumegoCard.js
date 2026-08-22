@@ -258,6 +258,7 @@ export default class HomeTsumegoCard extends Component {
     return h(
       'div',
       {class: 'home-tsumego-body'},
+      h('h3', {class: 'home-tsumego-section-title'}, t('Continue Tsumego')),
       h(
         'div',
         {class: 'home-tsumego-goban'},

@@ -117,7 +117,7 @@ export default class HomeDashboard extends Component {
                   'button',
                   {
                     type: 'button',
-                    class: 'ui-button ui-button-primary',
+                    class: 'ui-button ui-button-primary home-action-button',
                     onClick: this.handleNewGameButtonClick,
                   },
                   t('New board'),
@@ -126,7 +126,7 @@ export default class HomeDashboard extends Component {
                   'button',
                   {
                     type: 'button',
-                    class: 'ui-button ui-button-secondary',
+                    class: 'ui-button ui-button-secondary home-action-button',
                     onClick: this.handleBrowseLibrary,
                   },
                   t('Browse Library'),
