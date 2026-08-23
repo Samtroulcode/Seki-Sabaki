@@ -133,7 +133,7 @@ export default class HomeOgsCard extends Component {
     this.handleOpenActiveGame = async () => {
       let {activeGames} = this.state
       if (activeGames.length === 1) {
-        let gameId = activeGames[0].gameId
+        let gameId = activeGames[0].id
         await getOgsOnlineController().openGame(gameId)
       } else {
         sabaki.openWorkspaceTab('ogs')
