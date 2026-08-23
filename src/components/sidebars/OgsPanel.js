@@ -11,6 +11,7 @@ import {OgsGameHistoryPanel} from './OgsGameHistory.js'
 import {OgsFriendsPanel} from './OgsFriendsList.js'
 import {AutomatchForm} from './OgsPanelMatchmaking.js'
 import {defaultMatchmakingOptions, getSocketLabel} from './ogsPanelData.js'
+import {analyzeOgsGame, analyzeSekiGame} from './ogsAnalysisActions.js'
 
 const t = i18n.context('OgsPanel')
 
@@ -92,45 +93,11 @@ export default class OgsPanel extends Component {
     }
 
     this.handleAnalyzeSekiButtonClick = async (gameId) => {
-      let result = await onlineStore.downloadGameSgf(gameId)
-      if (result.stale || !result.ok) return
-
-      await sabaki.startCurrentGameSgfAnalysis({sgfContent: result.sgf})
+      await analyzeSekiGame(gameId)
     }
 
     this.handleAnalyzeOgsButtonClick = async (gameId) => {
-      let result = await onlineStore.listAiReviews(gameId)
-      let review = selectBestReview(result.reviews)
-
-      if (!result.ok || review == null) {
-        await showMessageBox(
-          result.error?.message ||
-            t('No OGS AI review is available for this game.'),
-          'info',
-        )
-        return
-      }
-
-      let connection = await window.sabaki.ogsReviews.connect(gameId, review)
-      if (!connection?.ok) {
-        await showMessageBox(
-          connection?.error?.message ||
-            t('Unable to connect to OGS AI review.'),
-          'warning',
-        )
-        return
-      }
-
-      let sgf = await onlineStore.downloadGameSgf(gameId)
-      if (sgf.ok) {
-        await sabaki.openContentInNewBoardTab(sgf.sgf, 'sgf', {
-          gotoEnd: true,
-          representedFilename: null,
-          ogsGameId: gameId,
-        })
-      } else {
-        await window.sabaki.ogsReviews.disconnect(review.uuid)
-      }
+      await analyzeOgsGame(gameId, {t})
     }
 
     this.handleMatchmakingOptionChange = async (options) => {

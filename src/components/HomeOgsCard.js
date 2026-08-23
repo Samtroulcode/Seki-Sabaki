@@ -16,6 +16,7 @@ import {
   getGameOutcome,
   LazyMiniGoban,
 } from './sidebars/OgsGameHistory.js'
+import {analyzeOgsGame, analyzeSekiGame} from './sidebars/ogsAnalysisActions.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -27,7 +28,7 @@ class HomeOgsRecentGameRow extends Component {
     this.handlePreview = (preview) => this.setState({preview})
   }
 
-  render({game, currentUserId}, {preview}) {
+  render({game, currentUserId, onAnalyzeOgs, onAnalyzeSeki}, {preview}) {
     let displayGame = {...game, winnerColor: preview?.winnerColor}
     let outcome = getGameOutcome(displayGame, currentUserId)
     let opponent = getOpponent(game, currentUserId)
@@ -67,6 +68,36 @@ class HomeOgsRecentGameRow extends Component {
           outcomeLabel,
         ),
         h('div', {class: 'home-ogs-recent-meta'}, h('span', {}, boardLabel)),
+        h(
+          'div',
+          {class: 'home-ogs-recent-actions'},
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'ui-button ui-button-ghost home-ogs-recent-action',
+              onClick: (evt) => {
+                evt.stopPropagation()
+                onAnalyzeOgs?.(game.id)
+              },
+              onKeyDown: (evt) => evt.stopPropagation(),
+            },
+            t('Analyze OGS'),
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'ui-button ui-button-ghost home-ogs-recent-action',
+              onClick: (evt) => {
+                evt.stopPropagation()
+                onAnalyzeSeki?.(game.id)
+              },
+              onKeyDown: (evt) => evt.stopPropagation(),
+            },
+            t('Analyze Seki'),
+          ),
+        ),
       ),
     )
   }
@@ -142,6 +173,14 @@ export default class HomeOgsCard extends Component {
 
     this.handleViewHistory = () => {
       sabaki.openWorkspaceTab('ogs')
+    }
+
+    this.handleAnalyzeOgs = async (gameId) => {
+      await analyzeOgsGame(gameId, {t})
+    }
+
+    this.handleAnalyzeSeki = async (gameId) => {
+      await analyzeSekiGame(gameId)
     }
 
     this.handleOnlineStoreState = (state) => {
@@ -413,6 +452,8 @@ export default class HomeOgsCard extends Component {
                           key: game.id,
                           game,
                           currentUserId,
+                          onAnalyzeOgs: this.handleAnalyzeOgs,
+                          onAnalyzeSeki: this.handleAnalyzeSeki,
                         }),
                       ),
                     ),
