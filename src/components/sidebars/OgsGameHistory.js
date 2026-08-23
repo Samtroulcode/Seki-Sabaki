@@ -307,7 +307,9 @@ export function getOutcomeLabel(game, currentUserId, t) {
 
 export function getResultDetail(result) {
   if (typeof result !== 'string') return null
-  let rest = result.trim().slice(1)
+  let trimmed = result.trim()
+  let rest =
+    trimmed[0] === 'B' || trimmed[0] === 'W' ? trimmed.slice(1) : trimmed
   if (rest.startsWith('+')) rest = rest.slice(1)
 
   let lower = rest.toLowerCase()
