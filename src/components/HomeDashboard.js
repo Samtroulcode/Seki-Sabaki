@@ -4,6 +4,7 @@ import {h, Component} from 'preact'
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
 import HomeTsumegoCard from './HomeTsumegoCard.js'
+import HomeOgsCard from './HomeOgsCard.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -171,6 +172,12 @@ export default class HomeDashboard extends Component {
                 ),
               ),
             ),
+          ),
+          h(
+            'section',
+            {class: 'home-work-section home-overview-section'},
+            h('h2', {}, t('Quick overview')),
+            h('div', {class: 'home-overview-grid'}, h(HomeOgsCard)),
           ),
         ),
         h(

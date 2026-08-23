@@ -550,6 +550,209 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   justify-items: start;
   gap: var(--space-8);
 }
+
+/* Home OGS Quick Overview Card */
+.home-ogs-card {
+  display: grid;
+  gap: var(--space-16);
+  padding: clamp(calc(var(--space-16) + var(--space-4)), 3cqw, calc(var(--space-24) + var(--space-4)));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-large);
+  background: var(--ui-surface-1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.home-ogs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+.home-ogs-header h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ui-text);
+}
+.home-ogs-status {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-small);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.home-ogs-status.online {
+  color: var(--ui-success);
+  background: rgba(96, 152, 115, 0.15);
+}
+.home-ogs-status.offline {
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-2);
+}
+.home-ogs-body {
+  display: grid;
+  gap: var(--space-16);
+}
+.home-ogs-disconnected {
+  padding-top: var(--space-8);
+}
+.home-ogs-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+.home-ogs-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.home-ogs-avatar-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-surface-2);
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.home-ogs-profile-info {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.home-ogs-profile-info strong {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-ogs-profile-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+.home-ogs-sections {
+  display: grid;
+  gap: var(--space-16);
+}
+@container home (min-width: 600px) {
+  .home-ogs-sections {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.home-ogs-section {
+  display: grid;
+  gap: var(--space-8);
+}
+.home-ogs-section h4 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+.home-ogs-quickmatch-summary {
+  font-size: 0.8125rem;
+  color: var(--ui-text);
+  line-height: 1.4;
+}
+.home-ogs-quickmatch-searching {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--ui-accent);
+  font-size: 0.875rem;
+}
+.home-ogs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--ui-border);
+  border-top-color: var(--ui-accent);
+  border-radius: 50%;
+  animation: home-ogs-spin 0.8s linear infinite;
+}
+@keyframes home-ogs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.home-ogs-quickmatch-matched {
+  color: var(--ui-success);
+  font-size: 0.875rem;
+}
+.home-ogs-active-count {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ui-text);
+}
+.home-ogs-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+.home-ogs-recent-header h4 {
+  margin: 0;
+}
+.home-ogs-recent-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.home-ogs-recent-item {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--radius-normal);
+  background: var(--ui-surface-2);
+}
+.home-ogs-recent-opponent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.home-ogs-recent-opponent strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.home-ogs-recent-rank {
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+.home-ogs-recent-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+.home-ogs-empty {
+  font-size: 0.875rem;
+  color: var(--ui-text-muted);
+  text-align: center;
+  padding: var(--space-16);
+}
 @container home (max-width: 900px) {
   .home-layout {
     grid-template-columns: 1fr;

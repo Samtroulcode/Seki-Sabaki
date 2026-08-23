@@ -45,6 +45,7 @@ test.describe('Home workspace', () => {
     ).toHaveCount(0)
     await expect(page.locator('.home-work-section > h2')).toHaveText([
       'Start',
+      'Quick overview',
       'Study',
     ])
 
@@ -412,7 +413,7 @@ test.describe('Home workspace', () => {
     }
   })
 
-  test('does not fetch OGS history when returning Home', async ({page}) => {
+  test('fetches OGS history when returning Home', async ({page}) => {
     await page.evaluate(() => {
       window.__homeHistoryCalls = []
       let user = {id: '7', username: 'sekibot', rank: '1d'}
@@ -448,8 +449,9 @@ test.describe('Home workspace', () => {
     await expect(page.locator('#home')).toBeVisible()
     await page.waitForTimeout(300)
     let calls = await page.evaluate(() => window.__homeHistoryCalls)
-    expect(calls).toHaveLength(before)
-    expect(calls.some((call) => call.pageSize === 3)).toBe(false)
+    // HomeOgsCard now fetches history on mount (pageSize 12)
+    expect(calls).toHaveLength(before + 1)
+    expect(calls.some((call) => call.pageSize === 12)).toBe(true)
   })
 
   test('remains usable at 800x600', async ({page, electronApp}) => {
