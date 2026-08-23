@@ -1566,6 +1566,11 @@ class OgsClient {
 
   applyOgsNotification(payload) {
     let gameId = sanitizeOptionalGameId(payload?.game_id)
+
+    if (payload?.type === 'gameEnded' && gameId != null) {
+      this.activeGames = this.activeGames.filter((item) => item.id !== gameId)
+    }
+
     if (gameId == null || gameId !== this.onlineGame.gameId) return
     if (payload?.type !== 'gameEnded') return
 
@@ -1694,6 +1699,11 @@ class OgsClient {
   upsertActiveGame(payload) {
     let game = sanitizeActiveGame(payload, this.serverUrl)
     if (game == null) return
+
+    if (game.phase === 'finished') {
+      this.activeGames = this.activeGames.filter((item) => item.id !== game.id)
+      return
+    }
 
     this.activeGames = [
       ...this.activeGames.filter((item) => item.id !== game.id),
