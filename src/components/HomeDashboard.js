@@ -3,6 +3,7 @@ import {h, Component} from 'preact'
 
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
+import HomeAnalysisCard from './HomeAnalysisCard.js'
 import HomeTsumegoCard from './HomeTsumegoCard.js'
 import HomeOgsCard from './HomeOgsCard.js'
 
@@ -177,7 +178,12 @@ export default class HomeDashboard extends Component {
             'section',
             {class: 'home-work-section home-overview-section'},
             h('h2', {}, t('Quick overview')),
-            h('div', {class: 'home-overview-grid'}, h(HomeOgsCard)),
+            h(
+              'div',
+              {class: 'home-overview-grid'},
+              h(HomeOgsCard),
+              h(HomeAnalysisCard),
+            ),
           ),
         ),
         h(
