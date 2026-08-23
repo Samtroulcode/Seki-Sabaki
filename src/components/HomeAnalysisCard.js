@@ -32,17 +32,16 @@ export default class HomeAnalysisCard extends Component {
     this.unsubscribeAnalysisStore?.()
   }
 
-  render(props, {analysisState, config, busy}) {
+  render(props, {analysisState, config, analyzedGames, busy}) {
     let currentJob = analysisState?.currentJob || null
     let queuedJobs = analysisState?.queuedJobs || []
-    let completedJobs = analysisState?.completedJobs || []
     let configMissing = !hasRunnableAnalysisConfig(config)
     let status = configMissing
       ? 'setup'
       : currentJob != null
         ? 'running'
         : 'ready'
-    let analyzedCount = completedJobs.length
+    let analyzedCount = Array.isArray(analyzedGames) ? analyzedGames.length : 0
 
     return h(
       'section',
