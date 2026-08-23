@@ -283,10 +283,65 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   display: block;
   height: 100%;
   box-sizing: border-box;
-  padding: calc(var(--space-32) + var(--space-8)) calc(var(--space-32) + var(--space-16));
+  padding: clamp(var(--space-24), 4cqw, calc(var(--space-32) + var(--space-32)));
   background: var(--ui-workspace);
   color: var(--ui-text);
   overflow: auto;
+}
+.home-view .home-content {
+  width: 100%;
+  min-width: 0;
+}
+.home-view .home-inner {
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+}
+.home-view .home-dashboard {
+  display: grid;
+  gap: var(--space-24);
+  width: 100%;
+  min-width: 0;
+}
+.home-identity {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: clamp(var(--space-24), 3cqh, var(--space-32));
+}
+.home-identity h1 {
+  color: var(--ui-text);
+  font-size: clamp(1.5rem, 2.5cqw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.home-identity p {
+  color: var(--ui-text-muted);
+  font-size: clamp(0.8125rem, 1cqw, 0.9375rem);
+  line-height: 1.4;
+}
+.home-control-label,
+.home-resume-details span,
+.home-tsumego-status,
+.home-tsumego-empty,
+.home-tsumego-solved {
+  color: var(--ui-text-muted);
+}
+.home-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(min(320px, 100%), 0.8fr);
+  gap: clamp(var(--space-24), 2.5cqw, var(--space-32));
+  align-items: start;
+}
+.home-main-column {
+  display: grid;
+  gap: clamp(var(--space-16), 2cqh, var(--space-24));
+  min-width: 0;
+}
+.home-study-column {
+  display: grid;
+  gap: clamp(var(--space-16), 2cqh, var(--space-24));
+  min-width: 0;
 }
 .home-view .home-content {
   width: 100%;
@@ -390,6 +445,202 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 .home-work-section {
   display: grid;
   gap: var(--space-12);
+}
+.home-work-section h2 {
+  color: var(--ui-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.home-start-surface,
+.home-resume-surface,
+.home-study-surface {
+  display: grid;
+  gap: clamp(var(--space-12), 1.5cqh, var(--space-16));
+  padding: clamp(var(--space-16), 2cqw, var(--space-24));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-large);
+  background: var(--ui-surface-1);
+}
+.home-resume-surface {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.home-resume-details,
+.home-study-details {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.home-resume-details strong,
+.home-tsumego-title {
+  overflow: hidden;
+  color: var(--ui-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-tsumego-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.home-tsumego-section-title {
+  color: var(--ui-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+.home-tsumego-meta {
+  display: grid;
+  gap: var(--space-4);
+}
+.home-tsumego-source {
+  color: var(--ui-text-muted);
+  font-size: 0.8125rem;
+}
+.home-tsumego-solved {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.home-start-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+}
+.home-start-surface .home-start-actions {
+  gap: var(--space-12);
+}
+.home-action-button {
+  min-width: clamp(140px, 20cqw, 200px);
+  min-height: 40px;
+  padding: var(--space-8) var(--space-16);
+  font-size: 0.875rem;
+}
+.home-size-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+}
+.home-size-options .home-size-button {
+  flex: 0 0 auto;
+  width: clamp(64px, 8cqw, 80px);
+  border-radius: 0;
+  border-right: 1px solid var(--ui-border);
+}
+.home-size-options .home-size-button:first-child {
+  border-radius: var(--radius-normal) 0 0 var(--radius-normal);
+}
+.home-size-options .home-size-button:last-child {
+  border-radius: 0 var(--radius-normal) var(--radius-normal) 0;
+  border-right: none;
+}
+.home-size-options .home-size-button[aria-pressed='true'] {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+}
+.home-size-options .home-size-button[aria-pressed='true']:hover:not(:disabled),
+.home-size-options .home-size-button[aria-pressed='true']:focus-visible:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+  color: var(--ui-text-on-accent);
+}
+.home-control-label {
+  margin-right: var(--space-8);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.home-study-surface h3 {
+  color: var(--ui-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.home-tsumego-body {
+  display: grid;
+  gap: clamp(var(--space-12), 1.5cqh, var(--space-16));
+  min-width: 0;
+}
+.home-tsumego-goban {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.home-tsumego-goban .ogs-mini-goban {
+  width: 100%;
+  max-width: min(300px, 100%);
+  aspect-ratio: 1 / 1;
+}
+.home-tsumego-progress {
+  height: 6px;
+  width: 100%;
+  overflow: hidden;
+  background: var(--ui-surface-3);
+  border-radius: var(--radius-small);
+}
+.home-tsumego-progress-bar {
+  height: 100%;
+  background: var(--ui-accent);
+  border-radius: var(--radius-small);
+  transition: width 0.2s ease;
+}
+.home-study-actions {
+  display: grid;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+}
+.home-study-actions .ui-button {
+  width: 100%;
+  justify-content: center;
+}
+.home-tsumego-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-8);
+}
+@container (max-width: 900px) {
+  .home-layout {
+    grid-template-columns: 1fr;
+  }
+  .home-study-column {
+    order: 2;
+  }
+  .home-tsumego-goban .ogs-mini-goban {
+    max-width: min(280px, 100%);
+  }
+}
+@container (max-width: 600px) {
+  .home-view {
+    padding: var(--space-24);
+  }
+  .home-identity h1 {
+    font-size: clamp(1.5rem, 4cqw, 1.75rem);
+  }
+  .home-tsumego-goban .ogs-mini-goban {
+    max-width: min(240px, 100%);
+  }
+}
+@container (max-width: 480px) {
+  .home-start-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .home-start-actions .ui-button {
+    width: 100%;
+    justify-content: center;
+  }
+  .home-size-options {
+    width: 100%;
+    justify-content: center;
+  }
+  .home-size-options .home-size-button {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
 }
 .home-work-section h2 {
   color: var(--ui-text);
