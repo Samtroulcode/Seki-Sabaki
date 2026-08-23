@@ -308,20 +308,21 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-identity {
   display: grid;
-  gap: var(--space-4);
-  margin-bottom: clamp(var(--space-24), 3cqh, var(--space-32));
+  gap: var(--space-6);
+  margin-bottom: clamp(var(--space-32), 4cqw, var(--space-48));
 }
 .home-identity h1 {
   color: var(--ui-text);
-  font-size: clamp(1.5rem, 2.5cqw, 2.25rem);
+  font-size: clamp(2rem, 3.5cqw, 2.75rem);
   font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 .home-identity p {
   color: var(--ui-text-muted);
-  font-size: clamp(0.8125rem, 1cqw, 0.9375rem);
-  line-height: 1.4;
+  font-size: clamp(1rem, 1.25cqw, 1.125rem);
+  line-height: 1.5;
+  opacity: 0.85;
 }
 .home-control-label,
 .home-resume-details span,
@@ -344,9 +345,11 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   min-width: 0;
 }
 .home-study-column {
-  display: grid
+  display: grid;
   gap: clamp(var(--space-16), 1.5rem, var(--space-24));
   min-width: 0;
+  overflow: hidden;
+  max-width: 100%;
 }
 .home-work-section {
   display: grid;
@@ -354,29 +357,54 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-work-section h2 {
   color: var(--ui-text);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
-.home-start-surface,
-.home-resume-surface,
-.home-study-surface {
+.home-start-surface {
   display: grid;
+  gap: clamp(var(--space-16), 2cqh, var(--space-24));
+  padding: clamp(var(--space-20), 3cqw, var(--space-28));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-large);
+  background: var(--ui-surface-1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.home-start-surface .home-work-section {
+  display: grid;
+  gap: clamp(var(--space-8), 1.5cqh, var(--space-12));
+}
+.home-start-surface .home-work-section h2 {
+  margin-bottom: clamp(var(--space-4), 1cqh, var(--space-8));
+}
+.home-start-content {
+  display: grid;
+  gap: clamp(var(--space-16), 2cqh, var(--space-24));
+  max-width: 480px;
+}
+.home-resume-surface {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: clamp(var(--space-12), 1.5rem, var(--space-16));
   padding: clamp(var(--space-16), 2cqw, var(--space-24));
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-large);
-  background: var(--ui-surface-1);
-}
-.home-resume-surface {
-  grid-template-columns: minmax(0, 1fr) auto;
+  background: var(--ui-surface-2);
   align-items: center;
+}
+.home-study-surface {
+  display: grid;
+  gap: clamp(var(--space-16), 2cqh, var(--space-24));
+  padding: clamp(var(--space-20), 3cqw, var(--space-28));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-large);
+  background: var(--ui-surface-1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 .home-resume-details,
 .home-study-details {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-6);
   min-width: 0;
 }
 .home-resume-details strong,
@@ -387,8 +415,9 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   white-space: nowrap;
 }
 .home-tsumego-title {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
+  line-height: 1.3;
 }
 .home-tsumego-section-title {
   color: var(--ui-text);
@@ -398,7 +427,9 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-tsumego-meta {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--ui-border-subtle);
 }
 .home-tsumego-source {
   color: var(--ui-text-muted);
@@ -407,6 +438,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 .home-tsumego-solved {
   font-size: 0.8125rem;
   font-weight: 500;
+  color: var(--ui-text);
 }
 .home-start-actions {
   display: flex;
@@ -418,10 +450,11 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   gap: var(--space-12);
 }
 .home-action-button {
-  min-width: clamp(140px, 20cqw, 200px);
-  min-height: 40px;
-  padding: var(--space-8) var(--space-16);
-  font-size: 0.875rem;
+  min-width: clamp(160px, 22cqw, 220px);
+  min-height: 44px;
+  padding: var(--space-10) var(--space-20);
+  font-size: 0.9375rem;
+  gap: var(--space-8);
 }
 .home-size-options {
   display: flex;
@@ -431,16 +464,28 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-size-options .home-size-button {
   flex: 0 0 auto;
-  width: clamp(64px, 8cqw, 80px);
+  width: clamp(72px, 9cqw, 88px);
+  min-height: 40px;
   border-radius: 0;
-  border-right: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-border);
+  border-right: none;
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .home-size-options .home-size-button:first-child {
   border-radius: var(--radius-normal) 0 0 var(--radius-normal);
+  border-left: 1px solid var(--ui-border);
 }
 .home-size-options .home-size-button:last-child {
   border-radius: 0 var(--radius-normal) var(--radius-normal) 0;
-  border-right: none;
+  border-right: 1px solid var(--ui-border);
+}
+.home-size-options .home-size-button:hover:not(:disabled),
+.home-size-options .home-size-button:focus-visible:not(:disabled) {
+  background: var(--ui-surface-3);
 }
 .home-size-options .home-size-button[aria-pressed='true'] {
   border-color: var(--ui-accent);
@@ -460,14 +505,14 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-study-surface h3 {
   color: var(--ui-text);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin-bottom: var(--space-4);
 }
 .home-tsumego-body {
   display: grid;
-  gap: clamp(var(--space-12), 1.5rem, var(--space-16));
+  gap: clamp(var(--space-16), 2cqh, var(--space-24));
   min-width: 0;
 }
 .home-tsumego-goban {
@@ -487,6 +532,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   overflow: hidden;
   background: var(--ui-surface-3);
   border-radius: var(--radius-small);
+  margin-top: var(--space-4);
 }
 .home-tsumego-progress-bar {
   height: 100%;
@@ -497,11 +543,14 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 .home-study-actions {
   display: grid;
   gap: var(--space-8);
-  margin-top: var(--space-4);
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--ui-border-subtle);
 }
 .home-study-actions .ui-button {
   width: 100%;
   justify-content: center;
+  min-height: 40px;
 }
 .home-tsumego-empty {
   display: grid;

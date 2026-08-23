@@ -102,12 +102,12 @@ test.describe('Home workspace', () => {
     page,
   }) => {
     let sizes = page.locator('.home-size-options')
-    await expect(sizes.getByRole('button', {name: '19x19'})).toHaveAttribute(
+    await expect(sizes.getByRole('button', {name: '19×19'})).toHaveAttribute(
       'aria-pressed',
       'true',
     )
-    await sizes.getByRole('button', {name: '9x9'}).click()
-    await expect(sizes.getByRole('button', {name: '9x9'})).toHaveAttribute(
+    await sizes.getByRole('button', {name: '9×9'}).click()
+    await expect(sizes.getByRole('button', {name: '9×9'})).toHaveAttribute(
       'aria-pressed',
       'true',
     )

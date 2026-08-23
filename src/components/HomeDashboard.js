@@ -112,45 +112,61 @@ export default class HomeDashboard extends Component {
               {class: 'home-start-surface'},
               h(
                 'div',
-                {class: 'home-start-actions'},
+                {class: 'home-start-content'},
                 h(
-                  'button',
-                  {
-                    type: 'button',
-                    class: 'ui-button ui-button-primary home-action-button',
-                    onClick: this.handleNewGameButtonClick,
-                  },
-                  t('New board'),
-                ),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    class: 'ui-button ui-button-secondary home-action-button',
-                    onClick: this.handleBrowseLibrary,
-                  },
-                  t('Browse Library'),
-                ),
-              ),
-              h(
-                'div',
-                {
-                  class: 'home-size-options',
-                  role: 'group',
-                  'aria-label': t('Board size'),
-                },
-                h('span', {class: 'home-control-label'}, t('Board size')),
-                [9, 13, 19].map((size) =>
+                  'div',
+                  {class: 'home-start-actions'},
                   h(
                     'button',
                     {
-                      key: size,
                       type: 'button',
-                      class: 'ui-button ui-button-ghost home-size-button',
-                      'aria-pressed': selectedBoardSize === size,
-                      onClick: () => this.setState({selectedBoardSize: size}),
+                      class: 'ui-button ui-button-primary home-action-button',
+                      onClick: this.handleNewGameButtonClick,
                     },
-                    `${size}x${size}`,
+                    h('img', {
+                      src: './node_modules/@primer/octicons/build/svg/plus-16.svg',
+                      width: 16,
+                      height: 16,
+                      alt: '',
+                    }),
+                    t('New board'),
+                  ),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      class: 'ui-button ui-button-secondary home-action-button',
+                      onClick: this.handleBrowseLibrary,
+                    },
+                    h('img', {
+                      src: './node_modules/@primer/octicons/build/svg/book-16.svg',
+                      width: 16,
+                      height: 16,
+                      alt: '',
+                    }),
+                    t('Browse Library'),
+                  ),
+                ),
+                h(
+                  'div',
+                  {
+                    class: 'home-size-options',
+                    role: 'group',
+                    'aria-label': t('Board size'),
+                  },
+                  h('span', {class: 'home-control-label'}, t('Board size')),
+                  [9, 13, 19].map((size) =>
+                    h(
+                      'button',
+                      {
+                        key: size,
+                        type: 'button',
+                        class: 'ui-button ui-button-ghost home-size-button',
+                        'aria-pressed': selectedBoardSize === size,
+                        onClick: () => this.setState({selectedBoardSize: size}),
+                      },
+                      `${size}\u00D7${size}`,
+                    ),
                   ),
                 ),
               ),
