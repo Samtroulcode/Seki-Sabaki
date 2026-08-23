@@ -702,6 +702,9 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   font-weight: 500;
   color: var(--ui-text);
 }
+.home-ogs-recent {
+  grid-column: 1 / -1;
+}
 .home-ogs-recent-header {
   display: flex;
   align-items: center;
@@ -745,6 +748,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-ogs-recent-info {
   display: grid;
+  grid-template-columns: 1fr auto;
   gap: var(--space-4);
   min-width: 0;
 }
@@ -752,6 +756,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  grid-column: 1;
 }
 .home-ogs-recent-opponent strong {
   font-size: 0.875rem;
@@ -771,6 +776,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   gap: var(--space-8);
   font-size: 0.8125rem;
   font-weight: 500;
+  grid-column: 1;
 }
 .home-ogs-recent-outcome.won {
   color: var(--ui-success);
@@ -784,15 +790,20 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   gap: var(--space-8);
   font-size: 0.8125rem;
   color: var(--ui-text-muted);
+  grid-column: 1;
 }
 .home-ogs-recent-actions {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: var(--space-4);
-  margin-top: var(--space-4);
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: center;
 }
 .home-ogs-recent-action {
   font-size: 0.6875rem;
-  padding: var(--space-2) var(--space-6);
+  padding: var(--space-4) var(--space-8);
   min-height: 22px;
   white-space: nowrap;
 }
