@@ -22,6 +22,59 @@ import {
 
 const t = i18n.context('HomeDashboard')
 
+// Home recent game row with local preview state for correct winner resolution
+class HomeOgsRecentGameRow extends Component {
+  constructor(props) {
+    super(props)
+    this.state = {preview: null}
+    this.handlePreview = (preview) => this.setState({preview})
+  }
+
+  render({game, currentUserId}, {preview}) {
+    let displayGame = {...game, winnerColor: preview?.winnerColor}
+    let outcome = getGameOutcome(displayGame, currentUserId)
+    let opponent = getOpponent(game, currentUserId)
+    let opponentName = opponent?.username || game.name || `#${game.id}`
+    let outcomeLabel =
+      getOutcomeLabel(displayGame, currentUserId, t) ||
+      game.result ||
+      t('Result unknown')
+    let boardLabel = formatBoard(game.board, t)
+
+    return h(
+      'li',
+      {
+        key: game.id,
+        class: `home-ogs-recent-item ${outcome.status}`,
+      },
+      h(
+        'div',
+        {class: 'home-ogs-recent-goban'},
+        h(LazyMiniGoban, {game, onPreview: this.handlePreview}),
+      ),
+      h(
+        'div',
+        {class: 'home-ogs-recent-info'},
+        h(
+          'div',
+          {class: 'home-ogs-recent-opponent'},
+          h('strong', {}, opponentName),
+          opponent?.rank != null &&
+            h('span', {class: 'home-ogs-recent-rank'}, ` · ${opponent.rank}`),
+        ),
+        h(
+          'div',
+          {
+            class: `home-ogs-recent-outcome ${outcome.status}`,
+          },
+          outcomeLabel,
+        ),
+        h('div', {class: 'home-ogs-recent-meta'}, h('span', {}, boardLabel)),
+      ),
+    )
+  }
+}
+
 function getMatchmakingSummary(options, t) {
   if (!options) return t('Not configured')
 
@@ -358,57 +411,13 @@ export default class HomeOgsCard extends Component {
                   : h(
                       'ul',
                       {class: 'home-ogs-recent-list'},
-                      recentGames.map((game) => {
-                        let opponent = getOpponent(game, currentUserId)
-                        let opponentName =
-                          opponent?.username || game.name || `#${game.id}`
-                        let outcome = getGameOutcome(game, currentUserId)
-                        let outcomeLabel =
-                          getOutcomeLabel(game, currentUserId, t) ||
-                          game.result ||
-                          t('Result unknown')
-                        let boardLabel = formatBoard(game.board, t)
-
-                        return h(
-                          'li',
-                          {
-                            key: game.id,
-                            class: `home-ogs-recent-item ${outcome.status}`,
-                          },
-                          h(
-                            'div',
-                            {class: 'home-ogs-recent-goban'},
-                            h(LazyMiniGoban, {game}),
-                          ),
-                          h(
-                            'div',
-                            {class: 'home-ogs-recent-info'},
-                            h(
-                              'div',
-                              {class: 'home-ogs-recent-opponent'},
-                              h('strong', {}, opponentName),
-                              opponent?.rank != null &&
-                                h(
-                                  'span',
-                                  {class: 'home-ogs-recent-rank'},
-                                  ` · ${opponent.rank}`,
-                                ),
-                            ),
-                            h(
-                              'div',
-                              {
-                                class: `home-ogs-recent-outcome ${outcome.status}`,
-                              },
-                              outcomeLabel,
-                            ),
-                            h(
-                              'div',
-                              {class: 'home-ogs-recent-meta'},
-                              h('span', {}, boardLabel),
-                            ),
-                          ),
-                        )
-                      }),
+                      recentGames.map((game) =>
+                        h(HomeOgsRecentGameRow, {
+                          key: game.id,
+                          game,
+                          currentUserId,
+                        }),
+                      ),
                     ),
               ),
             ),
