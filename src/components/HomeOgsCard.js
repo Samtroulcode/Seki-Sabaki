@@ -10,6 +10,15 @@ import {
   defaultMatchmakingOptions,
   timePresets,
 } from './sidebars/ogsPanelData.js'
+import {
+  getOpponent,
+  getUserColor,
+  getResultDetail,
+  getOutcomeLabel,
+  getWinnerColor,
+  getGameOutcome,
+  LazyMiniGoban,
+} from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -33,62 +42,6 @@ function getMatchmakingSummary(options, t) {
   let systemLabel = system === 'fischer' ? t('Fischer') : t('Byo-yomi')
 
   return `${sizeLabel} · ${speedLabel} · ${systemLabel}`
-}
-
-function getOpponent(game, currentUserId) {
-  let players = [game.black, game.white].filter(Boolean)
-  if (currentUserId == null) return null
-  return (
-    players.find(
-      (player) =>
-        player.id != null && Number(player.id) !== Number(currentUserId),
-    ) || null
-  )
-}
-
-function getUserColor(game, currentUserId) {
-  if (currentUserId == null) return null
-  if (
-    game.black?.id != null &&
-    Number(game.black.id) === Number(currentUserId)
-  ) {
-    return 'B'
-  }
-  if (
-    game.white?.id != null &&
-    Number(game.white.id) === Number(currentUserId)
-  ) {
-    return 'W'
-  }
-  return null
-}
-
-function getResultDetail(result) {
-  if (typeof result !== 'string') return null
-  let rest = result.trim().slice(1)
-  if (rest.startsWith('+')) rest = rest.slice(1)
-  if (rest === 'R') return 'resignation'
-  if (rest === 'T') return 'time'
-  if (rest === '') return null
-  return rest
-}
-
-function getOutcomeLabel(game, currentUserId, t) {
-  let userColor = getUserColor(game, currentUserId)
-  let result = typeof game.result === 'string' ? game.result.trim()[0] : null
-  let winnerColor = result === 'B' || result === 'W' ? result : game.winnerColor
-  if (userColor == null || winnerColor == null) return null
-
-  let won = userColor === winnerColor
-  let detail = getResultDetail(game.result)
-  if (detail == null) return null
-  if (detail === 'resignation') {
-    return won ? t('Won by resignation') : t('Lost by resignation')
-  }
-  if (detail === 'time') return won ? t('Won by time') : t('Lost by time')
-  return won
-    ? `${t('Won by')} ${detail} ${t('points')}`
-    : `${t('Lost by')} ${detail} ${t('points')}`
 }
 
 export default class HomeOgsCard extends Component {
@@ -267,10 +220,22 @@ export default class HomeOgsCard extends Component {
                 h(
                   'div',
                   {class: 'home-ogs-profile-meta'},
-                  playerProfile?.rank != null &&
-                    h('span', {}, playerProfile.rank),
-                  playerProfile?.rating != null &&
-                    h('span', {}, '·', String(playerProfile.rating)),
+                  (playerProfile?.rank ?? user?.rank) != null &&
+                    h('span', {}, playerProfile?.rank ?? user?.rank),
+                  (() => {
+                    let rating = playerProfile?.rating
+                    if (typeof rating === 'number' && Number.isFinite(rating)) {
+                      return h(
+                        'span',
+                        {},
+                        '·',
+                        t('Rating'),
+                        ' ',
+                        Math.round(rating),
+                      )
+                    }
+                    return null
+                  })(),
                   playerProfile?.country != null &&
                     h('span', {}, '·', playerProfile.country.toUpperCase()),
                 ),
@@ -397,6 +362,7 @@ export default class HomeOgsCard extends Component {
                         let opponent = getOpponent(game, currentUserId)
                         let opponentName =
                           opponent?.username || game.name || `#${game.id}`
+                        let outcome = getGameOutcome(game, currentUserId)
                         let outcomeLabel =
                           getOutcomeLabel(game, currentUserId, t) ||
                           game.result ||
@@ -405,23 +371,41 @@ export default class HomeOgsCard extends Component {
 
                         return h(
                           'li',
-                          {key: game.id, class: 'home-ogs-recent-item'},
+                          {
+                            key: game.id,
+                            class: `home-ogs-recent-item ${outcome.status}`,
+                          },
                           h(
                             'div',
-                            {class: 'home-ogs-recent-opponent'},
-                            h('strong', {}, opponentName),
-                            opponent?.rank != null &&
-                              h(
-                                'span',
-                                {class: 'home-ogs-recent-rank'},
-                                ` · ${opponent.rank}`,
-                              ),
+                            {class: 'home-ogs-recent-goban'},
+                            h(LazyMiniGoban, {game}),
                           ),
                           h(
                             'div',
-                            {class: 'home-ogs-recent-meta'},
-                            h('span', {}, outcomeLabel),
-                            h('span', {}, '·', boardLabel),
+                            {class: 'home-ogs-recent-info'},
+                            h(
+                              'div',
+                              {class: 'home-ogs-recent-opponent'},
+                              h('strong', {}, opponentName),
+                              opponent?.rank != null &&
+                                h(
+                                  'span',
+                                  {class: 'home-ogs-recent-rank'},
+                                  ` · ${opponent.rank}`,
+                                ),
+                            ),
+                            h(
+                              'div',
+                              {
+                                class: `home-ogs-recent-outcome ${outcome.status}`,
+                              },
+                              outcomeLabel,
+                            ),
+                            h(
+                              'div',
+                              {class: 'home-ogs-recent-meta'},
+                              h('span', {}, boardLabel),
+                            ),
                           ),
                         )
                       }),

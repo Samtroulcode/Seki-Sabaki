@@ -720,11 +720,33 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-ogs-recent-item {
   display: grid;
-  gap: var(--space-4);
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
   padding: var(--space-8);
   border: 1px solid var(--ui-border-subtle);
   border-radius: var(--radius-normal);
   background: var(--ui-surface-2);
+}
+.home-ogs-recent-item.won {
+  border-color: rgba(var(--ui-success-rgb, 96, 152, 115), 0.45);
+}
+.home-ogs-recent-item.lost {
+  border-color: rgba(var(--ui-error-rgb, 220, 75, 75), 0.45);
+}
+.home-ogs-recent-goban {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+}
+.home-ogs-recent-goban .ogs-mini-goban {
+  width: 100%;
+  height: 100%;
+}
+.home-ogs-recent-info {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
 }
 .home-ogs-recent-opponent {
   display: flex;
@@ -735,10 +757,26 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .home-ogs-recent-rank {
   font-size: 0.8125rem;
   color: var(--ui-text-muted);
+}
+.home-ogs-recent-outcome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.home-ogs-recent-outcome.won {
+  color: var(--ui-success);
+}
+.home-ogs-recent-outcome.lost {
+  color: var(--ui-error);
 }
 .home-ogs-recent-meta {
   display: flex;
@@ -1870,7 +1908,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   cursor: crosshair;
 }
 
-header,
+#bar > header,
 #bar .bar {
   position: absolute;
   left: 0;
@@ -1881,10 +1919,10 @@ header,
   transition: transform 0.2s;
 }
 
-header {
+#bar > header {
   display: flex;
 }
-header .hotspot {
+#bar > header .hotspot {
   position: relative;
   width: 12px;
   height: 20px;
@@ -1894,8 +1932,8 @@ header .hotspot {
   transform: translateY(-42px);
   transition: transform 0.2s;
 }
-header .hotspot::before,
-header .hotspot::after {
+#bar > header .hotspot::before,
+#bar > header .hotspot::after {
   content: '';
   display: block;
   position: absolute;
@@ -1904,15 +1942,15 @@ header .hotspot::after {
   border-top: 6px solid #a456bb;
   border-right: 6px solid transparent;
 }
-header .hotspot::after {
+#bar > header .hotspot::after {
   left: 6px;
   border-right: none;
   border-left: 6px solid transparent;
 }
-header.hotspot .hotspot {
+#bar > header.hotspot .hotspot {
   transform: none;
 }
-header .playercontent {
+#bar > header .playercontent {
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1921,25 +1959,25 @@ header .playercontent {
   flex: 1 0;
   padding: 0 10px;
 }
-header .playercontent.player_-1 {
+#bar > header .playercontent.player_-1 {
   justify-content: flex-start;
 }
-header .playercontent > * + * {
+#bar > header .playercontent > * + * {
   margin-left: 5px;
 }
-header .name {
+#bar > header .name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-header .engine {
+#bar > header .engine {
   font-family: Consolas, Menlo, Monaco, 'Ubuntu Mono', monospace;
 }
-header .rank {
+#bar > header .rank {
   flex: 0 1 auto;
   opacity: 0.4;
 }
-header .captures {
+#bar > header .captures {
   flex: none;
   display: inline-block;
   height: 20px;
@@ -1953,25 +1991,25 @@ header .captures {
   font-size: 0.8em;
   transition: opacity 0.2s;
 }
-header .current-player,
-header .menu {
+#bar > header .current-player,
+#bar > header .menu {
   display: flex;
   align-items: center;
   flex: none;
   justify-content: center;
   padding: 5px;
 }
-header .current-player {
+#bar > header .current-player {
   cursor: pointer;
 }
-header .menu {
+#bar > header .menu {
   width: 32px;
 }
-header .menu:hover,
-header .menu:focus {
+#bar > header .menu:hover,
+#bar > header .menu:focus {
   background: #222;
 }
-header .menu img {
+#bar > header .menu img {
   filter: invert(100%);
 }
 
@@ -1994,7 +2032,7 @@ header .menu img {
 #bar .bar.current {
   transform: none;
 }
-#bar header:not(.current) {
+#bar > header:not(.current) {
   transform: translateY(40px);
 }
 #bar .bar.hidecontent > * {

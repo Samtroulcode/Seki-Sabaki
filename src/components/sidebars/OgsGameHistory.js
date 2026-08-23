@@ -256,7 +256,7 @@ class OgsGameHistoryColumnEntry extends Component {
   }
 }
 
-function getOpponent(game, currentUserId) {
+export function getOpponent(game, currentUserId) {
   let players = [game.black, game.white].filter(Boolean)
   if (currentUserId == null) return null
   return (
@@ -267,11 +267,11 @@ function getOpponent(game, currentUserId) {
   )
 }
 
-function getOpponentName(game, currentUserId) {
+export function getOpponentName(game, currentUserId) {
   return getOpponent(game, currentUserId)?.username || null
 }
 
-function getUserColor(game, currentUserId) {
+export function getUserColor(game, currentUserId) {
   if (currentUserId == null) return null
   if (
     game.black?.id != null &&
@@ -288,7 +288,7 @@ function getUserColor(game, currentUserId) {
   return null
 }
 
-function getOutcomeLabel(game, currentUserId, t) {
+export function getOutcomeLabel(game, currentUserId, t) {
   let userColor = getUserColor(game, currentUserId)
   let winnerColor = getWinnerColor(game)
   if (userColor == null || winnerColor == null) return null
@@ -305,7 +305,7 @@ function getOutcomeLabel(game, currentUserId, t) {
     : `${t('Lost by')} ${detail} ${t('points')}`
 }
 
-function getResultDetail(result) {
+export function getResultDetail(result) {
   if (typeof result !== 'string') return null
   let rest = result.trim().slice(1)
   if (rest.startsWith('+')) rest = rest.slice(1)
@@ -313,6 +313,37 @@ function getResultDetail(result) {
   if (rest === 'T') return 'time'
   if (rest === '') return null
   return rest
+}
+
+export function getWinnerColor(game) {
+  let result = typeof game.result === 'string' ? game.result.trim()[0] : null
+  if (result === 'B' || result === 'W') return result
+
+  if (game.winnerColor === 'B' || game.winnerColor === 'W') {
+    return game.winnerColor
+  }
+
+  if (game.winner != null) {
+    if (Number(game.winner) === Number(game.black?.id)) return 'B'
+    if (Number(game.winner) === Number(game.white?.id)) return 'W'
+  }
+
+  return null
+}
+
+export function getGameOutcome(game, currentUserId) {
+  let winner = winnerLabel(game)
+  if (winner == null) return {status: '', winner: null}
+
+  let winnerId =
+    game.winner ??
+    (getWinnerColor(game) === 'B' ? game.black?.id : game.white?.id)
+  let status = ''
+  if (currentUserId != null && winnerId != null) {
+    status = Number(winnerId) === Number(currentUserId) ? 'won' : 'lost'
+  }
+
+  return {status, winner}
 }
 
 function formatEndDate(ended) {
@@ -445,37 +476,6 @@ function winnerLabel(game) {
   let color = getWinnerColor(game)
   if (color === 'B') return t('Black')
   if (color === 'W') return t('White')
-  return null
-}
-
-function getGameOutcome(game, currentUserId) {
-  let winner = winnerLabel(game)
-  if (winner == null) return {status: '', winner: null}
-
-  let winnerId =
-    game.winner ??
-    (getWinnerColor(game) === 'B' ? game.black?.id : game.white?.id)
-  let status = ''
-  if (currentUserId != null && winnerId != null) {
-    status = Number(winnerId) === Number(currentUserId) ? 'won' : 'lost'
-  }
-
-  return {status, winner}
-}
-
-function getWinnerColor(game) {
-  let result = typeof game.result === 'string' ? game.result.trim()[0] : null
-  if (result === 'B' || result === 'W') return result
-
-  if (game.winnerColor === 'B' || game.winnerColor === 'W') {
-    return game.winnerColor
-  }
-
-  if (game.winner != null) {
-    if (Number(game.winner) === Number(game.black?.id)) return 'B'
-    if (Number(game.winner) === Number(game.white?.id)) return 'W'
-  }
-
   return null
 }
 
