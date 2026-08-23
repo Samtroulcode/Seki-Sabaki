@@ -12,10 +12,7 @@ import {
 } from './sidebars/ogsPanelData.js'
 import {
   getOpponent,
-  getUserColor,
-  getResultDetail,
   getOutcomeLabel,
-  getWinnerColor,
   getGameOutcome,
   LazyMiniGoban,
 } from './sidebars/OgsGameHistory.js'
@@ -356,7 +353,7 @@ export default class HomeOgsCard extends Component {
                     ? t('None')
                     : activeCount === 1
                       ? t('1 game')
-                      : t('{count} games', {count: activeCount}),
+                      : `${activeCount} ${t('games')}`,
                 ),
                 activeCount === 1
                   ? h(

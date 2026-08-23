@@ -309,10 +309,16 @@ export function getResultDetail(result) {
   if (typeof result !== 'string') return null
   let rest = result.trim().slice(1)
   if (rest.startsWith('+')) rest = rest.slice(1)
-  if (rest === 'R') return 'resignation'
-  if (rest === 'T') return 'time'
-  if (rest === '') return null
-  return rest
+
+  let lower = rest.toLowerCase()
+  if (lower === 'r' || lower === 'resignation') return 'resignation'
+  if (lower === 't' || lower === 'time' || lower === 'timeout') return 'time'
+  if (lower === '') return null
+
+  let numeric = rest.replace(/points?$/i, '').trim()
+  if (/^\d+(\.\d+)?$/.test(numeric)) return numeric
+
+  return null
 }
 
 export function getWinnerColor(game) {
