@@ -25,12 +25,22 @@ export class GameSummaryCard extends Component {
   }
 
   render(
-    {game, outcome, opponent, onOpenGame, onAnalyzeOgs, onAnalyzeSeki},
+    {
+      game,
+      outcome,
+      opponent,
+      onOpenGame,
+      onAnalyzeOgs,
+      onAnalyzeSeki,
+      resolveOutcome,
+    },
     {preview},
   ) {
     let displayGame = {...game, winnerColor: preview?.winnerColor}
+    let resolvedOutcome = resolveOutcome?.(displayGame) ?? outcome
     let opponentName = opponent?.username || game.name || `#${game.id}`
-    let outcomeLabel = outcome.label || game.result || t('Result unknown')
+    let outcomeLabel =
+      resolvedOutcome.label || game.result || t('Result unknown')
     let boardLabel = this.props.formatBoard?.(game.board, t) || ''
 
     // Determine if this is a compact variant (used in OgsGameHistoryColumn)
@@ -40,7 +50,7 @@ export class GameSummaryCard extends Component {
     let Tag = onOpenGame ? 'article' : 'div'
     let rootClass = [
       'game-summary-card',
-      outcome.status,
+      resolvedOutcome.status,
       compact ? 'compact' : null,
     ]
       .filter(Boolean)
@@ -93,7 +103,7 @@ export class GameSummaryCard extends Component {
             ),
           h(
             'span',
-            {class: `game-summary-result ${outcome.status}`},
+            {class: `game-summary-result ${resolvedOutcome.status}`},
             this.props.resultStone?.(displayGame),
             outcomeLabel,
           ),

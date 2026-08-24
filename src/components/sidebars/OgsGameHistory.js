@@ -83,6 +83,10 @@ export function OgsGameHistoryPanel({
                 formatBoard,
                 formatEndDate,
                 resultStone,
+                resolveOutcome: (dg) => {
+                  let o = getGameOutcome(dg, currentUserId)
+                  return {...o, label: getOutcomeLabel(dg, currentUserId, t)}
+                },
                 onOpenGame,
                 onAnalyzeOgs,
                 onAnalyzeSeki,
@@ -169,6 +173,10 @@ export function OgsGameHistoryColumn({
                 formatEndDate,
                 resultStone,
                 compact: true,
+                resolveOutcome: (dg) => {
+                  let o = getGameOutcome(dg, currentUserId)
+                  return {...o, label: getOutcomeLabel(dg, currentUserId, t)}
+                },
                 onOpenGame,
                 onAnalyzeOgs,
                 onAnalyzeSeki,

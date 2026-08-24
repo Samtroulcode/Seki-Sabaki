@@ -379,6 +379,13 @@ export default class HomeOgsCard extends Component {
                           opponent,
                           userColor,
                           formatBoard,
+                          resolveOutcome: (dg) => {
+                            let o = getGameOutcome(dg, currentUserId)
+                            return {
+                              ...o,
+                              label: getOutcomeLabel(dg, currentUserId, t),
+                            }
+                          },
                           onAnalyzeOgs: this.handleAnalyzeOgs,
                           onAnalyzeSeki: this.handleAnalyzeSeki,
                         })

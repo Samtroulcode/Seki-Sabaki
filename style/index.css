@@ -1072,7 +1072,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 
 .game-summary-card.won {
-  border-color: rgba(var(--ui-success-rgb, 96, 152, 115), 0.35);
+  border-color: rgba(var(--ui-accent-rgb, 87, 151, 168), 0.35);
 }
 
 .game-summary-card.lost {
@@ -1089,7 +1089,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 
 .game-summary-card.compact.won {
-  border-color: rgba(var(--ui-success-rgb, 96, 152, 115), 0.4);
+  border-color: rgba(var(--ui-accent-rgb, 87, 151, 168), 0.4);
 }
 
 .game-summary-card.compact.lost {
@@ -1186,7 +1186,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 
 .game-summary-result.won {
-  color: var(--ui-success);
+  color: var(--ui-accent);
 }
 
 .game-summary-result.lost {
