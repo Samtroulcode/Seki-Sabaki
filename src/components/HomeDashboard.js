@@ -6,6 +6,7 @@ import sabaki from '../modules/sabaki.js'
 import HomeAnalysisCard from './HomeAnalysisCard.js'
 import HomeTsumegoCard from './HomeTsumegoCard.js'
 import HomeOgsCard from './HomeOgsCard.js'
+import HomeRecentCard from './HomeRecentCard.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -185,6 +186,7 @@ export default class HomeDashboard extends Component {
               h(HomeAnalysisCard),
             ),
           ),
+          h(HomeRecentCard),
         ),
         h(
           'aside',

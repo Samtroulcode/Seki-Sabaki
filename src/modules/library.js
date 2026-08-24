@@ -37,3 +37,7 @@ export async function saveLibraryFile(relativePath, content, options = {}) {
 export async function createLibraryDirectory(relativePath) {
   return window.sabaki.library.createDirectory(relativePath)
 }
+
+export async function getRecentLibraryFiles(limit = 3) {
+  return window.sabaki.library.getRecentFiles(limit)
+}

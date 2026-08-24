@@ -628,6 +628,63 @@ exports.create = function (setting, dialog, options = {}) {
     return {ok: true, root: validation.root, tsumegoRoot: tsumego.path}
   }
 
+  // Recursively collects SGF/RSGF files from the user library, excluding the
+  // top-level Tsumego folder. Returns at most `limit` entries sorted by
+  // modifiedAt descending. Reuses the existing symlink protections.
+  function collectRecentFiles(root, directoryPath, results, limit, depth = 0) {
+    if (depth > MAX_COUNT_DEPTH) return
+    if (results.length >= limit) return
+
+    let entries
+    try {
+      entries = fs.readdirSync(directoryPath, {withFileTypes: true})
+    } catch (err) {
+      return
+    }
+
+    for (let entry of entries) {
+      if (results.length >= limit) return
+      if (entry.isSymbolicLink()) continue
+
+      let entryPath = path.join(directoryPath, entry.name)
+      if (entry.isDirectory()) {
+        // Exclude the top-level Tsumego folder
+        let relative = path.relative(root, entryPath)
+        if (relative === 'Tsumego') continue
+
+        collectRecentFiles(root, entryPath, results, limit, depth + 1)
+      } else if (entry.isFile() && isSgfFile(entry.name)) {
+        try {
+          let stats = fs.statSync(entryPath)
+          let relativePath = path.relative(root, entryPath)
+          results.push({
+            name: entry.name,
+            relativePath,
+            modifiedAt: stats.mtimeMs,
+            size: stats.size,
+          })
+        } catch (err) {
+          // Skip unreadable files
+        }
+      }
+    }
+  }
+
+  function getRecentFiles(limit = 3) {
+    let config = getConfig()
+    if (!config.configured)
+      return {ok: false, code: 'not-configured', entries: []}
+
+    try {
+      let results = []
+      collectRecentFiles(config.root, config.root, results, limit)
+      results.sort((a, b) => b.modifiedAt - a.modifiedAt)
+      return {ok: true, entries: results.slice(0, limit)}
+    } catch (err) {
+      return {ok: false, code: 'read-failed', entries: []}
+    }
+  }
+
   return {
     getConfig,
     chooseRoot,
@@ -639,6 +696,7 @@ exports.create = function (setting, dialog, options = {}) {
     countProblems,
     saveFile,
     createDirectory,
+    getRecentFiles,
   }
 }
 

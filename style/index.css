@@ -551,6 +551,85 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   gap: var(--space-8);
 }
 
+/* Home Recent Card */
+.home-recent-card {
+  display: grid;
+  gap: var(--space-12);
+  padding: clamp(calc(var(--space-16) + var(--space-4)), 3cqw, calc(var(--space-24) + var(--space-4)));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-large);
+  background: var(--ui-surface-1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.home-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+.home-recent-header h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ui-text);
+}
+.home-recent-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.home-recent-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: center;
+  padding: var(--space-8);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--radius-normal);
+  background: var(--ui-surface-2);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.home-recent-item:hover {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-3);
+}
+.home-recent-info {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.home-recent-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.home-recent-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+.home-recent-date {
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+.home-recent-action {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: var(--space-4) var(--space-8);
+  font-size: 0.75rem;
+}
+
 /* Home OGS Quick Overview Card */
 .home-ogs-card {
   display: grid;

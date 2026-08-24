@@ -165,6 +165,8 @@ window.sabaki = {
       ipcRenderer.invoke('library:saveFile', relativePath, content, options),
     createDirectory: (relativePath) =>
       ipcRenderer.invoke('library:createDirectory', relativePath),
+    getRecentFiles: (limit) =>
+      ipcRenderer.invoke('library:getRecentFiles', limit),
   },
 
   tsumegoProgress: {

@@ -450,6 +450,10 @@ function setupIpcHandlers() {
     if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
     return libraryApi.createDirectory(relativePath)
   })
+  ipcMain.handle('library:getRecentFiles', (e, limit) => {
+    if (!isTrustedRendererEvent(e)) throw new Error('Untrusted renderer')
+    return libraryApi.getRecentFiles(limit)
+  })
 
   let tsumegoProgressStore = tsumegoProgress.createTsumegoProgressStore({
     userDataDirectory: setting.userDataDirectory,
