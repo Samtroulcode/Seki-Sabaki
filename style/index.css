@@ -1048,6 +1048,237 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 .ogs-history-column-actions button:focus {
   background: #006fca;
 }
+
+/* GameSummaryCard — reusable OGS game summary card */
+.game-summary-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+  min-width: 0;
+  padding: var(--space-8);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--radius-normal);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.game-summary-card:not(.compact):hover,
+.game-summary-card:not(.compact):focus {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.game-summary-card.won {
+  border-color: rgba(var(--ui-success-rgb, 96, 152, 115), 0.35);
+}
+
+.game-summary-card.lost {
+  border-color: rgba(var(--ui-danger-rgb, 201, 104, 104), 0.35);
+}
+
+.game-summary-card.compact {
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  min-height: 6.5rem;
+  padding: 0.6rem 0.7rem;
+  border-color: var(--ui-border-subtle);
+  background: var(--ui-surface-1);
+}
+
+.game-summary-card.compact.won {
+  border-color: rgba(var(--ui-success-rgb, 96, 152, 115), 0.4);
+}
+
+.game-summary-card.compact.lost {
+  border-color: rgba(var(--ui-danger-rgb, 201, 104, 104), 0.4);
+}
+
+.game-summary-card.compact:hover,
+.game-summary-card.compact:focus {
+  border-color: var(--ui-accent);
+  background: var(--ui-surface-2);
+}
+
+.game-summary-goban {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+}
+
+.game-summary-card.compact .game-summary-goban {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+  height: 5.5rem;
+}
+
+.game-summary-goban .ogs-mini-goban {
+  width: 100%;
+  height: 100%;
+}
+
+.game-summary-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-4);
+  min-width: 0;
+  align-items: start;
+}
+
+.game-summary-card.compact .game-summary-body {
+  grid-template-columns: 1fr;
+  gap: 0.2rem;
+}
+
+.game-summary-main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.game-summary-opponent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-summary-card.compact .game-summary-opponent {
+  font-size: 0.9rem;
+  color: var(--ui-text);
+}
+
+.game-summary-rank {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ui-text-muted);
+}
+
+.game-summary-color {
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+
+.game-summary-card.compact .game-summary-color {
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.game-summary-result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ui-text-muted);
+}
+
+.game-summary-card.compact .game-summary-result {
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.game-summary-result.won {
+  color: var(--ui-success);
+}
+
+.game-summary-result.lost {
+  color: var(--ui-danger);
+}
+
+.game-summary-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: 0.8125rem;
+  color: var(--ui-text-muted);
+}
+
+.game-summary-card.compact .game-summary-meta {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.game-summary-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-4);
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: center;
+}
+
+.game-summary-card.compact .game-summary-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  grid-column: 1;
+  grid-row: auto;
+  align-self: start;
+}
+
+.game-summary-action {
+  font-size: 0.6875rem;
+  padding: var(--space-4) var(--space-8);
+  min-height: 22px;
+  white-space: nowrap;
+}
+
+.game-summary-card.compact .game-summary-action {
+  font-size: 0.75rem;
+  padding: 0.28rem 0.45rem;
+  min-height: 20px;
+}
+
+/* Primary action (Analyze Seki) uses accent */
+.game-summary-action.ui-button-primary {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+}
+
+.game-summary-action.ui-button-primary:hover:not(:disabled),
+.game-summary-action.ui-button-primary:focus-visible:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+  color: var(--ui-text-on-accent);
+}
+
+.game-summary-action.ui-button-primary:active:not(:disabled) {
+  border-color: var(--ui-accent-active);
+  background: var(--ui-accent-active);
+  color: var(--ui-text-on-accent);
+}
+
+/* Secondary action (OGS Review) uses secondary style */
+.game-summary-action.ui-button-secondary {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+
+.game-summary-action.ui-button-secondary:hover:not(:disabled),
+.game-summary-action.ui-button-secondary:focus-visible:not(:disabled) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-3);
+  color: var(--ui-text);
+}
+
+.game-summary-action.ui-button-secondary:active:not(:disabled) {
+  background: var(--ui-surface-1);
+}
+
 .library-panel {
   display: grid;
   align-content: start;

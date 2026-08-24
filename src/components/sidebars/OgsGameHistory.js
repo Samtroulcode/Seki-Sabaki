@@ -4,6 +4,7 @@ import i18n from '../../i18n.js'
 import onlineStore from '../../modules/onlinestore.js'
 import {parseSgfPreview} from '../../modules/sgfpreview.js'
 import {formatBoard} from './ogsPanelData.js'
+import {GameSummaryCard} from './GameSummaryCard.js'
 
 const t = i18n.context('OgsPanel')
 const previewCache = new Map()
@@ -68,16 +69,25 @@ export function OgsGameHistoryPanel({
         : h(
             'div',
             {class: 'ogs-history-grid'},
-            games.map((game) =>
-              h(OgsGameHistoryCard, {
+            games.map((game) => {
+              let displayGame = {...game}
+              let outcome = getGameOutcome(displayGame, currentUserId)
+              let opponent = getOpponent(game, currentUserId)
+              let userColor = getUserColor(game, currentUserId)
+              return h(GameSummaryCard, {
                 key: game.id,
                 game,
-                currentUserId,
+                outcome,
+                opponent,
+                userColor,
+                formatBoard,
+                formatEndDate,
+                resultStone,
                 onOpenGame,
                 onAnalyzeOgs,
                 onAnalyzeSeki,
-              }),
-            ),
+              })
+            }),
           ),
     !compact &&
       authenticated &&
@@ -144,116 +154,28 @@ export function OgsGameHistoryColumn({
         : h(
             'div',
             {class: 'ogs-history-column-list'},
-            games.map((game) =>
-              h(OgsGameHistoryColumnEntry, {
+            games.map((game) => {
+              let displayGame = {...game}
+              let outcome = getGameOutcome(displayGame, currentUserId)
+              let opponent = getOpponent(game, currentUserId)
+              let userColor = getUserColor(game, currentUserId)
+              return h(GameSummaryCard, {
                 key: game.id,
                 game,
-                currentUserId,
+                outcome,
+                opponent,
+                userColor,
+                formatBoard,
+                formatEndDate,
+                resultStone,
+                compact: true,
                 onOpenGame,
                 onAnalyzeOgs,
                 onAnalyzeSeki,
-              }),
-            ),
+              })
+            }),
           ),
   )
-}
-
-class OgsGameHistoryColumnEntry extends Component {
-  constructor(props) {
-    super(props)
-    this.state = {preview: null}
-    this.handlePreview = (preview) => this.setState({preview})
-  }
-
-  render() {
-    let {game, currentUserId, onOpenGame, onAnalyzeOgs, onAnalyzeSeki} =
-      this.props
-    let displayGame = {...game, winnerColor: this.state.preview?.winnerColor}
-    let outcome = getGameOutcome(displayGame, currentUserId)
-    let opponent = getOpponent(game, currentUserId)
-    let userColor = getUserColor(game, currentUserId)
-    let opponentName = opponent?.username || game.name || `#${game.id}`
-
-    return h(
-      'article',
-      {
-        class: `ogs-history-column-entry ${outcome.status}`,
-        role: 'button',
-        tabIndex: 0,
-        onClick: () => onOpenGame?.(game.id),
-        onKeyDown: (evt) => {
-          if (evt.key === 'Enter' || evt.key === ' ') {
-            evt.preventDefault()
-            onOpenGame?.(game.id)
-          }
-        },
-      },
-      h(LazyMiniGoban, {game, onPreview: this.handlePreview}),
-      h(
-        'div',
-        {class: 'ogs-history-column-body'},
-        h(
-          'strong',
-          {class: 'ogs-history-column-opponent', title: opponentName},
-          opponentName,
-          opponent?.rank != null &&
-            h(
-              'span',
-              {class: 'ogs-history-column-rank'},
-              ` · ${opponent.rank}`,
-            ),
-        ),
-        userColor != null &&
-          h(
-            'span',
-            {class: 'ogs-history-column-color'},
-            userColor === 'B' ? t('You played Black') : t('You played White'),
-          ),
-        h(
-          'span',
-          {class: 'ogs-history-column-result'},
-          resultStone(displayGame),
-          getOutcomeLabel(displayGame, currentUserId, t) ||
-            game.result ||
-            t('Result unknown'),
-        ),
-        h(
-          'span',
-          {class: 'ogs-history-column-meta'},
-          formatBoard(game.board, t),
-          game.ended ? ` · ${formatEndDate(game.ended)}` : '',
-        ),
-        h(
-          'div',
-          {class: 'ogs-history-column-actions'},
-          h(
-            'button',
-            {
-              type: 'button',
-              onClick: (evt) => {
-                evt.stopPropagation()
-                onAnalyzeOgs?.(game.id)
-              },
-              onKeyDown: (evt) => evt.stopPropagation(),
-            },
-            t('Analyze OGS'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              onClick: (evt) => {
-                evt.stopPropagation()
-                onAnalyzeSeki?.(game.id)
-              },
-              onKeyDown: (evt) => evt.stopPropagation(),
-            },
-            t('Analyze Seki'),
-          ),
-        ),
-      ),
-    )
-  }
 }
 
 export function getOpponent(game, currentUserId) {
@@ -359,118 +281,6 @@ function formatEndDate(ended) {
   let date = new Date(ended)
   if (Number.isNaN(date.getTime())) return ended.slice(0, 10)
   return date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})
-}
-
-class OgsGameHistoryCard extends Component {
-  constructor(props) {
-    super(props)
-    this.state = {preview: null}
-    this.handlePreview = (preview) => this.setState({preview})
-  }
-
-  render() {
-    let {game, currentUserId, onOpenGame, onAnalyzeOgs, onAnalyzeSeki} =
-      this.props
-    let displayGame = {...game, winnerColor: this.state.preview?.winnerColor}
-    let outcome = getGameOutcome(displayGame, currentUserId)
-
-    return h(
-      'article',
-      {
-        type: 'button',
-        class: `ogs-history-card ${outcome.status}`,
-        role: 'button',
-        tabIndex: 0,
-        onClick: () => onOpenGame?.(game.id),
-        onKeyDown: (evt) => {
-          if (evt.key === 'Enter' || evt.key === ' ') {
-            evt.preventDefault()
-            onOpenGame?.(game.id)
-          }
-        },
-      },
-      outcome.winner != null &&
-        h(
-          'span',
-          {class: 'ogs-history-outcome'},
-          outcome.status === 'won' ? '✓' : outcome.status === 'lost' ? '×' : '',
-          ' ',
-          outcome.winner,
-        ),
-      h(LazyMiniGoban, {game, onPreview: this.handlePreview}),
-      h(
-        'span',
-        {class: 'ogs-history-card-body'},
-        h('strong', {}, game.name || `#${game.id}`),
-        h(
-          'span',
-          {class: 'ogs-history-players'},
-          h(
-            'span',
-            {},
-            h('i', {class: 'ogs-stone black'}),
-            t('Black'),
-            ': ',
-            game.black?.username || t('Black'),
-          ),
-          h(
-            'span',
-            {},
-            h('i', {class: 'ogs-stone white'}),
-            t('White'),
-            ': ',
-            game.white?.username || t('White'),
-          ),
-        ),
-        h(
-          'span',
-          {class: 'ogs-history-result'},
-          resultStone(displayGame),
-          game.result || t('Result unknown'),
-          winnerLabel(displayGame) != null &&
-            h(
-              'span',
-              {class: 'ogs-history-winner'},
-              ` · ${winnerLabel(displayGame)}`,
-            ),
-        ),
-        h(
-          'span',
-          {class: 'ogs-history-meta'},
-          formatBoard(game.board, t),
-          game.ended ? ` · ${game.ended.slice(0, 10)}` : '',
-        ),
-        h(
-          'span',
-          {class: 'ogs-history-actions'},
-          h(
-            'button',
-            {
-              type: 'button',
-              onClick: (evt) => {
-                evt.stopPropagation()
-                onAnalyzeOgs?.(game.id)
-              },
-              onKeyDown: (evt) => evt.stopPropagation(),
-            },
-            t('Analyze OGS'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              onClick: (evt) => {
-                evt.stopPropagation()
-                onAnalyzeSeki?.(game.id)
-              },
-              onKeyDown: (evt) => evt.stopPropagation(),
-            },
-            t('Analyze Seki'),
-          ),
-        ),
-      ),
-    )
-  }
 }
 
 function resultStone(game) {

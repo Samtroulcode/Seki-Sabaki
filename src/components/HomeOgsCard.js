@@ -14,94 +14,14 @@ import {
   getOpponent,
   getOutcomeLabel,
   getGameOutcome,
-  LazyMiniGoban,
+  getUserColor,
+  resultStone,
+  formatEndDate,
 } from './sidebars/OgsGameHistory.js'
+import {GameSummaryCard} from './sidebars/GameSummaryCard.js'
 import {analyzeOgsGame, analyzeSekiGame} from './sidebars/ogsAnalysisActions.js'
 
 const t = i18n.context('HomeDashboard')
-
-// Home recent game row with local preview state for correct winner resolution
-class HomeOgsRecentGameRow extends Component {
-  constructor(props) {
-    super(props)
-    this.state = {preview: null}
-    this.handlePreview = (preview) => this.setState({preview})
-  }
-
-  render({game, currentUserId, onAnalyzeOgs, onAnalyzeSeki}, {preview}) {
-    let displayGame = {...game, winnerColor: preview?.winnerColor}
-    let outcome = getGameOutcome(displayGame, currentUserId)
-    let opponent = getOpponent(game, currentUserId)
-    let opponentName = opponent?.username || game.name || `#${game.id}`
-    let outcomeLabel =
-      getOutcomeLabel(displayGame, currentUserId, t) ||
-      game.result ||
-      t('Result unknown')
-    let boardLabel = formatBoard(game.board, t)
-
-    return h(
-      'li',
-      {
-        key: game.id,
-        class: `home-ogs-recent-item ${outcome.status}`,
-      },
-      h(
-        'div',
-        {class: 'home-ogs-recent-goban'},
-        h(LazyMiniGoban, {game, onPreview: this.handlePreview}),
-      ),
-      h(
-        'div',
-        {class: 'home-ogs-recent-info'},
-        h(
-          'div',
-          {class: 'home-ogs-recent-opponent'},
-          h('strong', {}, opponentName),
-          opponent?.rank != null &&
-            h('span', {class: 'home-ogs-recent-rank'}, ` · ${opponent.rank}`),
-        ),
-        h(
-          'div',
-          {
-            class: `home-ogs-recent-outcome ${outcome.status}`,
-          },
-          outcomeLabel,
-        ),
-        h('div', {class: 'home-ogs-recent-meta'}, h('span', {}, boardLabel)),
-        h(
-          'div',
-          {class: 'home-ogs-recent-actions'},
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'ui-button ui-button-ghost home-ogs-recent-action',
-              onClick: (evt) => {
-                evt.stopPropagation()
-                onAnalyzeOgs?.(game.id)
-              },
-              onKeyDown: (evt) => evt.stopPropagation(),
-            },
-            t('Analyze OGS'),
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'ui-button ui-button-ghost home-ogs-recent-action',
-              onClick: (evt) => {
-                evt.stopPropagation()
-                onAnalyzeSeki?.(game.id)
-              },
-              onKeyDown: (evt) => evt.stopPropagation(),
-            },
-            t('Analyze Seki'),
-          ),
-        ),
-      ),
-    )
-  }
-}
 
 function getMatchmakingSummary(options, t) {
   if (!options) return t('Not configured')
@@ -447,15 +367,22 @@ export default class HomeOgsCard extends Component {
                   : h(
                       'ul',
                       {class: 'home-ogs-recent-list'},
-                      recentGames.map((game) =>
-                        h(HomeOgsRecentGameRow, {
+                      recentGames.map((game) => {
+                        let displayGame = {...game}
+                        let outcome = getGameOutcome(displayGame, currentUserId)
+                        let opponent = getOpponent(game, currentUserId)
+                        let userColor = getUserColor(game, currentUserId)
+                        return h(GameSummaryCard, {
                           key: game.id,
                           game,
-                          currentUserId,
+                          outcome,
+                          opponent,
+                          userColor,
+                          formatBoard,
                           onAnalyzeOgs: this.handleAnalyzeOgs,
                           onAnalyzeSeki: this.handleAnalyzeSeki,
-                        }),
-                      ),
+                        })
+                      }),
                     ),
               ),
             ),

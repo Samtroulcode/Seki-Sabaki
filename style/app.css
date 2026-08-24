@@ -28,8 +28,10 @@
   --ui-focus: #79BDCC;
 
   --ui-success: #609873;
+  --ui-success-rgb: 96, 152, 115;
   --ui-warning: #C69A57;
   --ui-danger: #C96868;
+  --ui-danger-rgb: 201, 104, 104;
   --ui-text-on-danger: #000;
 }
 
