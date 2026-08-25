@@ -20,7 +20,7 @@ function formatRelativeDate(timestamp) {
 
   if (diffDays === 0) return t('Today')
   if (diffDays === 1) return t('Yesterday')
-  if (diffDays < 7) return t('${n} days ago', {n: diffDays})
+  if (diffDays < 7) return `${diffDays} ${t('days ago')}`
   return date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})
 }
 

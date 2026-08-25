@@ -7,6 +7,7 @@ import HomeAnalysisCard from './HomeAnalysisCard.js'
 import HomeTsumegoCard from './HomeTsumegoCard.js'
 import HomeOgsCard from './HomeOgsCard.js'
 import HomeRecentCard from './HomeRecentCard.js'
+import HomeBoardPreview from './HomeBoardPreview.js'
 
 const t = i18n.context('HomeDashboard')
 
@@ -113,6 +114,10 @@ export default class HomeDashboard extends Component {
             h(
               'div',
               {class: 'home-start-surface'},
+              h(HomeBoardPreview, {
+                width: selectedBoardSize || 19,
+                height: selectedBoardSize || 19,
+              }),
               h(
                 'div',
                 {class: 'home-start-content'},
