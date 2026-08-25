@@ -3,6 +3,8 @@ import {h, Component} from 'preact'
 import i18n from '../i18n.js'
 import sabaki from '../modules/sabaki.js'
 import {getRecentLibraryFiles, openLibraryFile} from '../modules/library.js'
+import {parseSgfPreview} from '../modules/sgfpreview.js'
+import {MiniGoban} from './sidebars/OgsGameHistory.js'
 
 const t = i18n.context('HomeDashboard')
 const MAX_RECENT_FILES = 3
@@ -18,7 +20,7 @@ function formatRelativeDate(timestamp) {
 
   if (diffDays === 0) return t('Today')
   if (diffDays === 1) return t('Yesterday')
-  if (diffDays < 7) return t('%% days ago', {n: diffDays})
+  if (diffDays < 7) return t('${n} days ago', {n: diffDays})
   return date.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})
 }
 
@@ -88,10 +90,16 @@ export default class HomeRecentCard extends Component {
       h(
         'ul',
         {class: 'home-recent-list'},
-        entries.map((entry) =>
-          h(
+        entries.map((entry) => {
+          let preview = parseSgfPreview(entry.previewContent)
+          return h(
             'li',
             {key: entry.relativePath, class: 'home-recent-item'},
+            h(MiniGoban, {
+              board: preview,
+              preview,
+              status: preview == null ? 'error' : 'idle',
+            }),
             h(
               'div',
               {class: 'home-recent-info'},
@@ -117,8 +125,8 @@ export default class HomeRecentCard extends Component {
               },
               t('Open'),
             ),
-          ),
-        ),
+          )
+        }),
       ),
     )
   }

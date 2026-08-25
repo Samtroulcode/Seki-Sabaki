@@ -629,11 +629,11 @@ exports.create = function (setting, dialog, options = {}) {
   }
 
   // Recursively collects SGF/RSGF files from the user library, excluding the
-  // top-level Tsumego folder. Returns at most `limit` entries sorted by
-  // modifiedAt descending. Reuses the existing symlink protections.
-  function collectRecentFiles(root, directoryPath, results, limit, depth = 0) {
+  // top-level Tsumego folder. Collects all eligible files first, then sorts by
+  // modifiedAt descending and returns the top `limit`. Reuses the existing
+  // symlink protections.
+  function collectRecentFiles(root, directoryPath, results, depth = 0) {
     if (depth > MAX_COUNT_DEPTH) return
-    if (results.length >= limit) return
 
     let entries
     try {
@@ -643,7 +643,6 @@ exports.create = function (setting, dialog, options = {}) {
     }
 
     for (let entry of entries) {
-      if (results.length >= limit) return
       if (entry.isSymbolicLink()) continue
 
       let entryPath = path.join(directoryPath, entry.name)
@@ -652,7 +651,7 @@ exports.create = function (setting, dialog, options = {}) {
         let relative = path.relative(root, entryPath)
         if (relative === 'Tsumego') continue
 
-        collectRecentFiles(root, entryPath, results, limit, depth + 1)
+        collectRecentFiles(root, entryPath, results, depth + 1)
       } else if (entry.isFile() && isSgfFile(entry.name)) {
         try {
           let stats = fs.statSync(entryPath)
@@ -677,9 +676,32 @@ exports.create = function (setting, dialog, options = {}) {
 
     try {
       let results = []
-      collectRecentFiles(config.root, config.root, results, limit)
+      collectRecentFiles(config.root, config.root, results)
       results.sort((a, b) => b.modifiedAt - a.modifiedAt)
-      return {ok: true, entries: results.slice(0, limit)}
+      let topResults = results.slice(0, limit)
+
+      // Read preview content only for the final top files, using the same
+      // bounded file-reading protections as Library previews.
+      let previewBytes = 0
+      for (let entry of topResults) {
+        if (
+          entry.size != null &&
+          entry.size <= MAX_PREVIEW_BYTES &&
+          previewBytes + entry.size <= MAX_PREVIEW_TOTAL_BYTES
+        ) {
+          let preview = readBoundedFile(
+            path.join(config.root, entry.relativePath),
+            MAX_PREVIEW_BYTES,
+            config.root,
+          )
+          if (preview != null) {
+            entry.previewContent = preview.content
+            previewBytes += preview.size
+          }
+        }
+      }
+
+      return {ok: true, entries: topResults}
     } catch (err) {
       return {ok: false, code: 'read-failed', entries: []}
     }
