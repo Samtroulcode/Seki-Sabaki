@@ -585,7 +585,7 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 }
 .home-recent-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   gap: var(--space-12);
   align-items: center;
   padding: var(--space-8);
@@ -593,6 +593,29 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
   border-radius: var(--radius-normal);
   background: var(--ui-surface-2);
   transition: border-color 0.12s ease, background 0.12s ease;
+}
+.home-recent-item .ogs-mini-goban {
+  width: 72px;
+  height: 72px;
+}
+@container home (max-width: 480px) {
+  .home-recent-item {
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      'goban info'
+      'goban action';
+  }
+  .home-recent-item .ogs-mini-goban {
+    grid-area: goban;
+  }
+  .home-recent-info {
+    grid-area: info;
+  }
+  .home-recent-action {
+    grid-area: action;
+    justify-self: end;
+  }
 }
 .home-recent-item:hover {
   border-color: var(--ui-border);
