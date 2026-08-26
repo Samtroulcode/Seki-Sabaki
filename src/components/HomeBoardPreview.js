@@ -10,6 +10,6 @@ export default class HomeBoardPreview extends Component {
 
     let board = {width, height, signMap}
 
-    return h(MiniGoban, {board, preview: null, status: 'idle'})
+    return h(MiniGoban, {board, preview: board, status: 'idle'})
   }
 }
