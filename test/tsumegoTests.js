@@ -3,6 +3,7 @@ import assert from 'assert'
 import * as gametree from '../src/modules/gametree.js'
 import {
   advanceSolution,
+  advanceRefutation,
   analyzeProblem,
   classifyMove,
   resolveMove,
@@ -2145,5 +2146,141 @@ describe('advanceSolution', () => {
     assert(result != null)
     assert.strictEqual(result.solved, false)
     assert.strictEqual(result.nextPlayerMove.data.B[0], 'hm')
+  })
+})
+
+describe('advanceRefutation', () => {
+  it('advances through a wrong branch continuation to terminal position', () => {
+    // B[gl] Correct -> W[hm] -> B[hl] (canonical)
+    // B[dd] Wrong -> W[xx] -> B[yy] (refutation)
+    let wrongMove
+    let tree = gametree.new().mutate((draft) => {
+      let correct = draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      draft.appendNode(correct, {W: ['hm']})
+      draft.appendNode(correct, {B: ['hl']})
+
+      wrongMove = draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong']})
+      let w1 = draft.appendNode(wrongMove, {W: ['xx']})
+      draft.appendNode(w1, {B: ['yy']})
+    })
+
+    let result = advanceRefutation(tree, tree.get(wrongMove))
+    assert(result != null)
+    assert.strictEqual(result.automaticMoves.length, 2)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'xx')
+    assert.strictEqual(result.automaticMoves[1].data.B[0], 'yy')
+    assert.strictEqual(result.positionNodeId, result.automaticMoves[1].id)
+  })
+
+  it('traverses non-move nodes in the refutation continuation', () => {
+    let wrongMove
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      wrongMove = draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong']})
+      let setup = draft.appendNode(wrongMove, {C: ['refutation setup']})
+      let w1 = draft.appendNode(setup, {W: ['xx']})
+      draft.appendNode(w1, {B: ['yy']})
+    })
+
+    let result = advanceRefutation(tree, tree.get(wrongMove))
+    assert(result != null)
+    assert.strictEqual(result.automaticMoves.length, 2)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'xx')
+    assert.strictEqual(result.automaticMoves[1].data.B[0], 'yy')
+  })
+
+  it('returns null for a null node', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+    })
+
+    assert.strictEqual(advanceRefutation(tree, null), null)
+  })
+
+  it('returns null when the node is not a move', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {C: ['setup']})
+    })
+    let setupNode = tree.get(tree.root.children[1].id)
+
+    assert.strictEqual(advanceRefutation(tree, setupNode), null)
+  })
+
+  it('returns null when the node has no data', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+    })
+    let dataLessNode = {
+      id: tree.root.children[0].id,
+      data: null,
+      parentId: null,
+      children: [],
+    }
+
+    assert.strictEqual(advanceRefutation(tree, dataLessNode), null)
+  })
+
+  it('returns null when the node is missing from the tree', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+    })
+    let otherTree = gametree.new()
+    let node = tree.get(tree.root.children[0].id)
+
+    assert.strictEqual(advanceRefutation(otherTree, node), null)
+  })
+
+  it('returns null when the continuation contains a pass', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let wrongMove = draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong']})
+      draft.appendNode(wrongMove, {W: ['']})
+    })
+    let wrongMove = tree.get(tree.root.children[0].id)
+
+    assert.strictEqual(advanceRefutation(tree, wrongMove), null)
+  })
+
+  it('returns null when the continuation contains a non-string move value', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let wrongMove = draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong']})
+      draft.appendNode(wrongMove, {W: [null]})
+    })
+    let wrongMove = tree.get(tree.root.children[0].id)
+
+    assert.strictEqual(advanceRefutation(tree, wrongMove), null)
+  })
+
+  it('returns empty automaticMoves when wrong move is terminal', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong']})
+    })
+    let wrongMove = tree.get(tree.root.children[1].id)
+
+    let result = advanceRefutation(tree, wrongMove)
+    assert(result != null)
+    assert.deepStrictEqual(result.automaticMoves, [])
+    assert.strictEqual(result.positionNodeId, wrongMove.id)
+  })
+
+  it('follows only the first child (canonical line) of the wrong branch', () => {
+    let wrongMove
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['gl'], C: ['Correct']})
+      wrongMove = draft.appendNode(draft.root.id, {B: ['dd'], C: ['Wrong']})
+      draft.appendNode(wrongMove, {W: ['xx']}) // first child - canonical
+      draft.appendNode(wrongMove, {W: ['yy']}) // sibling - should not be followed
+    })
+    let canonical = tree.get(tree.get(wrongMove).children[0].id)
+    tree = tree.mutate((draft) => {
+      draft.appendNode(canonical.id, {B: ['zz']})
+    })
+
+    let result = advanceRefutation(tree, tree.get(wrongMove))
+    assert(result != null)
+    assert.strictEqual(result.automaticMoves.length, 2)
+    assert.strictEqual(result.automaticMoves[0].data.W[0], 'xx')
+    assert.strictEqual(result.automaticMoves[1].data.B[0], 'zz')
   })
 })

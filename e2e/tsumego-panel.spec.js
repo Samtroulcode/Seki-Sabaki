@@ -114,7 +114,7 @@ test.describe('Tsumego workspace', () => {
       (startedAt) => performance.now() - startedAt,
       autoReplyStartedAt,
     )
-    expect(autoReplyElapsed).toBeGreaterThanOrEqual(850)
+    expect(autoReplyElapsed).toBeGreaterThanOrEqual(400)
     await expect
       .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
       .toBeGreaterThan(2)
@@ -324,6 +324,58 @@ test.describe('Tsumego workspace', () => {
       'builtin:tsumego/easy/ggg-easy-01.sgf',
     )
     expect(after.completedAt).toBe(completedAt)
+  })
+
+  test('retry always resets to the original problem state', async ({page}) => {
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page.locator('.tsumego-entry-directory').first().click()
+    await openGggEasy01(page)
+
+    // Play the first correct move and wait for the auto-reply to finish.
+    await dispatchVertex(page, 17, 18)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+
+    // Fail at the second decision point with an absent move.
+    await dispatchVertex(page, 0, 0)
+    await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+      'Incorrect',
+    )
+
+    // Retry must restore the original starting position, not the last decision point.
+    await page.getByRole('button', {name: 'Retry', exact: true}).click()
+    await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+  })
+
+  test('an SGF-present wrong branch plays its refutation before Incorrect', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      window.__tsumegoAudioPlays = 0
+      Audio.prototype.play = () => {
+        window.__tsumegoAudioPlays += 1
+        return Promise.resolve()
+      }
+    })
+
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page.locator('.tsumego-entry-directory').first().click()
+    await openGggEasy01(page)
+
+    // B[rq] (17,16) is a documented wrong move; it should play the user's
+    // move, enter waiting, animate the refutation, then show Incorrect.
+    await dispatchVertex(page, 17, 16)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
+    await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
+
+    // The refutation sequence ends with the terminal position and feedback.
+    await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+      'Incorrect',
+    )
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
+    await expect
+      .poll(() => page.evaluate(() => window.__tsumegoAudioPlays))
+      .toBeGreaterThan(1)
   })
 
   test('cancelling the auto-reply sequence never records progress', async ({

@@ -901,3 +901,48 @@ export function advanceSolution(tree, problem, correctMoveNode) {
     solved: true,
   }
 }
+
+// Advances through a refutation variation after a wrong move. `wrongMoveNode`
+// is the node of the user's incorrect move that exists in the SGF. Walks the
+// canonical continuation (first child) of that branch through to its terminal
+// position, collecting all moves for automatic playback.
+//
+// Returns `{automaticMoves, positionNodeId}` or `null` when the input is
+// incoherent (invalid node, a pass/malformed move in the continuation).
+// - `automaticMoves`: all subsequent moves on the canonical line after the
+//   wrong move (nodes), including both opponent responses and any further moves;
+// - `positionNodeId`: the last real position reached by the canonical
+//   continuation, including the final position.
+//
+// Non-move nodes between moves are traversed; sibling variations are never
+// followed. Color alternation is not validated: consecutive moves of the same
+// color are accepted as-is. Descriptive/setup nodes required to reach the
+// correct final SGF position are preserved via `positionNodeId`.
+export function advanceRefutation(tree, wrongMoveNode) {
+  if (wrongMoveNode == null) return null
+  if (!hasMove(wrongMoveNode)) return null
+
+  // Walk from the tree's own node so a stale reference cannot leak stale
+  // children into the walk.
+  let node = tree.get(wrongMoveNode.id)
+  if (node == null || node.data == null) return null
+
+  let automaticMoves = []
+  let positionNodeId = node.id
+  while (node.children.length > 0) {
+    node = node.children[0]
+
+    if (hasMove(node)) {
+      // A pass or malformed move in the continuation is incoherent.
+      let vertex = getMoveVertex(node)
+      if (vertex == null || vertex[0] < 0 || vertex[1] < 0) return null
+
+      positionNodeId = node.id
+      automaticMoves.push(node)
+    } else if (isPositionNode(node)) {
+      positionNodeId = node.id
+    }
+  }
+
+  return {automaticMoves, positionNodeId}
+}

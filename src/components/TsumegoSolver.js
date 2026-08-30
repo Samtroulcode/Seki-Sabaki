@@ -3,7 +3,11 @@ import {stringifyVertex} from '@sabaki/sgf'
 
 import i18n from '../i18n.js'
 import * as gametree from '../modules/gametree.js'
-import {advanceSolution, resolveMove} from '../modules/tsumego.js'
+import {
+  advanceSolution,
+  advanceRefutation,
+  resolveMove,
+} from '../modules/tsumego.js'
 import * as sound from '../modules/sound.js'
 import {
   applyExplorationMove,
@@ -14,7 +18,7 @@ import GameGraph from './sidebars/GameGraph.js'
 import Goban from './Goban.js'
 
 const t = i18n.context('TsumegoSolver')
-const AUTO_REPLY_DELAY = 1000
+const AUTO_REPLY_DELAY = 500
 
 export default class TsumegoSolver extends Component {
   constructor(props) {
@@ -29,7 +33,7 @@ export default class TsumegoSolver extends Component {
   }
 
   getInitialState({problem}) {
-    let initial = {
+    return {
       phase: 'solving',
       displayNodeId: problem.startNodeId,
       decisionPointId: problem.startNodeId,
@@ -39,7 +43,6 @@ export default class TsumegoSolver extends Component {
       explorationBoard: null,
       explorationPlayer: null,
     }
-    return {...initial, retrySnapshot: {...initial}}
   }
 
   handleVertexClick = (evt) => {
@@ -60,7 +63,12 @@ export default class TsumegoSolver extends Component {
       expectedMoveNode,
     )
     if (result.status !== 'correct' || result.node == null) {
-      this.startFailedExploration(evt.vertex)
+      // Check if the wrong move has an SGF variation (result.node exists)
+      if (result.status === 'wrong' && result.node != null) {
+        this.startRefutationSequence(result.node)
+      } else {
+        this.startFailedExploration(evt.vertex)
+      }
       return
     }
 
@@ -83,12 +91,7 @@ export default class TsumegoSolver extends Component {
       explorationBoard: null,
       explorationPlayer: null,
     }
-    this.setState({
-      ...nextState,
-      retrySnapshot: advanced.solved
-        ? this.state.retrySnapshot
-        : {...nextState, retrySnapshot: undefined},
-    })
+    this.setState(nextState)
     if (waiting) {
       this.startAutoSequence(advanced)
     } else if (advanced.solved) {
@@ -125,12 +128,127 @@ export default class TsumegoSolver extends Component {
     playNext(0)
   }
 
+  startRefutationSequence(wrongMoveNode) {
+    this.cancelAutoSequence()
+    let {gameTree, problem} = this.props
+    let refutation = advanceRefutation(gameTree, wrongMoveNode)
+    if (refutation == null) {
+      // No refutation sequence available, fall back to failed exploration
+      this.startFailedExplorationFromNode(wrongMoveNode)
+      return
+    }
+
+    // Play the user's wrong move first
+    sound.playPachi()
+    this.setState(
+      {
+        displayNodeId: wrongMoveNode.id,
+        phase: 'waiting',
+        feedback: null,
+        showGameGraph: false,
+        explorationBoard: null,
+        explorationPlayer: null,
+      },
+      () => {
+        // Then play the refutation sequence automatically
+        this.playRefutationSequence(refutation)
+      },
+    )
+  }
+
+  playRefutationSequence(refutation) {
+    this.cancelAutoSequence()
+    let sequenceId = this.autoSequenceId
+    let playNext = (index) => {
+      if (sequenceId !== this.autoSequenceId) return
+      if (index >= refutation.automaticMoves.length) {
+        // Refutation complete, show Incorrect
+        this.setState({
+          displayNodeId: refutation.positionNodeId,
+          phase: 'failed',
+          feedback: t('Incorrect'),
+          showGameGraph: false,
+          explorationBoard: null,
+          explorationPlayer: null,
+        })
+        return
+      }
+
+      this.autoTimer = setTimeout(() => {
+        this.autoTimer = null
+        if (sequenceId !== this.autoSequenceId) return
+        let move = refutation.automaticMoves[index]
+        sound.playPachi()
+        this.setState({displayNodeId: move.id}, () => playNext(index + 1))
+      }, AUTO_REPLY_DELAY)
+    }
+    playNext(0)
+  }
+
   cancelAutoSequence() {
     if (this.autoTimer != null) {
       clearTimeout(this.autoTimer)
       this.autoTimer = null
     }
     this.autoSequenceId += 1
+  }
+
+  startFailedExploration(vertex) {
+    let {gameTree, problem} = this.props
+    let board = cloneExplorationBoard(
+      gametree.getBoard(gameTree, this.state.displayNodeId),
+    )
+    let node = gameTree.get(this.state.displayNodeId)
+    let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+    let movedBoard = applyExplorationMove(board, sign, vertex)
+    let nextBoard = movedBoard || board
+    if (movedBoard != null) sound.playPachi()
+    this.setState({
+      phase: 'failed',
+      feedback: t('Incorrect'),
+      explorationBoard: nextBoard,
+      explorationPlayer: movedBoard == null ? sign : -sign,
+    })
+  }
+
+  startFailedExplorationFromNode(wrongMoveNode) {
+    let {gameTree, problem} = this.props
+    let board = cloneExplorationBoard(
+      gametree.getBoard(gameTree, wrongMoveNode.id),
+    )
+    let node = gameTree.get(wrongMoveNode.id)
+    let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+    // The wrong move is already on the board at wrongMoveNode; sign is the
+    // player to move from that position.
+    sound.playPachi()
+    this.setState({
+      displayNodeId: wrongMoveNode.id,
+      phase: 'failed',
+      feedback: t('Incorrect'),
+      explorationBoard: board,
+      explorationPlayer: sign,
+    })
+  }
+
+  handleRetry = () => {
+    this.cancelAutoSequence()
+    // Always restore the original problem state (full reset)
+    this.setState(this.getInitialState(this.props))
+  }
+
+  handleBack = () => {
+    this.cancelAutoSequence()
+    this.props.onBack()
+  }
+
+  handlePrevious = () => {
+    this.cancelAutoSequence()
+    this.props.onPrevious()
+  }
+
+  handleNext = () => {
+    this.cancelAutoSequence()
+    this.props.onNext()
   }
 
   handleGraphNodeClick = (evt) => {
@@ -173,59 +291,6 @@ export default class TsumegoSolver extends Component {
       explorationPlayer: -sign,
       feedback: null,
     })
-  }
-
-  startFailedExploration(vertex) {
-    let {gameTree, problem} = this.props
-    let board = cloneExplorationBoard(
-      gametree.getBoard(gameTree, this.state.displayNodeId),
-    )
-    let node = gameTree.get(this.state.displayNodeId)
-    let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
-    let movedBoard = applyExplorationMove(board, sign, vertex)
-    let nextBoard = movedBoard || board
-    if (movedBoard != null) sound.playPachi()
-    let retrySnapshot = {
-      phase: 'solving',
-      displayNodeId: this.state.displayNodeId,
-      decisionPointId: this.state.decisionPointId,
-      expectedMoveNodeId: this.state.expectedMoveNodeId,
-      feedback: null,
-      showGameGraph: false,
-      explorationBoard: null,
-      explorationPlayer: null,
-    }
-    this.setState({
-      phase: 'failed',
-      feedback: t('Incorrect'),
-      explorationBoard: nextBoard,
-      explorationPlayer: movedBoard == null ? sign : -sign,
-      retrySnapshot,
-    })
-  }
-
-  handleRetry = () => {
-    this.cancelAutoSequence()
-    if (this.state.phase === 'failed') {
-      this.setState(this.state.retrySnapshot)
-    } else {
-      this.setState(this.getInitialState(this.props))
-    }
-  }
-
-  handleBack = () => {
-    this.cancelAutoSequence()
-    this.props.onBack()
-  }
-
-  handlePrevious = () => {
-    this.cancelAutoSequence()
-    this.props.onPrevious()
-  }
-
-  handleNext = () => {
-    this.cancelAutoSequence()
-    this.props.onNext()
   }
 
   render() {
