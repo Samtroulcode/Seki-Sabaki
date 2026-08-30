@@ -1179,45 +1179,64 @@ function analyzeStoneSelection(tree) {
 
 function parseScoreAnswer(text) {
   if (typeof text !== 'string') return null
-  let winner = text.match(
-    /\b(black|white)\s+wins?\s+by\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
-  )
-  let black = text.match(
-    /\bblack(?:'s)?\s+(?:territory|total|score)?\s*(?:=|is|has|:)?\s*([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
-  )
-  let white = text.match(
-    /\bwhite(?:'s)?\s+(?:territory|total|score)?\s*(?:=|is|has|:)?\s*([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
-  )
-  let both = text.match(
-    /\bboth\s+black\s+and\s+white\s+have\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
-  )
-  if (both) black = white = both
-  let totals = black && white ? {B: +black[1], W: +white[1]} : null
-  if (winner) {
-    let result = {
-      winner: winner[1].toLowerCase() === 'black' ? 'B' : 'W',
-      margin: +winner[2],
-    }
-    if (
-      totals &&
-      (totals.B === totals.W ||
-        Math.abs(totals.B - totals.W) !== result.margin ||
-        (totals.B > totals.W ? 'B' : 'W') !== result.winner)
-    )
-      return null
-    return {result, totals}
-  }
-  if (/\b(draw|jigo)\b/i.test(text) && (!totals || totals.B === totals.W))
-    return {result: {winner: 'draw', margin: 0}, totals}
-  if (totals)
-    return {
-      result: {
+  let winners = [
+    ...text.matchAll(
+      /\b(black|white)\s+wins?\s+by\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
+    ),
+  ].map((m) => ({
+    winner: m[1].toLowerCase() === 'black' ? 'B' : 'W',
+    margin: +m[2],
+  }))
+  let blackValues = [
+    ...text.matchAll(
+      /\bblack(?:'s)?\s+(?:territory|total|score)\s+(?:amounts\s+to|comes\s+to|=|is|has)\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
+    ),
+  ].map((m) => +m[1])
+  let whiteValues = [
+    ...text.matchAll(
+      /\bwhite(?:'s)?\s+(?:territory|total|score)\s+(?:amounts\s+to|comes\s+to|=|is|has)\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
+    ),
+  ].map((m) => +m[1])
+  let bothValues = [
+    ...text.matchAll(
+      /\bboth\s+black\s+and\s+white\s+have\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
+    ),
+  ].map((m) => +m[1])
+  if (bothValues.length)
+    (blackValues.push(...bothValues), whiteValues.push(...bothValues))
+  let values = [...winners.map((w) => w.margin), ...blackValues, ...whiteValues]
+  if (values.some((value) => !Number.isFinite(value) || value < 0)) return null
+  if (new Set(winners.map((w) => `${w.winner}:${w.margin}`)).size > 1)
+    return null
+  if (new Set(blackValues).size > 1 || new Set(whiteValues).size > 1)
+    return null
+  let hasDraw = /\b(draw|jigo)\b/i.test(text)
+  if (hasDraw && winners.length) return null
+  let totals =
+    blackValues.length && whiteValues.length
+      ? {B: blackValues[0], W: whiteValues[0]}
+      : null
+  let derived = totals
+    ? {
         winner:
           totals.B === totals.W ? 'draw' : totals.B > totals.W ? 'B' : 'W',
         margin: Math.abs(totals.B - totals.W),
-      },
-      totals,
-    }
+      }
+    : null
+  if (winners.length) {
+    if (
+      derived &&
+      (derived.winner !== winners[0].winner ||
+        derived.margin !== winners[0].margin)
+    )
+      return null
+    return {result: winners[0], totals}
+  }
+  if (hasDraw) {
+    if (derived && derived.winner !== 'draw') return null
+    return {result: {winner: 'draw', margin: 0}, totals}
+  }
+  if (derived) return {result: derived, totals}
   return null
 }
 
@@ -1226,12 +1245,10 @@ function analyzeScore(tree) {
     /who\s+wins?\s+and\s+by\s+how\s+many\s+points|determine\s+the\s+score|calculate\s+the\s+score|what\s+is\s+the\s+score/i
   let question = tree
     .listNodes()
-    .find(
-      (node) =>
-        (node === tree.root || isPositionNode(node)) &&
-        (node.data?.C || []).some(
-          (value) => typeof value === 'string' && questionRe.test(value),
-        ),
+    .find((node) =>
+      (node.data?.C || []).some(
+        (value) => typeof value === 'string' && questionRe.test(value),
+      ),
     )
   if (question == null) return null
   let start = getPositionAncestor(tree, question)
@@ -1247,7 +1264,9 @@ function analyzeScore(tree) {
     if (seen.has(item.node.id) && seen.get(item.node.id) <= item.distance)
       continue
     seen.set(item.node.id, item.distance)
-    let parsed = parseScoreAnswer((item.node.data?.C || []).join(' '))
+    let parsed = hasPositiveResultMarker(item.node)
+      ? parseScoreAnswer((item.node.data?.C || []).join(' '))
+      : null
     if (parsed)
       answers.push({...parsed, node: item.node, distance: item.distance})
     else

@@ -2986,6 +2986,36 @@ describe('interpretProblem', () => {
     assert.strictEqual(interpretProblem(invalid).kind, 'unsupported')
   })
 
+  it('interprets explicit score winner and totals answers', () => {
+    let winnerTree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Who wins and by how many points?',
+      ])
+      draft.appendNode(draft.root.id, {
+        C: [
+          'Correct Answer',
+          'Black territory amounts to 38 points. White territory comes to 36 points. Black wins by 2 points.',
+        ],
+      })
+    })
+    let winner = interpretProblem(winnerTree)
+    assert.strictEqual(winner.kind, 'score')
+    assert.strictEqual(winner.answerMode, 'winner-margin')
+    assert.deepStrictEqual(winner.result, {winner: 'B', margin: 2})
+    assert.deepStrictEqual(winner.totals, {B: 38, W: 36})
+
+    let totalsTree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Determine the score.'])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct Answer', 'Both Black and White have 28 points.'],
+      })
+    })
+    let totals = interpretProblem(totalsTree)
+    assert.strictEqual(totals.kind, 'score')
+    assert.strictEqual(totals.answerMode, 'totals')
+    assert.deepStrictEqual(totals.result, {winner: 'draw', margin: 0})
+  })
+
   it('uses actual board state for AE removal and captures', () => {
     let removed = gametree.new().mutate((draft) => {
       let setup = draft.appendNode(draft.root.id, {AB: ['aa']})
@@ -3080,7 +3110,9 @@ describe('interpretProblem', () => {
       draft.updateProperty(draft.root.id, 'C', [
         'Who wins and by how many points?',
       ])
-      draft.appendNode(draft.root.id, {C: ['Black wins by 2 points.']})
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Black wins by 2 points.'],
+      })
     })
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'score')
@@ -3092,7 +3124,7 @@ describe('interpretProblem', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.updateProperty(draft.root.id, 'C', ['Determine the score.'])
       draft.appendNode(draft.root.id, {
-        C: ['Both Black and White have 28 points.'],
+        C: ['Correct', 'Both Black and White have 28 points.'],
       })
     })
     let result = interpretProblem(tree)

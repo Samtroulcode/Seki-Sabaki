@@ -1262,6 +1262,54 @@ test.describe('Tsumego workspace', () => {
       rmSync(root, {recursive: true, force: true})
     }
   })
+
+  test('score Tsumego is read-only and checks a winner margin', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-score-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '057.sgf'),
+      '(;GM[1]SZ[9]AB[aa][bb]AW[cc]C[Who wins and by how many points?](;C[Correct Answer;Black territory amounts to 38 points. White territory comes to 36 points. Black wins by 2 points.]))',
+    )
+    try {
+      await page.evaluate(
+        (libraryRoot) => window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      let initial = await page
+        .locator('.tsumego-solver-sidebar h2')
+        .textContent()
+      await page
+        .locator('.tsumego-solver-board')
+        .locator('.shudan-vertex[data-x="4"][data-y="4"]')
+        .click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+      await page.getByLabel('Winner').selectOption('B')
+      await page.getByLabel('Margin').fill('')
+      await page.getByRole('button', {name: 'Check answer'}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
+      await expect(
+        page.getByRole('button', {name: 'Retry', exact: true}),
+      ).toBeVisible()
+      await page.getByRole('button', {name: 'Retry', exact: true}).click()
+      await page.getByLabel('Winner').selectOption('B')
+      await page.getByLabel('Margin').fill('2')
+      await page.getByRole('button', {name: 'Check answer'}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solution')).toContainText(
+        'Black territory',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
 })
 
 async function dispatchVertex(page, x, y) {

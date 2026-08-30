@@ -87,7 +87,7 @@ export default class TsumegoSolver extends Component {
     if (evt.vertex == null) return
     if (this.state.phase === 'waiting') return
     if (
-      this.props.interpretation?.kind === 'stone-selection' &&
+      ['stone-selection', 'score'].includes(this.props.interpretation?.kind) &&
       this.state.phase !== 'solving'
     )
       return
@@ -109,6 +109,7 @@ export default class TsumegoSolver extends Component {
       this.handleStoneSelectionVertex(evt.vertex)
       return
     }
+    if (interpretation != null && interpretation.kind === 'score') return
 
     let expectedMoveNode = gameTree.get(this.state.expectedMoveNodeId)
     let result = resolveMove(
@@ -351,23 +352,25 @@ export default class TsumegoSolver extends Component {
     if (this.state.phase !== 'solving') return
     let {interpretation} = this.props
     if (interpretation?.kind !== 'score') return
-    let value =
-      interpretation.answerMode === 'winner-margin'
-        ? {
-            winner: this.state.scoreChoice,
-            margin: Number(this.state.scoreMargin),
-          }
-        : {
-            winner:
-              Number(this.state.scoreBlack) === Number(this.state.scoreWhite)
-                ? 'draw'
-                : Number(this.state.scoreBlack) > Number(this.state.scoreWhite)
-                  ? 'B'
-                  : 'W',
-            margin: Math.abs(
-              Number(this.state.scoreBlack) - Number(this.state.scoreWhite),
-            ),
-          }
+    let value
+    if (interpretation.answerMode === 'winner-margin') {
+      let margin = normalizeScoreInput(this.state.scoreMargin)
+      if (!['B', 'W', 'draw'].includes(this.state.scoreChoice))
+        return this.setState({phase: 'failed', feedback: t('Incorrect')})
+      if (this.state.scoreChoice === 'draw') value = {winner: 'draw', margin: 0}
+      else if (margin == null || margin <= 0)
+        return this.setState({phase: 'failed', feedback: t('Incorrect')})
+      else value = {winner: this.state.scoreChoice, margin}
+    } else {
+      let black = normalizeScoreInput(this.state.scoreBlack)
+      let white = normalizeScoreInput(this.state.scoreWhite)
+      if (black == null || white == null)
+        return this.setState({phase: 'failed', feedback: t('Incorrect')})
+      value = {
+        winner: black === white ? 'draw' : black > white ? 'B' : 'W',
+        margin: Math.abs(black - white),
+      }
+    }
     let expected = interpretation.result
     let correct =
       value.winner === expected.winner && value.margin === expected.margin
@@ -958,4 +961,10 @@ function splitRelativePath(relativePath) {
   return String(relativePath || '')
     .split(/[\\/]/)
     .filter(Boolean)
+}
+
+function normalizeScoreInput(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null
+  let number = Number(value)
+  return Number.isFinite(number) && number >= 0 ? number : null
 }
