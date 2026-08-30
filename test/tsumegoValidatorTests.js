@@ -260,4 +260,28 @@ describe('tsumegoValidator', () => {
       assert(result.problem != null)
     })
   })
+
+  describe('judgement', () => {
+    it('accepts Alive/Dead judgement with no B/W moves', () => {
+      let content =
+        '(;GM[1]SZ[9]AB[aa][bb]AW[cc]C[Alive or Dead?](;C[White is dead. Correct]))'
+      let result = validateTsumegoContent(content)
+
+      assert.strictEqual(result.valid, true)
+      assert.strictEqual(result.interpretation.kind, 'judgement')
+      assert.strictEqual(result.interpretation.judgementType, 'alive-dead')
+      assert.strictEqual(result.interpretation.correctChoice, 'dead')
+      assert.deepStrictEqual(codes(result), [])
+      assert.deepStrictEqual(warningCodes(result), [])
+    })
+
+    it('does not emit player-to-move warning for judgement', () => {
+      let content =
+        '(;GM[1]SZ[9]AB[aa][bb]C[Alive or Dead?](;C[Black is alive. Correct]))'
+      let result = validateTsumegoContent(content)
+
+      assert.strictEqual(result.valid, true)
+      assert.deepStrictEqual(warningCodes(result), [])
+    })
+  })
 })

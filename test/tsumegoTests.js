@@ -2503,4 +2503,62 @@ describe('interpretProblem', () => {
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'unsupported')
   })
+
+  it('detects Alive/Dead question with White is dead answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      draft.appendNode(draft.root.id, {C: ['White is dead.', 'Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'alive-dead')
+    assert.strictEqual(result.correctChoice, 'dead')
+    assert.deepStrictEqual(result.choices, ['alive', 'dead'])
+  })
+
+  it('detects Black is alive answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Is this group alive or dead?'])
+      draft.appendNode(draft.root.id, {C: ['Black is alive.', 'Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'alive')
+  })
+
+  it('fails closed when answer contains both alive and dead', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      draft.appendNode(draft.root.id, {
+        C: ['White is alive and black is dead. Correct'],
+      })
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('does not classify arbitrary alive/dead without question', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['This is a normal comment'])
+      draft.appendNode(draft.root.id, {C: ['White is dead. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('does not depend on AP producer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AP', ['GOWrite:2.0'])
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      draft.appendNode(draft.root.id, {C: ['White is dead. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'dead')
+  })
 })

@@ -1082,6 +1082,111 @@ function analyzePointSelection(tree, options = {}) {
   }
 }
 
+// Judgement detection for Alive/Dead problems.
+// Returns {startNodeId, answerNodeId, correctChoice} or null.
+function analyzeJudgement(tree, options = {}) {
+  let {allowTeFallback = false} = options || {}
+
+  // Find the question: initial/problem comment that unambiguously presents
+  // an Alive/Dead question. Check root and position-defining nodes.
+  let questionNode = null
+  let questionText = null
+  // Check root first, then other position nodes
+  let candidates = [tree.root]
+  for (let node of tree.listNodes()) {
+    if (node !== tree.root && isPositionNode(node)) candidates.push(node)
+  }
+  const ALIVE_DEAD_QUESTION_RE = /\balive\b.*\bdead\b|\bdead\b.*\balive\b/i
+  for (let node of candidates) {
+    if (node.data == null || node.data.C == null) continue
+    for (let value of node.data.C) {
+      if (typeof value !== 'string') continue
+      if (ALIVE_DEAD_QUESTION_RE.test(value)) {
+        questionNode = node
+        questionText = value
+        break
+      }
+    }
+    if (questionNode != null) break
+  }
+  if (questionNode == null) return null
+
+  // Find structurally related positive-result answer nodes
+  // The answer should be a descendant of the question's position or sibling
+  let questionDecisionPoint = isPositionNode(questionNode)
+    ? questionNode
+    : tree.root
+  // For judgement, the answer is typically a child or descendant of the decision point
+  // We look for positive-result nodes that are descendants of the question decision point
+  let answerCandidates = []
+  let stack = [...questionDecisionPoint.children]
+  let visited = new Set()
+  while (stack.length) {
+    let node = stack.pop()
+    if (visited.has(node.id)) continue
+    visited.add(node.id)
+    let hasPositive = hasPositiveResultMarker(node)
+    if (!hasPositive && allowTeFallback && hasTeMarker(node)) hasPositive = true
+    if (hasPositive) {
+      answerCandidates.push(node)
+    }
+    for (let child of node.children) stack.push(child)
+  }
+
+  // Also check if questionNode itself has positive marker and contains answer
+  // (unlikely, but handle)
+  if (answerCandidates.length === 0) {
+    let hasPositive = hasPositiveResultMarker(questionNode)
+    if (!hasPositive && allowTeFallback && hasTeMarker(questionNode))
+      hasPositive = true
+    if (hasPositive) answerCandidates.push(questionNode)
+  }
+
+  if (answerCandidates.length === 0) return null
+
+  // For each answer candidate, check if its text unambiguously identifies exactly one result
+  const ALIVE_RE = /\balive\b/i
+  const DEAD_RE = /\bdead\b/i
+  let validAnswers = []
+  for (let node of answerCandidates) {
+    if (node.data == null || node.data.C == null) continue
+    for (let value of node.data.C) {
+      if (typeof value !== 'string') continue
+      let hasAlive = ALIVE_RE.test(value)
+      let hasDead = DEAD_RE.test(value)
+      if (hasAlive && !hasDead) {
+        validAnswers.push({node, choice: 'alive', text: value})
+        break
+      } else if (!hasAlive && hasDead) {
+        validAnswers.push({node, choice: 'dead', text: value})
+        break
+      } else if (hasAlive && hasDead) {
+        // Ambiguous - both present, fail closed
+        return null
+      }
+    }
+  }
+
+  if (validAnswers.length === 0) return null
+  // If multiple valid answers with different choices, ambiguous
+  let choices = new Set(validAnswers.map((a) => a.choice))
+  if (choices.size !== 1) return null
+
+  // Use the first valid answer
+  let answer = validAnswers[0]
+  let startNodeId = questionDecisionPoint.id
+  // If questionNode is a position node, use it as start; otherwise use decision point
+  if (isPositionNode(questionNode)) {
+    startNodeId = questionNode.id
+  }
+
+  return {
+    startNodeId,
+    answerNodeId: answer.node.id,
+    correctChoice: answer.choice,
+  }
+}
+
 // Higher-level interpretation that distinguishes move-sequence and
 // point-selection problems while preserving the existing analyzeProblem API.
 //
@@ -1089,6 +1194,8 @@ function analyzePointSelection(tree, options = {}) {
 // - {kind: 'move-sequence', problem} when a playable move-sequence is found
 // - {kind: 'point-selection', startNodeId, acceptedPoints, answerGroups, playerToMove} when
 //   L-based point-selection is detected
+// - {kind: 'judgement', judgementType: 'alive-dead', startNodeId, answerNodeId, choices, correctChoice} when
+//   Alive/Dead judgement is detected
 // - {kind: 'unsupported'} otherwise
 export function interpretProblem(tree, options = {}) {
   let problem = analyzeProblem(tree, options)
@@ -1104,6 +1211,18 @@ export function interpretProblem(tree, options = {}) {
       acceptedPoints: pointSelection.acceptedPoints,
       answerGroups: pointSelection.answerGroups,
       playerToMove: pointSelection.playerToMove,
+    }
+  }
+
+  let judgement = analyzeJudgement(tree, options)
+  if (judgement != null) {
+    return {
+      kind: 'judgement',
+      judgementType: 'alive-dead',
+      startNodeId: judgement.startNodeId,
+      answerNodeId: judgement.answerNodeId,
+      choices: ['alive', 'dead'],
+      correctChoice: judgement.correctChoice,
     }
   }
 

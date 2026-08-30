@@ -1086,6 +1086,69 @@ test.describe('Tsumego workspace', () => {
     }
   })
 
+  test('judgement Alive/Dead solves and navigates correctly', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-judgement-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, 'judgement.sgf'),
+      '(;GM[1]SZ[9]AB[aa][bb]AW[cc][dd]C[Alive or Dead?](;C[White is dead. Correct]))',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+      await expect(page.locator('.tsumego-judgement-controls')).toBeVisible()
+
+      // Wrong choice gives Incorrect without revealing answer
+      await page.getByRole('button', {name: 'Alive', exact: true}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
+      await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+        'Incorrect',
+      )
+      // Should not have navigated to answer node
+      let commentFailed = await page.locator('.tsumego-solution p').count()
+      expect(commentFailed).toBe(0)
+
+      // Retry restores initial position
+      await page.getByRole('button', {name: 'Retry', exact: true}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+
+      // Correct choice solves and navigates to answer node
+      await page.getByRole('button', {name: 'Dead', exact: true}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+        'Solved',
+      )
+      let commentSolved = await page
+        .locator('.tsumego-solution p')
+        .first()
+        .textContent()
+      expect(commentSolved).toContain('White is dead')
+
+      // Wheel navigation works after solved
+      await page
+        .locator('.tsumego-solver-board')
+        .dispatchEvent('wheel', {deltaY: 100})
+      await page.waitForTimeout(100)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
   test('solved wheel navigation works across solver workspace', async ({
     page,
   }) => {

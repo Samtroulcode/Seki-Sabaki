@@ -58,6 +58,19 @@ export default class TsumegoSolver extends Component {
         highlightVertices: [],
       }
     }
+    if (interpretation != null && interpretation.kind === 'judgement') {
+      return {
+        phase: 'solving',
+        displayNodeId: interpretation.startNodeId,
+        decisionPointId: interpretation.startNodeId,
+        expectedMoveNodeId: null,
+        feedback: null,
+        showGameGraph: false,
+        explorationBoard: null,
+        explorationPlayer: null,
+        highlightVertices: [],
+      }
+    }
     return {
       phase: 'solving',
       displayNodeId: problem.startNodeId,
@@ -82,6 +95,11 @@ export default class TsumegoSolver extends Component {
     let {gameTree, problem, interpretation} = this.props
     if (interpretation != null && interpretation.kind === 'point-selection') {
       this.handlePointSelectionVertex(evt.vertex)
+      return
+    }
+    if (interpretation != null && interpretation.kind === 'judgement') {
+      // Judgement problems do not use board clicks as answers
+      this.handleExplorationVertex(evt.vertex)
       return
     }
 
@@ -241,6 +259,36 @@ export default class TsumegoSolver extends Component {
 
     // Other legal point - incorrect
     this.startFailedExploration(vertex)
+  }
+
+  handleJudgementChoice = (choice) => {
+    if (this.state.phase !== 'solving') return
+    let {interpretation} = this.props
+    if (interpretation == null || interpretation.kind !== 'judgement') return
+
+    if (choice === interpretation.correctChoice) {
+      sound.playPachi()
+      this.setState({
+        phase: 'solved',
+        displayNodeId: interpretation.answerNodeId,
+        feedback: t('Solved') || 'Solved',
+        showGameGraph: true,
+        explorationBoard: null,
+        explorationPlayer: null,
+        highlightVertices: [],
+      })
+      this.props.onSolved?.()
+      this.startAutoNext()
+    } else {
+      sound.playPachi()
+      this.setState({
+        phase: 'failed',
+        feedback: t('Incorrect'),
+        explorationBoard: null,
+        explorationPlayer: null,
+        highlightVertices: [],
+      })
+    }
   }
 
   startAutoSequence(advanced) {
@@ -611,6 +659,30 @@ export default class TsumegoSolver extends Component {
           ),
         this.props.initialComment &&
           h('p', {class: 'tsumego-initial-comment'}, this.props.initialComment),
+        interpretation != null &&
+          interpretation.kind === 'judgement' &&
+          interpretation.judgementType === 'alive-dead' &&
+          phase === 'solving' &&
+          h(
+            'div',
+            {class: 'tsumego-judgement-controls'},
+            h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => this.handleJudgementChoice('alive'),
+              },
+              t('Alive'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => this.handleJudgementChoice('dead'),
+              },
+              t('Dead'),
+            ),
+          ),
         feedback != null &&
           h(
             'p',
