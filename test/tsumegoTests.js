@@ -2838,6 +2838,20 @@ describe('interpretProblem', () => {
     assert.strictEqual(result.correctChoice, 'dead')
   })
 
+  it('keeps several descriptive nodes at structural distance zero', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      let first = draft.appendNode(draft.root.id, {C: ['description']})
+      let second = draft.appendNode(first, {N: ['diagram note']})
+      draft.appendNode(second, {C: ['White is dead.']})
+      let laterPosition = draft.appendNode(draft.root.id, {AB: ['aa']})
+      draft.appendNode(laterPosition, {C: ['White is alive.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'dead')
+  })
+
   it('does not let deeper descendant override nearest answer', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
@@ -2866,6 +2880,46 @@ describe('interpretProblem', () => {
       // Both L with Correct and judgement answer at same frontier
       draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
       draft.appendNode(draft.root.id, {C: ['White is dead.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('chooses an earlier point-selection anchor over later judgement', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+      let later = draft.appendNode(draft.root.id, {
+        AB: ['bb'],
+        C: ['Alive or Dead?'],
+      })
+      draft.appendNode(later, {C: ['White is dead.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
+  })
+
+  it('chooses an earlier judgement anchor over later point-selection', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      let answer = draft.appendNode(draft.root.id, {C: ['White is dead.']})
+      let later = draft.appendNode(answer, {AB: ['bb']})
+      draft.appendNode(later, {L: ['cc'], C: ['Correct']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.startNodeId, tree.root.id)
+  })
+
+  it('fails closed for unrelated non-move anchors', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let pointPosition = draft.appendNode(draft.root.id, {AB: ['aa']})
+      draft.appendNode(pointPosition, {L: ['bb'], C: ['Correct']})
+      let judgementPosition = draft.appendNode(draft.root.id, {
+        AB: ['cc'],
+        C: ['Alive or Dead?'],
+      })
+      draft.appendNode(judgementPosition, {C: ['White is dead.']})
     })
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'unsupported')

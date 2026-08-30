@@ -1002,6 +1002,23 @@ function getNodeDepth(tree, targetId) {
   return 0
 }
 
+// Compares structural problem anchors. An ancestor is earlier than its
+// descendant; unrelated branches are not reliably ordered.
+function compareProblemAnchors(tree, firstId, secondId) {
+  if (firstId === secondId) return 0
+  let current = tree.get(secondId)
+  while (current != null && current.parentId != null) {
+    if (current.parentId === firstId) return -1
+    current = tree.get(current.parentId)
+  }
+  current = tree.get(firstId)
+  while (current != null && current.parentId != null) {
+    if (current.parentId === secondId) return 1
+    current = tree.get(current.parentId)
+  }
+  return null
+}
+
 // Infers playerToMove for point-selection from structured SGF evidence
 // in the decision context. Returns 'B' | 'W' | null when ambiguous or absent.
 function inferPointSelectionPlayerToMove(tree, decisionPoint) {
@@ -1204,119 +1221,76 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
   }
   if (questionNode == null) return null
 
-  // Find structurally related answer candidates using nearest-answer strategy
-  // Structural distance is defined by position changes, not raw node count.
-  // Descriptive nodes (non-position) are transparent and do not increase depth.
+  // Find the minimum structural answer distance. Entering a position costs
+  // one; descriptive nodes are transparent.
   let questionDecisionPoint = isPositionNode(questionNode)
     ? questionNode
     : tree.root
-  let startNodes =
-    type.judgementType === 'good-bad' ? [questionNode] : [questionDecisionPoint]
-  // BFS by structural depth (position changes)
-  // Descriptive nodes are transparent: their children are at same depth
-  let frontier = [...startNodes.flatMap((n) => n.children)]
-  let visited = new Set()
-  while (frontier.length > 0) {
-    let nextFrontier = []
-    let nextPositionFrontier = []
-    let viableAtThisDepth = []
-    // Use a queue to handle transparent descriptive nodes at same depth
-    let queue = [...frontier]
-    let currentDepthVisited = new Set()
-    while (queue.length > 0) {
-      let node = queue.shift()
-      if (visited.has(node.id) || currentDepthVisited.has(node.id)) continue
-      currentDepthVisited.add(node.id)
-      visited.add(node.id)
-      // Check if node is viable answer (positive marker or unambiguous semantics)
-      let hasPositive = hasPositiveResultMarker(node)
-      if (!hasPositive && allowTeFallback && hasTeMarker(node))
-        hasPositive = true
-      let hasAnswerSemantics = false
-      let matchedChoice = null
-      if (node.data != null && node.data.C != null) {
-        for (let value of node.data.C) {
-          if (typeof value !== 'string') continue
-          let matches = []
-          for (let choice of type.choices) {
-            let re = type.answerRes[choice]
-            if (re.test(value)) matches.push(choice)
-          }
-          if (matches.length === 1) {
-            hasAnswerSemantics = true
-            matchedChoice = matches[0]
-            break
-          } else if (matches.length > 1) {
-            // Ambiguous at this node - fail closed
-            return null
-          }
-        }
-      }
-      if (hasPositive || hasAnswerSemantics) {
-        if (hasPositive && !hasAnswerSemantics) {
-          let found = false
-          if (node.data != null && node.data.C != null) {
-            for (let value of node.data.C) {
-              if (typeof value !== 'string') continue
-              let matches = []
-              for (let choice of type.choices) {
-                let re = type.answerRes[choice]
-                if (re.test(value)) matches.push(choice)
-              }
-              if (matches.length === 1) {
-                viableAtThisDepth.push({node, choice: matches[0]})
-                found = true
-                break
-              } else if (matches.length > 1) {
-                return null
-              }
-            }
-          }
-          if (!found) {
-            // Positive marker but no answer semantics - not viable, but still traverse children
-            // For descriptive nodes, children are at same depth
-            let targetFrontier = isPositionNode(node)
-              ? nextPositionFrontier
-              : queue
-            for (let child of node.children) {
-              if (!visited.has(child.id) && !currentDepthVisited.has(child.id))
-                targetFrontier.push(child)
-            }
-          }
-        } else {
-          viableAtThisDepth.push({node, choice: matchedChoice})
-        }
-      } else {
-        // Not viable, traverse children
-        // Descriptive nodes are transparent: children at same depth
-        let targetFrontier = isPositionNode(node) ? nextPositionFrontier : queue
-        for (let child of node.children) {
-          if (!visited.has(child.id) && !currentDepthVisited.has(child.id))
-            targetFrontier.push(child)
-        }
-      }
+  let anchor =
+    type.judgementType === 'good-bad' ? questionNode : questionDecisionPoint
+  let queue = anchor.children.map((node) => ({
+    node,
+    distance: isPositionNode(node) ? 1 : 0,
+  }))
+  let distances = new Map()
+  let nearestDistance = null
+  let nearestAnswers = []
+
+  while (queue.length > 0) {
+    queue.sort((a, b) => a.distance - b.distance)
+    let {node, distance} = queue.shift()
+    if (nearestDistance != null && distance > nearestDistance) break
+    if (distances.has(node.id) && distances.get(node.id) <= distance) continue
+    distances.set(node.id, distance)
+
+    let answer = classifyJudgementAnswer(node, type, allowTeFallback)
+    if (answer === 'ambiguous') return null
+    if (answer != null) {
+      nearestDistance = distance
+      nearestAnswers.push(answer)
+      continue
     }
-    if (viableAtThisDepth.length > 0) {
-      let choices = new Set(viableAtThisDepth.map((a) => a.choice))
-      if (choices.size !== 1) return null
-      let answer = viableAtThisDepth[0]
-      let startNodeId = isPositionNode(questionNode)
-        ? questionNode.id
-        : questionDecisionPoint.id
-      if (type.judgementType === 'good-bad') {
-        startNodeId = questionNode.id
-      }
-      return {
-        judgementType: type.judgementType,
-        startNodeId,
-        answerNodeId: answer.node.id,
-        choices: type.choices,
-        correctChoice: answer.choice,
-      }
+
+    for (let child of node.children) {
+      queue.push({
+        node: child,
+        distance: distance + (isPositionNode(child) ? 1 : 0),
+      })
     }
-    frontier = nextPositionFrontier
   }
-  return null
+
+  if (nearestAnswers.length === 0) return null
+  let choices = new Set(nearestAnswers.map((answer) => answer.choice))
+  if (choices.size !== 1) return null
+  let answer = nearestAnswers.find((candidate) => candidate.marked)
+  answer = answer || nearestAnswers[0]
+  let startNodeId = isPositionNode(questionNode)
+    ? questionNode.id
+    : questionDecisionPoint.id
+  if (type.judgementType === 'good-bad') startNodeId = questionNode.id
+  return {
+    judgementType: type.judgementType,
+    startNodeId,
+    answerNodeId: answer.node.id,
+    choices: type.choices,
+    correctChoice: answer.choice,
+  }
+}
+
+function classifyJudgementAnswer(node, type, allowTeFallback) {
+  if (node.data == null || !Array.isArray(node.data.C)) return null
+  let matchedChoices = new Set()
+  for (let value of node.data.C) {
+    if (typeof value !== 'string') continue
+    for (let choice of type.choices) {
+      if (type.answerRes[choice].test(value)) matchedChoices.add(choice)
+    }
+  }
+  if (matchedChoices.size > 1) return 'ambiguous'
+  if (matchedChoices.size === 0) return null
+  let marked = hasPositiveResultMarker(node)
+  if (!marked && allowTeFallback && hasTeMarker(node)) marked = true
+  return {node, choice: [...matchedChoices][0], marked}
 }
 
 // Higher-level interpretation that distinguishes move-sequence and
@@ -1335,38 +1309,37 @@ export function interpretProblem(tree, options = {}) {
     return {kind: 'move-sequence', problem}
   }
 
-  // Compute point-selection and judgement independently for conflict handling
+  // Compute non-move interpretations independently
   let pointSelection = analyzePointSelection(tree, options)
   let judgement = analyzeJudgement(tree, options)
 
-  // Handle conflict: if both are independently plausible at same structural position, fail closed
+  // Arbitrate by structural problem anchor: earlier startNodeId wins
   if (pointSelection != null && judgement != null) {
-    // Only fail closed if they share the same decision position or answer node
-    let pointSelectionNodes = new Set(
-      pointSelection.answerGroups.map((g) => g.nodeId),
+    let order = compareProblemAnchors(
+      tree,
+      pointSelection.startNodeId,
+      judgement.startNodeId,
     )
-    if (
-      pointSelectionNodes.has(judgement.answerNodeId) ||
-      pointSelection.startNodeId === judgement.startNodeId
-    ) {
-      return {kind: 'unsupported'}
+    if (order === -1) {
+      return {
+        kind: 'point-selection',
+        startNodeId: pointSelection.startNodeId,
+        acceptedPoints: pointSelection.acceptedPoints,
+        answerGroups: pointSelection.answerGroups,
+        playerToMove: pointSelection.playerToMove,
+      }
     }
-    // Otherwise, they are at different positions, so prefer the one with stronger evidence
-    // For 211-style, Good/Bad at B[aa] vs point-selection at For Reference L, prefer Good/Bad
-    // For now, if they are at different positions, return the one that was detected first
-    // But to be safe, we should check which has more specific evidence
-    // For 211-style, the Good/Bad question is on B[aa] move node, which is more specific than generic L
-    // So we should prefer judgement in that case
-    // For now, if both are valid but at different positions, return judgement if it exists
-    // This handles 211-style where later For Reference L should be ignored
-    return {
-      kind: 'judgement',
-      judgementType: judgement.judgementType,
-      startNodeId: judgement.startNodeId,
-      answerNodeId: judgement.answerNodeId,
-      choices: judgement.choices,
-      correctChoice: judgement.correctChoice,
+    if (order === 1) {
+      return {
+        kind: 'judgement',
+        judgementType: judgement.judgementType,
+        startNodeId: judgement.startNodeId,
+        answerNodeId: judgement.answerNodeId,
+        choices: judgement.choices,
+        correctChoice: judgement.correctChoice,
+      }
     }
+    return {kind: 'unsupported'}
   }
 
   if (pointSelection != null) {
