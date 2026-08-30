@@ -2960,4 +2960,93 @@ describe('interpretProblem', () => {
     })
     assert.strictEqual(interpretProblem(invalid).kind, 'unsupported')
   })
+
+  it('uses actual board state for AE removal and captures', () => {
+    let removed = gametree.new().mutate((draft) => {
+      let setup = draft.appendNode(draft.root.id, {AB: ['aa']})
+      let position = draft.appendNode(setup, {AE: ['aa']})
+      draft.updateProperty(position, 'C', ['Which stones are dead?'])
+      draft.appendNode(position, {TR: ['aa'], C: ['Correct']})
+    })
+    assert.strictEqual(
+      gametree
+        .getBoard(removed, removed.root.children[0].children[0].id)
+        .get([0, 0]),
+      0,
+    )
+    let removedResult = interpretProblem(removed)
+    assert.strictEqual(removedResult.kind, 'unsupported')
+
+    let captured = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AW', ['bb'])
+      draft.updateProperty(draft.root.id, 'AB', ['ab', 'cb', 'bc'])
+      let capture = draft.appendNode(draft.root.id, {B: ['ba']})
+      let question = draft.appendNode(capture, {
+        C: ['Which stones are dead?'],
+      })
+      draft.appendNode(question, {TR: ['bb'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(captured).kind, 'unsupported')
+
+    let mixed = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AB', ['aa'])
+      draft.updateProperty(draft.root.id, 'AW', ['bb'])
+      let question = draft.appendNode(draft.root.id, {
+        C: ['Which stones are dead?'],
+      })
+      draft.appendNode(question, {TR: ['aa', 'bb'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(mixed).kind, 'stone-selection')
+  })
+
+  it('resolves a descriptive question to its nearest position ancestor', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let position = draft.appendNode(draft.root.id, {AB: ['aa']})
+      let question = draft.appendNode(position, {
+        C: ['Dead stones. Which ones are they?'],
+      })
+      draft.appendNode(question, {TR: ['aa'], C: ['Correct']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'stone-selection')
+    assert.strictEqual(result.startNodeId, tree.root.children[0].id)
+  })
+
+  it('resolves identical nearest stone answer sets deterministically', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AB', ['aa'])
+      draft.updateProperty(draft.root.id, 'C', ['Which stones are dead?'])
+      draft.appendNode(draft.root.id, {TR: ['aa'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {TR: ['aa'], C: ['Correct']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'stone-selection')
+    assert.strictEqual(result.answerNodeId, tree.root.children[0].id)
+  })
+
+  it('fails closed on conflicting nearest stone answer sets', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AB', ['aa', 'bb'])
+      draft.updateProperty(draft.root.id, 'C', ['Which stones are dead?'])
+      draft.appendNode(draft.root.id, {TR: ['aa'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {TR: ['bb'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(tree).kind, 'unsupported')
+  })
+
+  it('ignores a deeper conflicting stone reference after a nearer answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AB', ['aa', 'bb'])
+      draft.updateProperty(draft.root.id, 'C', ['Which stones are dead?'])
+      let answer = draft.appendNode(draft.root.id, {
+        TR: ['aa'],
+        C: ['Correct'],
+      })
+      let reference = draft.appendNode(answer, {AB: ['bb']})
+      draft.appendNode(reference, {TR: ['bb'], C: ['Correct']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'stone-selection')
+    assert.strictEqual(result.answerNodeId, tree.root.children[0].id)
+  })
 })

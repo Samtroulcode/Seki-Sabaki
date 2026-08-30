@@ -980,7 +980,8 @@ function isVertexOnBoard(vertex, dimensions) {
 
 // Returns the decision point for a point-selection answer node.
 // Walks up to the nearest position-defining ancestor, or the root.
-function getPointSelectionDecisionPoint(tree, node) {
+function getPositionAncestor(tree, node) {
+  if (node != null && isPositionNode(node)) return node
   let current = node.parentId != null ? tree.get(node.parentId) : null
   while (
     current != null &&
@@ -1081,7 +1082,7 @@ function analyzePointSelection(tree, options = {}) {
       answerGroups.push({nodeId: node.id, points: validPoints})
     }
 
-    let decisionPoint = getPointSelectionDecisionPoint(tree, node)
+    let decisionPoint = getPositionAncestor(tree, node)
     if (decisionPoint != null)
       decisionPoints.set(decisionPoint.id, decisionPoint)
   }
@@ -1117,7 +1118,7 @@ function analyzeStoneSelection(tree) {
     if (questionNode != null) break
   }
   if (questionNode == null) return null
-  let startNode = getPointSelectionDecisionPoint(tree, questionNode)
+  let startNode = getPositionAncestor(tree, questionNode)
   let board = gametree.getBoard(tree, startNode.id)
   let queue = [{node: questionNode, distance: 0}]
   let distances = new Map()
@@ -1134,10 +1135,10 @@ function analyzeStoneSelection(tree) {
       for (let value of node.data.TR) {
         if (typeof value !== 'string') return null
         let vertex = parseVertex(value)
-        let key = `${vertex[0]},${vertex[1]}`
         if (
           !isVertexOnBoard(vertex, dimensions) ||
-          (board.get(vertex) !== 1 && board.get(vertex) !== -1)
+          (board.signMap[vertex[1]]?.[vertex[0]] !== 1 &&
+            board.signMap[vertex[1]]?.[vertex[0]] !== -1)
         )
           return null
         if (!points.includes(value)) points.push(value)
@@ -1155,16 +1156,18 @@ function analyzeStoneSelection(tree) {
         })
       }
     }
-    if (answers.length) {
-      let sets = answers.map(({points}) => new Set(points))
-      let first = [...sets[0]].sort().join('|')
-      if (sets.some((set) => [...set].sort().join('|') !== first)) return null
-      return {
-        kind: 'stone-selection',
-        startNodeId: startNode.id,
-        answerNodeId: answers[0].node.id,
-        acceptedVertices: answers[0].points,
-      }
+  }
+  if (answers.length) {
+    let sets = answers.map(({points}) => new Set(points))
+    let first = [...sets[0]].sort().join('|')
+    if (sets.some((set) => [...set].sort().join('|') !== first)) return null
+    answers.sort((a, b) => String(a.node.id).localeCompare(String(b.node.id)))
+    return {
+      kind: 'stone-selection',
+      selectionType: 'dead-stones',
+      startNodeId: startNode.id,
+      answerNodeId: answers[0].node.id,
+      acceptedVertices: answers[0].points,
     }
   }
   return null
@@ -1386,47 +1389,23 @@ export function interpretProblem(tree, options = {}) {
     analyzePointSelection(tree, options),
     analyzeJudgement(tree, options),
     analyzeStoneSelection(tree),
-  ]
-    .filter(Boolean)
-    .map((candidate) => ({...candidate, kind: candidate.kind}))
+  ].filter(Boolean)
   if (candidates.length > 1) {
-    let earliest = candidates[0]
-    for (let candidate of candidates.slice(1)) {
-      let order = compareProblemAnchors(
-        tree,
-        earliest.startNodeId,
-        candidate.startNodeId,
-      )
-      if (order === null || order === 0) return {kind: 'unsupported'}
-      if (order === 1) earliest = candidate
-    }
-    candidates = [earliest]
+    let earliest = candidates.filter((candidate) =>
+      candidates.every(
+        (other) =>
+          candidate === other ||
+          compareProblemAnchors(
+            tree,
+            candidate.startNodeId,
+            other.startNodeId,
+          ) === -1,
+      ),
+    )
+    if (earliest.length !== 1) return {kind: 'unsupported'}
+    candidates = earliest
   }
   let candidate = candidates[0]
 
-  if (candidate?.kind === 'point-selection') {
-    return {
-      kind: 'point-selection',
-      startNodeId: candidate.startNodeId,
-      acceptedPoints: candidate.acceptedPoints,
-      answerGroups: candidate.answerGroups,
-      playerToMove: candidate.playerToMove,
-    }
-  }
-
-  if (candidate?.kind === 'judgement') {
-    return {
-      kind: 'judgement',
-      judgementType: candidate.judgementType,
-      startNodeId: candidate.startNodeId,
-      answerNodeId: candidate.answerNodeId,
-      choices: candidate.choices,
-      correctChoice: candidate.correctChoice,
-    }
-  }
-
-  if (candidate?.kind === 'stone-selection')
-    return {selectionType: 'dead-stones', ...candidate}
-
-  return {kind: 'unsupported'}
+  return candidate || {kind: 'unsupported'}
 }
