@@ -6,6 +6,7 @@ import {
   advanceRefutation,
   analyzeProblem,
   classifyMove,
+  interpretProblem,
   resolveMove,
 } from '../src/modules/tsumego.js'
 
@@ -2282,5 +2283,121 @@ describe('advanceRefutation', () => {
     assert.strictEqual(result.automaticMoves.length, 2)
     assert.strictEqual(result.automaticMoves[0].data.W[0], 'xx')
     assert.strictEqual(result.automaticMoves[1].data.B[0], 'zz')
+  })
+})
+
+describe('interpretProblem', () => {
+  it('combines points from multiple positive L answer nodes', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['dj', 'dk'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {L: ['cj', 'ck'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.deepStrictEqual(
+      new Set(result.acceptedPoints),
+      new Set(['dj', 'dk', 'cj', 'ck']),
+    )
+    assert.strictEqual(result.acceptedPoints.length, 4)
+  })
+
+  it('allows a positive L answer to coexist with an explicit wrong move variation', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['dj'], C: ['Correct Answer']})
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.deepStrictEqual(result.acceptedPoints, ['dj'])
+  })
+
+  it('deduplicates duplicate points', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['dj', 'dj'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {L: ['dj'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.deepStrictEqual(result.acceptedPoints, ['dj'])
+  })
+
+  it('rejects out-of-board markup safely', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['9'])
+      draft.appendNode(draft.root.id, {L: ['aa', 'zz'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.deepStrictEqual(result.acceptedPoints, ['aa'])
+  })
+
+  it('does not interpret arbitrary explanatory L markup as an answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['aa', 'bb'], C: ['Legal position']})
+      draft.appendNode(draft.root.id, {L: ['cc'], C: ['Illegal position']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('does not treat LB question labels as answers', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {LB: ['aa:A', 'bb:B'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('prefers existing move-sequence problems over point-selection', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {L: ['bb'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'move-sequence')
+    assert(result.problem != null)
+    assert.strictEqual(result.problem.firstMove.data.B[0], 'aa')
+  })
+
+  it('infers player color only from structured unambiguous evidence', () => {
+    // Explicit PL
+    let treePl = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'PL', ['W'])
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(treePl).playerToMove, 'W')
+
+    // Consistent move color
+    let treeMoves = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong']})
+      draft.appendNode(draft.root.id, {B: ['cc'], C: ['Wrong']})
+    })
+    assert.strictEqual(interpretProblem(treeMoves).playerToMove, 'B')
+
+    // Inconsistent move colors -> null
+    let treeMixed = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong']})
+      draft.appendNode(draft.root.id, {W: ['cc'], C: ['Wrong']})
+    })
+    assert.strictEqual(interpretProblem(treeMixed).playerToMove, null)
+  })
+
+  it('returns null color when no structured color evidence exists', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.playerToMove, null)
   })
 })

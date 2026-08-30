@@ -946,3 +946,122 @@ export function advanceRefutation(tree, wrongMoveNode) {
 
   return {automaticMoves, positionNodeId}
 }
+
+// Returns board dimensions from SGF SZ property, defaulting to 19x19.
+function getBoardDimensions(tree) {
+  let size = tree.root.data?.SZ?.[0] ?? '19'
+  let dimensions = String(size).split(':').map(Number)
+  let width = dimensions[0]
+  let height = dimensions[dimensions.length - 1]
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return {width: 19, height: 19}
+  }
+  return {width, height}
+}
+
+// Returns whether a vertex is within board dimensions.
+function isVertexOnBoard(vertex, dimensions) {
+  return (
+    vertex != null &&
+    vertex[0] >= 0 &&
+    vertex[1] >= 0 &&
+    vertex[0] < dimensions.width &&
+    vertex[1] < dimensions.height
+  )
+}
+
+// Infers playerToMove for point-selection from structured SGF evidence.
+// Returns 'B' | 'W' | null when ambiguous or absent.
+function inferPointSelectionPlayerToMove(tree) {
+  // Explicit PL is the most direct structured evidence. Check all PL
+  // properties in the tree for consistency.
+  let plColors = new Set()
+  for (let node of tree.listNodes()) {
+    let pl = node.data?.PL?.[0]
+    if (pl === 'B' || pl === 'W') plColors.add(pl)
+    else if (pl != null) {
+      // Invalid PL value - treat as ambiguous
+      return null
+    }
+  }
+  if (plColors.size === 1) return [...plColors][0]
+  if (plColors.size > 1) return null
+
+  // Fall back to consistent first-move color from actual move variations.
+  // Collect all B/W move nodes in the tree.
+  let colors = new Set()
+  for (let node of tree.listNodes()) {
+    if (node.data == null) continue
+    if (node.data.B != null && node.data.W == null) colors.add('B')
+    else if (node.data.W != null && node.data.B == null) colors.add('W')
+    else if (node.data.B != null && node.data.W != null) {
+      // Malformed node with both colors - treat as ambiguous
+      return null
+    }
+  }
+  if (colors.size === 1) return [...colors][0]
+  return null
+}
+
+// Analyzes point-selection candidates when no move-sequence problem exists.
+// Returns {acceptedPoints, playerToMove} or null when no valid candidate.
+function analyzePointSelection(tree, options = {}) {
+  let {allowTeFallback = false} = options || {}
+  let dimensions = getBoardDimensions(tree)
+  let points = new Map() // key: vertex string, value: vertex string
+
+  for (let node of tree.listNodes()) {
+    if (node.data == null || node.data.L == null) continue
+    if (!Array.isArray(node.data.L) || node.data.L.length === 0) continue
+
+    // Only consider L nodes with reliable positive result evidence.
+    let hasPositive = hasPositiveResultMarker(node)
+    if (!hasPositive && allowTeFallback && hasTeMarker(node)) hasPositive = true
+    if (!hasPositive) continue
+
+    for (let value of node.data.L) {
+      if (typeof value !== 'string') continue
+      let vertex = parseVertex(value)
+      if (!isVertexOnBoard(vertex, dimensions)) continue
+      let key = `${vertex[0]},${vertex[1]}`
+      if (!points.has(key)) points.set(key, value)
+    }
+  }
+
+  if (points.size === 0) return null
+
+  let acceptedPoints = [...points.values()]
+  let playerToMove = inferPointSelectionPlayerToMove(tree)
+  return {acceptedPoints, playerToMove}
+}
+
+// Higher-level interpretation that distinguishes move-sequence and
+// point-selection problems while preserving the existing analyzeProblem API.
+//
+// Returns:
+// - {kind: 'move-sequence', problem} when a playable move-sequence is found
+// - {kind: 'point-selection', acceptedPoints, playerToMove} when L-based
+//   point-selection is detected
+// - {kind: 'unsupported'} otherwise
+export function interpretProblem(tree, options = {}) {
+  let problem = analyzeProblem(tree, options)
+  if (problem != null) {
+    return {kind: 'move-sequence', problem}
+  }
+
+  let pointSelection = analyzePointSelection(tree, options)
+  if (pointSelection != null) {
+    return {
+      kind: 'point-selection',
+      acceptedPoints: pointSelection.acceptedPoints,
+      playerToMove: pointSelection.playerToMove,
+    }
+  }
+
+  return {kind: 'unsupported'}
+}
