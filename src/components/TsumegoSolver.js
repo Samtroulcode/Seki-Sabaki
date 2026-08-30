@@ -49,7 +49,8 @@ export default class TsumegoSolver extends Component {
       interpretation != null &&
       (interpretation.kind === 'point-selection' ||
         interpretation.kind === 'judgement' ||
-        interpretation.kind === 'stone-selection')
+        interpretation.kind === 'stone-selection' ||
+        interpretation.kind === 'score')
     ) {
       return {
         phase: 'solving',
@@ -62,6 +63,10 @@ export default class TsumegoSolver extends Component {
         explorationPlayer: null,
         highlightVertices: [],
         selectedVertices: [],
+        scoreChoice: null,
+        scoreMargin: '',
+        scoreBlack: '',
+        scoreWhite: '',
       }
     }
     return {
@@ -340,6 +345,47 @@ export default class TsumegoSolver extends Component {
         highlightVertices: this.state.selectedVertices || [],
       })
     }
+  }
+
+  handleScoreCheck = () => {
+    if (this.state.phase !== 'solving') return
+    let {interpretation} = this.props
+    if (interpretation?.kind !== 'score') return
+    let value =
+      interpretation.answerMode === 'winner-margin'
+        ? {
+            winner: this.state.scoreChoice,
+            margin: Number(this.state.scoreMargin),
+          }
+        : {
+            winner:
+              Number(this.state.scoreBlack) === Number(this.state.scoreWhite)
+                ? 'draw'
+                : Number(this.state.scoreBlack) > Number(this.state.scoreWhite)
+                  ? 'B'
+                  : 'W',
+            margin: Math.abs(
+              Number(this.state.scoreBlack) - Number(this.state.scoreWhite),
+            ),
+          }
+    let expected = interpretation.result
+    let correct =
+      value.winner === expected.winner && value.margin === expected.margin
+    if (interpretation.answerMode === 'totals')
+      correct =
+        correct &&
+        Number(this.state.scoreBlack) === interpretation.totals.B &&
+        Number(this.state.scoreWhite) === interpretation.totals.W
+    if (correct) {
+      this.setState({
+        phase: 'solved',
+        displayNodeId: interpretation.answerNodeId,
+        feedback: t('Solved') || 'Solved',
+        showGameGraph: true,
+      })
+      this.props.onSolved?.()
+      this.startAutoNext()
+    } else this.setState({phase: 'failed', feedback: t('Incorrect')})
   }
 
   startAutoSequence(advanced) {
@@ -746,6 +792,71 @@ export default class TsumegoSolver extends Component {
               ),
             ),
           ),
+        interpretation?.kind === 'score' &&
+          phase === 'solving' &&
+          h(
+            'div',
+            {class: 'tsumego-score-controls'},
+            interpretation.answerMode === 'winner-margin'
+              ? [
+                  h(
+                    'label',
+                    {},
+                    t('Winner'),
+                    h(
+                      'select',
+                      {
+                        value: this.state.scoreChoice,
+                        onChange: (evt) =>
+                          this.setState({scoreChoice: evt.target.value}),
+                      },
+                      h('option', {value: ''}, ''),
+                      h('option', {value: 'B'}, t('Black')),
+                      h('option', {value: 'W'}, t('White')),
+                      h('option', {value: 'draw'}, t('Draw')),
+                    ),
+                  ),
+                  this.state.scoreChoice !== 'draw' &&
+                    h(
+                      'label',
+                      {},
+                      t('Margin'),
+                      h('input', {
+                        type: 'number',
+                        step: 'any',
+                        value: this.state.scoreMargin,
+                        onInput: (evt) =>
+                          this.setState({scoreMargin: evt.target.value}),
+                      }),
+                    ),
+                ]
+              : [
+                  h(
+                    'label',
+                    {},
+                    t('Black'),
+                    h('input', {
+                      type: 'number',
+                      step: 'any',
+                      value: this.state.scoreBlack,
+                      onInput: (evt) =>
+                        this.setState({scoreBlack: evt.target.value}),
+                    }),
+                  ),
+                  h(
+                    'label',
+                    {},
+                    t('White'),
+                    h('input', {
+                      type: 'number',
+                      step: 'any',
+                      value: this.state.scoreWhite,
+                      onInput: (evt) =>
+                        this.setState({scoreWhite: evt.target.value}),
+                    }),
+                  ),
+                ],
+          ),
         interpretation != null &&
           interpretation.kind === 'stone-selection' &&
           phase === 'solving' &&
@@ -817,6 +928,13 @@ export default class TsumegoSolver extends Component {
             'button',
             {type: 'button', onClick: this.handleRetry},
             solved ? t('Retry Problem') : t('Retry'),
+          ),
+        interpretation?.kind === 'score' &&
+          phase === 'solving' &&
+          h(
+            'button',
+            {type: 'button', onClick: this.handleScoreCheck},
+            t('Check answer'),
           ),
         !testMode &&
           problemCount > 1 &&

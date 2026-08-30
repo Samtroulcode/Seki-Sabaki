@@ -3074,4 +3074,49 @@ describe('interpretProblem', () => {
     assert.strictEqual(result.kind, 'stone-selection')
     assert.strictEqual(result.answerNodeId, tree.root.children[0].id)
   })
+
+  it('detects winner-margin score answers', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Who wins and by how many points?',
+      ])
+      draft.appendNode(draft.root.id, {C: ['Black wins by 2 points.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'score')
+    assert.strictEqual(result.answerMode, 'winner-margin')
+    assert.deepStrictEqual(result.result, {winner: 'B', margin: 2})
+  })
+
+  it('detects totals and derives a draw', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Determine the score.'])
+      draft.appendNode(draft.root.id, {
+        C: ['Both Black and White have 28 points.'],
+      })
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'score')
+    assert.strictEqual(result.answerMode, 'totals')
+    assert.deepStrictEqual(result.totals, {B: 28, W: 28})
+    assert.deepStrictEqual(result.result, {winner: 'draw', margin: 0})
+  })
+
+  it('rejects contradictory score statements and unrelated score prose', () => {
+    let contradictory = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Determine the score.'])
+      draft.appendNode(draft.root.id, {
+        C: ['Black wins by 2 points. Black 38 points. White 38 points.'],
+      })
+    })
+    assert.strictEqual(interpretProblem(contradictory).kind, 'unsupported')
+
+    let unrelated = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'The score is discussed below.',
+      ])
+      draft.appendNode(draft.root.id, {C: ['Black wins by 2 points.']})
+    })
+    assert.strictEqual(interpretProblem(unrelated).kind, 'unsupported')
+  })
 })

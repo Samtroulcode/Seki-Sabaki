@@ -1177,6 +1177,108 @@ function analyzeStoneSelection(tree) {
   return null
 }
 
+function parseScoreAnswer(text) {
+  if (typeof text !== 'string') return null
+  let winner = text.match(
+    /\b(black|white)\s+wins?\s+by\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
+  )
+  let black = text.match(
+    /\bblack(?:'s)?\s+(?:territory|total|score)?\s*(?:=|is|has|:)?\s*([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
+  )
+  let white = text.match(
+    /\bwhite(?:'s)?\s+(?:territory|total|score)?\s*(?:=|is|has|:)?\s*([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
+  )
+  let both = text.match(
+    /\bboth\s+black\s+and\s+white\s+have\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/i,
+  )
+  if (both) black = white = both
+  let totals = black && white ? {B: +black[1], W: +white[1]} : null
+  if (winner) {
+    let result = {
+      winner: winner[1].toLowerCase() === 'black' ? 'B' : 'W',
+      margin: +winner[2],
+    }
+    if (
+      totals &&
+      (totals.B === totals.W ||
+        Math.abs(totals.B - totals.W) !== result.margin ||
+        (totals.B > totals.W ? 'B' : 'W') !== result.winner)
+    )
+      return null
+    return {result, totals}
+  }
+  if (/\b(draw|jigo)\b/i.test(text) && (!totals || totals.B === totals.W))
+    return {result: {winner: 'draw', margin: 0}, totals}
+  if (totals)
+    return {
+      result: {
+        winner:
+          totals.B === totals.W ? 'draw' : totals.B > totals.W ? 'B' : 'W',
+        margin: Math.abs(totals.B - totals.W),
+      },
+      totals,
+    }
+  return null
+}
+
+function analyzeScore(tree) {
+  let questionRe =
+    /who\s+wins?\s+and\s+by\s+how\s+many\s+points|determine\s+the\s+score|calculate\s+the\s+score|what\s+is\s+the\s+score/i
+  let question = tree
+    .listNodes()
+    .find(
+      (node) =>
+        (node === tree.root || isPositionNode(node)) &&
+        (node.data?.C || []).some(
+          (value) => typeof value === 'string' && questionRe.test(value),
+        ),
+    )
+  if (question == null) return null
+  let start = getPositionAncestor(tree, question)
+  let queue = question.children.map((node) => ({
+    node,
+    distance: isPositionNode(node) ? 1 : 0,
+  }))
+  let seen = new Map(),
+    answers = []
+  while (queue.length) {
+    queue.sort((a, b) => a.distance - b.distance)
+    let item = queue.shift()
+    if (seen.has(item.node.id) && seen.get(item.node.id) <= item.distance)
+      continue
+    seen.set(item.node.id, item.distance)
+    let parsed = parseScoreAnswer((item.node.data?.C || []).join(' '))
+    if (parsed)
+      answers.push({...parsed, node: item.node, distance: item.distance})
+    else
+      for (let child of item.node.children)
+        queue.push({
+          node: child,
+          distance: item.distance + (isPositionNode(child) ? 1 : 0),
+        })
+  }
+  if (!answers.length) return null
+  let min = Math.min(...answers.map((answer) => answer.distance))
+  answers = answers.filter((answer) => answer.distance === min)
+  let signature = (answer) =>
+    `${answer.result.winner}:${answer.result.margin}:${JSON.stringify(answer.totals)}`
+  if (new Set(answers.map(signature)).size !== 1) return null
+  answers.sort((a, b) => String(a.node.id).localeCompare(String(b.node.id)))
+  let answer = answers[0]
+  return {
+    kind: 'score',
+    answerMode: /who\s+wins?|by\s+how\s+many/i.test(
+      (question.data?.C || []).join(' '),
+    )
+      ? 'winner-margin'
+      : 'totals',
+    startNodeId: start.id,
+    answerNodeId: answer.node.id,
+    result: answer.result,
+    totals: answer.totals,
+  }
+}
+
 // Judgement detection for Alive/Dead, Legal/Illegal, Yes/No, Good/Bad problems.
 // Shared pipeline: find question → classify domain → find answer candidates → classify answer → resolve ambiguity.
 function analyzeJudgement(tree, options = {}) {
@@ -1393,6 +1495,7 @@ export function interpretProblem(tree, options = {}) {
     analyzePointSelection(tree, options),
     analyzeJudgement(tree, options),
     analyzeStoneSelection(tree),
+    analyzeScore(tree),
   ].filter(Boolean)
   if (candidates.length > 1) {
     let earliest = candidates.filter((candidate) =>

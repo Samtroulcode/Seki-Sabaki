@@ -74,10 +74,10 @@ export function validateTsumegoTree(gameTree, options = {}) {
 
     // PL is only meaningful on the position the engine picked as the start.
     // Only warn when a player color was actually inferred without explicit PL.
-    // Judgement problems do not have a player to move.
+    // Only move-sequence and point-selection interpretations have a player.
     if (
-      interpretation.kind !== 'judgement' &&
-      interpretation.kind !== 'stone-selection'
+      interpretation.kind === 'move-sequence' ||
+      interpretation.kind === 'point-selection'
     ) {
       let playerToMove = null
       if (interpretation.kind === 'move-sequence') {
