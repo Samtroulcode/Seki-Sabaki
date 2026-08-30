@@ -2400,4 +2400,76 @@ describe('interpretProblem', () => {
     assert.strictEqual(result.kind, 'point-selection')
     assert.strictEqual(result.playerToMove, null)
   })
+
+  it('infers B when L answer has B wrong move with W refutation', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['dj'], C: ['Correct Answer']})
+      let wrong = draft.appendNode(draft.root.id, {B: ['hc'], C: ['Wrong']})
+      draft.appendNode(wrong, {W: ['kk']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.playerToMove, 'B')
+  })
+
+  it('returns null for conflicting first-move candidates at same decision point', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['dj'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['Wrong']})
+      draft.appendNode(draft.root.id, {W: ['bb'], C: ['Wrong']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.playerToMove, null)
+  })
+
+  it('handles SZ correctly for point-selection', () => {
+    // Missing SZ -> 19x19 default
+    let treeMissing = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['ss'], C: ['Correct']})
+    })
+    let resultMissing = interpretProblem(treeMissing)
+    assert.strictEqual(resultMissing.kind, 'point-selection')
+    assert.deepStrictEqual(resultMissing.acceptedPoints, ['ss'])
+
+    // Valid SZ 9x9 -> correct bounds
+    let treeValid = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['9'])
+      draft.appendNode(draft.root.id, {L: ['aa', 'ii', 'jj'], C: ['Correct']})
+    })
+    let resultValid = interpretProblem(treeValid)
+    assert.strictEqual(resultValid.kind, 'point-selection')
+    assert.deepStrictEqual(
+      new Set(resultValid.acceptedPoints),
+      new Set(['aa', 'ii']),
+    )
+
+    // Valid rectangular SZ
+    let treeRect = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['9:13'])
+      draft.appendNode(draft.root.id, {L: ['aa', 'ii', 'ai'], C: ['Correct']})
+    })
+    let resultRect = interpretProblem(treeRect)
+    assert.strictEqual(resultRect.kind, 'point-selection')
+    // 9x13: width 9 (aa-ii), height 13 (aa-am), so ai (0,8) valid, ii (8,8) valid
+    assert.deepStrictEqual(
+      new Set(resultRect.acceptedPoints),
+      new Set(['aa', 'ii', 'ai']),
+    )
+
+    // Malformed explicit SZ -> no inference
+    let treeMalformed = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['foo'])
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(treeMalformed).kind, 'unsupported')
+
+    let treeZero = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['0'])
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(treeZero).kind, 'unsupported')
+  })
 })

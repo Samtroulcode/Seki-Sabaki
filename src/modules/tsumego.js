@@ -948,9 +948,11 @@ export function advanceRefutation(tree, wrongMoveNode) {
 }
 
 // Returns board dimensions from SGF SZ property, defaulting to 19x19.
+// Returns null when SZ is explicitly present but malformed.
 function getBoardDimensions(tree) {
-  let size = tree.root.data?.SZ?.[0] ?? '19'
-  let dimensions = String(size).split(':').map(Number)
+  let sz = tree.root.data?.SZ?.[0]
+  if (sz == null) return {width: 19, height: 19}
+  let dimensions = String(sz).split(':').map(Number)
   let width = dimensions[0]
   let height = dimensions[dimensions.length - 1]
   if (
@@ -959,7 +961,7 @@ function getBoardDimensions(tree) {
     width <= 0 ||
     height <= 0
   ) {
-    return {width: 19, height: 19}
+    return null
   }
   return {width, height}
 }
@@ -975,34 +977,51 @@ function isVertexOnBoard(vertex, dimensions) {
   )
 }
 
-// Infers playerToMove for point-selection from structured SGF evidence.
-// Returns 'B' | 'W' | null when ambiguous or absent.
-function inferPointSelectionPlayerToMove(tree) {
-  // Explicit PL is the most direct structured evidence. Check all PL
-  // properties in the tree for consistency.
-  let plColors = new Set()
-  for (let node of tree.listNodes()) {
-    let pl = node.data?.PL?.[0]
-    if (pl === 'B' || pl === 'W') plColors.add(pl)
-    else if (pl != null) {
-      // Invalid PL value - treat as ambiguous
-      return null
-    }
+// Returns the decision point for a point-selection answer node.
+// Walks up to the nearest position-defining ancestor, or the root.
+function getPointSelectionDecisionPoint(tree, node) {
+  let current = node.parentId != null ? tree.get(node.parentId) : null
+  while (
+    current != null &&
+    !isPositionNode(current) &&
+    current.parentId != null
+  ) {
+    current = tree.get(current.parentId)
   }
-  if (plColors.size === 1) return [...plColors][0]
-  if (plColors.size > 1) return null
+  return current || tree.root
+}
 
-  // Fall back to consistent first-move color from actual move variations.
-  // Collect all B/W move nodes in the tree.
+// Returns depth of a node by walking from root.
+function getNodeDepth(tree, targetId) {
+  let stack = [{node: tree.root, depth: 0}]
+  while (stack.length) {
+    let {node, depth} = stack.pop()
+    if (node.id === targetId) return depth
+    for (let child of node.children) stack.push({node: child, depth: depth + 1})
+  }
+  return 0
+}
+
+// Infers playerToMove for point-selection from structured SGF evidence
+// in the decision context. Returns 'B' | 'W' | null when ambiguous or absent.
+function inferPointSelectionPlayerToMove(tree, decisionPoint) {
+  if (decisionPoint == null) return null
+
+  // Explicit valid PL on the relevant decision position is strongest evidence.
+  let pl = decisionPoint.data?.PL?.[0]
+  if (pl === 'B' || pl === 'W') return pl
+  if (pl != null) return null // invalid PL
+
+  // Fall back to consistent first-move color from the decision point's
+  // first playable candidates, treating descriptive nodes as transparent.
+  let depth = getNodeDepth(tree, decisionPoint.id)
+  let candidates = getDecisionPointCandidates(decisionPoint, depth)
   let colors = new Set()
-  for (let node of tree.listNodes()) {
+  for (let {node} of candidates) {
     if (node.data == null) continue
     if (node.data.B != null && node.data.W == null) colors.add('B')
     else if (node.data.W != null && node.data.B == null) colors.add('W')
-    else if (node.data.B != null && node.data.W != null) {
-      // Malformed node with both colors - treat as ambiguous
-      return null
-    }
+    else if (node.data.B != null && node.data.W != null) return null
   }
   if (colors.size === 1) return [...colors][0]
   return null
@@ -1013,7 +1032,9 @@ function inferPointSelectionPlayerToMove(tree) {
 function analyzePointSelection(tree, options = {}) {
   let {allowTeFallback = false} = options || {}
   let dimensions = getBoardDimensions(tree)
+  if (dimensions == null) return null
   let points = new Map() // key: vertex string, value: vertex string
+  let decisionPoints = new Map() // key: decisionPoint id, value: decisionPoint
 
   for (let node of tree.listNodes()) {
     if (node.data == null || node.data.L == null) continue
@@ -1031,12 +1052,20 @@ function analyzePointSelection(tree, options = {}) {
       let key = `${vertex[0]},${vertex[1]}`
       if (!points.has(key)) points.set(key, value)
     }
+
+    let decisionPoint = getPointSelectionDecisionPoint(tree, node)
+    if (decisionPoint != null)
+      decisionPoints.set(decisionPoint.id, decisionPoint)
   }
 
   if (points.size === 0) return null
 
   let acceptedPoints = [...points.values()]
-  let playerToMove = inferPointSelectionPlayerToMove(tree)
+  let playerToMove = null
+  if (decisionPoints.size === 1) {
+    let decisionPoint = [...decisionPoints.values()][0]
+    playerToMove = inferPointSelectionPlayerToMove(tree, decisionPoint)
+  }
   return {acceptedPoints, playerToMove}
 }
 
