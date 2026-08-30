@@ -37,7 +37,10 @@ export default class TsumegoSolver extends Component {
 
   componentDidUpdate(previousProps) {
     if (this.props.autoNext === previousProps.autoNext) return
-    if (this.props.autoNext) {
+    if (
+      this.props.autoNext &&
+      this.props.interpretation?.interaction !== 'reveal'
+    ) {
       if (this.state.phase === 'solved') this.startAutoNext()
     } else {
       this.cancelAutoNext()
@@ -63,10 +66,6 @@ export default class TsumegoSolver extends Component {
         explorationPlayer: null,
         highlightVertices: [],
         selectedVertices: [],
-        scoreChoice: null,
-        scoreMargin: '',
-        scoreBlack: '',
-        scoreWhite: '',
       }
     }
     return {
@@ -348,47 +347,20 @@ export default class TsumegoSolver extends Component {
     }
   }
 
-  handleScoreCheck = () => {
-    if (this.state.phase !== 'solving') return
-    let {interpretation} = this.props
-    if (interpretation?.kind !== 'score') return
-    let value
-    if (interpretation.answerMode === 'winner-margin') {
-      let margin = normalizeScoreInput(this.state.scoreMargin)
-      if (!['B', 'W', 'draw'].includes(this.state.scoreChoice))
-        return this.setState({phase: 'failed', feedback: t('Incorrect')})
-      if (this.state.scoreChoice === 'draw') value = {winner: 'draw', margin: 0}
-      else if (margin == null || margin <= 0)
-        return this.setState({phase: 'failed', feedback: t('Incorrect')})
-      else value = {winner: this.state.scoreChoice, margin}
-    } else {
-      let black = normalizeScoreInput(this.state.scoreBlack)
-      let white = normalizeScoreInput(this.state.scoreWhite)
-      if (black == null || white == null)
-        return this.setState({phase: 'failed', feedback: t('Incorrect')})
-      value = {
-        winner: black === white ? 'draw' : black > white ? 'B' : 'W',
-        margin: Math.abs(black - white),
-      }
-    }
-    let expected = interpretation.result
-    let correct =
-      value.winner === expected.winner && value.margin === expected.margin
-    if (interpretation.answerMode === 'totals')
-      correct =
-        correct &&
-        Number(this.state.scoreBlack) === interpretation.totals.B &&
-        Number(this.state.scoreWhite) === interpretation.totals.W
-    if (correct) {
-      this.setState({
-        phase: 'solved',
-        displayNodeId: interpretation.answerNodeId,
-        feedback: t('Solved') || 'Solved',
-        showGameGraph: true,
-      })
-      this.props.onSolved?.()
-      this.startAutoNext()
-    } else this.setState({phase: 'failed', feedback: t('Incorrect')})
+  handleScoreReveal = () => {
+    if (
+      this.state.phase !== 'solving' ||
+      this.props.interpretation?.kind !== 'score' ||
+      this.props.interpretation?.interaction !== 'reveal'
+    )
+      return
+    this.setState({
+      phase: 'solved',
+      displayNodeId: this.props.interpretation.answerNodeId,
+      feedback: null,
+      showGameGraph: true,
+    })
+    this.props.onSolved?.()
   }
 
   startAutoSequence(advanced) {
@@ -795,71 +767,6 @@ export default class TsumegoSolver extends Component {
               ),
             ),
           ),
-        interpretation?.kind === 'score' &&
-          phase === 'solving' &&
-          h(
-            'div',
-            {class: 'tsumego-score-controls'},
-            interpretation.answerMode === 'winner-margin'
-              ? [
-                  h(
-                    'label',
-                    {},
-                    t('Winner'),
-                    h(
-                      'select',
-                      {
-                        value: this.state.scoreChoice,
-                        onChange: (evt) =>
-                          this.setState({scoreChoice: evt.target.value}),
-                      },
-                      h('option', {value: ''}, ''),
-                      h('option', {value: 'B'}, t('Black')),
-                      h('option', {value: 'W'}, t('White')),
-                      h('option', {value: 'draw'}, t('Draw')),
-                    ),
-                  ),
-                  this.state.scoreChoice !== 'draw' &&
-                    h(
-                      'label',
-                      {},
-                      t('Margin'),
-                      h('input', {
-                        type: 'number',
-                        step: 'any',
-                        value: this.state.scoreMargin,
-                        onInput: (evt) =>
-                          this.setState({scoreMargin: evt.target.value}),
-                      }),
-                    ),
-                ]
-              : [
-                  h(
-                    'label',
-                    {},
-                    t('Black'),
-                    h('input', {
-                      type: 'number',
-                      step: 'any',
-                      value: this.state.scoreBlack,
-                      onInput: (evt) =>
-                        this.setState({scoreBlack: evt.target.value}),
-                    }),
-                  ),
-                  h(
-                    'label',
-                    {},
-                    t('White'),
-                    h('input', {
-                      type: 'number',
-                      step: 'any',
-                      value: this.state.scoreWhite,
-                      onInput: (evt) =>
-                        this.setState({scoreWhite: evt.target.value}),
-                    }),
-                  ),
-                ],
-          ),
         interpretation != null &&
           interpretation.kind === 'stone-selection' &&
           phase === 'solving' &&
@@ -933,11 +840,12 @@ export default class TsumegoSolver extends Component {
             solved ? t('Retry Problem') : t('Retry'),
           ),
         interpretation?.kind === 'score' &&
+          interpretation.interaction === 'reveal' &&
           phase === 'solving' &&
           h(
             'button',
-            {type: 'button', onClick: this.handleScoreCheck},
-            t('Check answer'),
+            {type: 'button', onClick: this.handleScoreReveal},
+            t('Show solution'),
           ),
         !testMode &&
           problemCount > 1 &&
@@ -961,10 +869,4 @@ function splitRelativePath(relativePath) {
   return String(relativePath || '')
     .split(/[\\/]/)
     .filter(Boolean)
-}
-
-function normalizeScoreInput(value) {
-  if (typeof value !== 'string' || value.trim() === '') return null
-  let number = Number(value)
-  return Number.isFinite(number) && number >= 0 ? number : null
 }

@@ -1263,9 +1263,7 @@ test.describe('Tsumego workspace', () => {
     }
   })
 
-  test('score Tsumego is read-only and checks a winner margin', async ({
-    page,
-  }) => {
+  test('legacy score Tsumego reveals its SGF solution', async ({page}) => {
     let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-score-e2e-'))
     let tsumego = path.join(root, 'Tsumego', 'User Set')
     mkdirSync(tsumego, {recursive: true})
@@ -1283,29 +1281,34 @@ test.describe('Tsumego workspace', () => {
       await page.locator('.tsumego-entry-directory').click()
       await page.locator('.tsumego-entry-file').click()
       await expect(page.locator('.tsumego-solver')).toBeVisible()
-      let initial = await page
-        .locator('.tsumego-solver-sidebar h2')
-        .textContent()
+      await expect(
+        page.getByRole('button', {name: 'Show solution'}),
+      ).toBeVisible()
+      await expect(page.getByLabel('Winner')).toHaveCount(0)
+      await expect(page.getByLabel('Margin')).toHaveCount(0)
+      await expect(
+        page.getByRole('button', {name: 'Check answer'}),
+      ).toHaveCount(0)
       await page
         .locator('.tsumego-solver-board')
         .locator('.shudan-vertex[data-x="4"][data-y="4"]')
         .click()
       await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
-      await page.getByLabel('Winner').selectOption('B')
-      await page.getByLabel('Margin').fill('')
-      await page.getByRole('button', {name: 'Check answer'}).click()
-      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
-      await expect(
-        page.getByRole('button', {name: 'Retry', exact: true}),
-      ).toBeVisible()
-      await page.getByRole('button', {name: 'Retry', exact: true}).click()
-      await page.getByLabel('Winner').selectOption('B')
-      await page.getByLabel('Margin').fill('2')
-      await page.getByRole('button', {name: 'Check answer'}).click()
+      await page.getByRole('button', {name: 'Show solution'}).click()
       await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
       await expect(page.locator('.tsumego-solution')).toContainText(
         'Black territory',
       )
+      await expect(
+        page.getByRole('button', {name: 'Show solution'}),
+      ).toHaveCount(0)
+      await page
+        .getByRole('button', {name: 'Retry Problem', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+      await expect(
+        page.getByRole('button', {name: 'Show solution'}),
+      ).toBeVisible()
     } finally {
       rmSync(root, {recursive: true, force: true})
     }

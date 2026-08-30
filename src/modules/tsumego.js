@@ -1296,6 +1296,7 @@ function analyzeScore(tree) {
   let answer = answers[0]
   return {
     kind: 'score',
+    interaction: 'reveal',
     answerMode,
     startNodeId: start.id,
     answerNodeId: answer.node.id,
