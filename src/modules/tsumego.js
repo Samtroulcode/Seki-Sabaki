@@ -978,7 +978,7 @@ function isVertexOnBoard(vertex, dimensions) {
   )
 }
 
-// Returns the decision point for a point-selection answer node.
+// Returns the nearest position-defining node for a tree node.
 // Walks up to the nearest position-defining ancestor, or the root.
 function getPositionAncestor(tree, node) {
   if (node != null && isPositionNode(node)) return node
@@ -1082,7 +1082,8 @@ function analyzePointSelection(tree, options = {}) {
       answerGroups.push({nodeId: node.id, points: validPoints})
     }
 
-    let decisionPoint = getPositionAncestor(tree, node)
+    let parent = node.parentId != null ? tree.get(node.parentId) : null
+    let decisionPoint = getPositionAncestor(tree, parent || tree.root)
     if (decisionPoint != null)
       decisionPoints.set(decisionPoint.id, decisionPoint)
   }
@@ -1120,7 +1121,10 @@ function analyzeStoneSelection(tree) {
   if (questionNode == null) return null
   let startNode = getPositionAncestor(tree, questionNode)
   let board = gametree.getBoard(tree, startNode.id)
-  let queue = [{node: questionNode, distance: 0}]
+  let queue = questionNode.children.map((node) => ({
+    node,
+    distance: isPositionNode(node) ? 1 : 0,
+  }))
   let distances = new Map()
   let nearestDistance = null
   let answers = []

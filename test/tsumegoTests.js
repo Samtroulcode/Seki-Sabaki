@@ -2944,6 +2944,31 @@ describe('interpretProblem', () => {
     assert.strictEqual(result.answerNodeId, tree.root.children[0].id)
   })
 
+  it('keeps point-selection start at its ancestor when answer has setup properties', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let position = draft.appendNode(draft.root.id, {AB: ['aa']})
+      draft.appendNode(position, {
+        AB: ['bb'],
+        L: ['cc'],
+        C: ['Correct'],
+      })
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.children[0].id)
+  })
+
+  it('does not treat question-node TR markup as a stone-selection answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'AB', ['aa'])
+      draft.updateProperty(draft.root.id, 'C', [
+        'Dead stones. Which ones are they? Correct',
+      ])
+      draft.updateProperty(draft.root.id, 'TR', ['aa'])
+    })
+    assert.strictEqual(interpretProblem(tree).kind, 'unsupported')
+  })
+
   it('rejects TR answers that include empty or invalid points', () => {
     let empty = gametree.new().mutate((draft) => {
       draft.updateProperty(draft.root.id, 'C', ['Which stones are dead?'])
