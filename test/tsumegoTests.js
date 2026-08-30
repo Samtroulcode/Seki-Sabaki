@@ -2620,4 +2620,115 @@ describe('interpretProblem', () => {
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'unsupported')
   })
+
+  it('detects 053-style Legal/Illegal with LB and explanatory L', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Problem 53. Legal move? Can Black play at 1?',
+      ])
+      draft.updateProperty(draft.root.id, 'LB', ['aa:1'])
+      let answer = draft.appendNode(draft.root.id, {
+        C: ['An Illegal Move\nBlack 1 cannot be played. Correct'],
+        L: ['bb', 'cc'],
+      })
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'legal-illegal')
+    assert.strictEqual(result.correctChoice, 'illegal')
+    // Explanatory L must not become point-selection
+    assert.notStrictEqual(result.kind, 'point-selection')
+  })
+
+  it('detects 054-style single candidate Legal/Illegal', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Is this a legal move?'])
+      draft.appendNode(draft.root.id, {C: ['This is legal. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'legal-illegal')
+    assert.strictEqual(result.correctChoice, 'legal')
+  })
+
+  it('detects 055-style Can...? with cannot -> No', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Problem 55. Can Black remove the white stones?',
+      ])
+      draft.appendNode(draft.root.id, {
+        C: ['The White stones cannot be taken. Correct'],
+      })
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'yes-no')
+    assert.strictEqual(result.correctChoice, 'no')
+  })
+
+  it('fails closed on ambiguous yes/no answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Can Black win?'])
+      draft.appendNode(draft.root.id, {
+        C: ['Yes, but also no. Correct'],
+      })
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('detects 210-style Good/Bad with B move question', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Problem 210. Good or bad? please move one step forward.',
+      ])
+      let move = draft.appendNode(draft.root.id, {
+        B: ['ha'],
+        C: ['Black has taken a stone with 1. Is this a good or a bad move?'],
+      })
+      draft.appendNode(move, {C: ['Black 1 is Bad. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'good-bad')
+    assert.strictEqual(result.correctChoice, 'bad')
+    // startNodeId must be the B move/question node
+    let moveNode = tree.root.children[0]
+    assert.strictEqual(result.startNodeId, moveNode.id)
+  })
+
+  it('detects Good answer variant', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Good or bad?'])
+      let move = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Is this good or bad?'],
+      })
+      draft.appendNode(move, {C: ['This is good. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'good-bad')
+    assert.strictEqual(result.correctChoice, 'good')
+  })
+
+  it('fails closed on ambiguous Good/Bad answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Good or bad?'])
+      let move = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Is this good or bad?'],
+      })
+      draft.appendNode(move, {C: ['Good and bad. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
 })

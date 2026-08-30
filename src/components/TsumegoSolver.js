@@ -660,26 +660,37 @@ export default class TsumegoSolver extends Component {
           h('p', {class: 'tsumego-initial-comment'}, this.props.initialComment),
         interpretation != null &&
           interpretation.kind === 'judgement' &&
-          interpretation.judgementType === 'alive-dead' &&
           phase === 'solving' &&
           h(
             'div',
             {class: 'tsumego-judgement-controls'},
-            h(
-              'button',
-              {
-                type: 'button',
-                onClick: () => this.handleJudgementChoice('alive'),
-              },
-              t('Alive'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                onClick: () => this.handleJudgementChoice('dead'),
-              },
-              t('Dead'),
+            ...(interpretation.choices || []).map((choice) =>
+              h(
+                'button',
+                {
+                  type: 'button',
+                  onClick: () => this.handleJudgementChoice(choice),
+                },
+                t(
+                  choice === 'alive'
+                    ? 'Alive'
+                    : choice === 'dead'
+                      ? 'Dead'
+                      : choice === 'legal'
+                        ? 'Legal'
+                        : choice === 'illegal'
+                          ? 'Illegal'
+                          : choice === 'yes'
+                            ? 'Yes'
+                            : choice === 'no'
+                              ? 'No'
+                              : choice === 'good'
+                                ? 'Good'
+                                : choice === 'bad'
+                                  ? 'Bad'
+                                  : choice,
+                ),
+              ),
             ),
           ),
         feedback != null &&
