@@ -878,6 +878,149 @@ test.describe('Tsumego workspace', () => {
       rmSync(root, {recursive: true, force: true})
     }
   })
+
+  test('047-style point-selection opens and solves correctly', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-047-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    // No B/W moves, multiple L answers, no PL (playerToMove null)
+    writeFileSync(
+      path.join(tsumego, '047.sgf'),
+      '(;GM[1]SZ[9]AB[aa][bb]AW[cc]C[Black to play.](;L[dd][ee]C[Correct Answer])(;L[ff]C[Correct]))',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+      // No playerToMove when null
+      await expect(page.locator('.tsumego-player-to-move')).toHaveCount(0)
+
+      // Any accepted point solves
+      await dispatchVertex(page, 3, 3) // dd
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+        'Solved',
+      )
+
+      // Retry restores
+      await page
+        .getByRole('button', {name: 'Retry Problem', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+
+      // Unlisted point shows Incorrect without invented stone
+      let boardBefore = await page.evaluate(() => {
+        let board = window.__sabaki.state.gameTree
+          ? null
+          : document.querySelector('.tsumego-solver-board')
+        return document.querySelector('.tsumego-solver').className
+      })
+      await dispatchVertex(page, 0, 0) // aa is occupied, try 5,5 (ff is accepted, so 0,1 is unlisted)
+      await dispatchVertex(page, 0, 1)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
+      await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+        'Incorrect',
+      )
+      // Board should still be at start position, no invented stone at 0,1
+      // The goban should not show a stone at 0,1 that wasn't there before
+      await page.getByRole('button', {name: 'Retry', exact: true}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('048-style point-selection with wrong variation plays refutation', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-048-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '048.sgf'),
+      '(;GM[1]SZ[9]PL[B]AB[aa][bb]AW[cc]C[Black to play.](;L[dd]C[Correct Answer])(;B[ee]C[Wrong Answer];W[ff]))',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-player-to-move')).toContainText(
+        'Black to play',
+      )
+
+      // Accepted point solves
+      await dispatchVertex(page, 3, 3) // dd
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await page
+        .getByRole('button', {name: 'Retry Problem', exact: true})
+        .click()
+
+      // Wrong point plays refutation before Incorrect
+      await dispatchVertex(page, 4, 4) // ee
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
+      await expect(page.locator('.tsumego-solver-feedback')).toContainText(
+        'Incorrect',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('existing move-sequence Tsumego still opens normally', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-move-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, 'move.sgf'),
+      '(;GM[1]SZ[9]PL[B]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+      await expect(page.locator('.tsumego-player-to-move')).toContainText(
+        'Black to play',
+      )
+      await dispatchVertex(page, 2, 2) // cc
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
 })
 
 async function dispatchVertex(page, x, y) {

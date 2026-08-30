@@ -73,14 +73,23 @@ export function validateTsumegoTree(gameTree, options = {}) {
     }
 
     // PL is only meaningful on the position the engine picked as the start.
-    let startNodeId =
-      interpretation.kind === 'move-sequence'
-        ? interpretation.problem.startNodeId
-        : interpretation.startNodeId
-    let startNode = gameTree.get(startNodeId)
-    let pl = startNode?.data?.PL?.[0]
-    if (pl !== 'B' && pl !== 'W') {
-      warnings.push(diagnostic('PLAYER_TO_MOVE_INFERRED'))
+    // Only warn when a player color was actually inferred without explicit PL.
+    let playerToMove = null
+    if (interpretation.kind === 'move-sequence') {
+      playerToMove = interpretation.problem.playerToMove
+    } else if (interpretation.kind === 'point-selection') {
+      playerToMove = interpretation.playerToMove
+    }
+    if (playerToMove != null) {
+      let startNodeId =
+        interpretation.kind === 'move-sequence'
+          ? interpretation.problem.startNodeId
+          : interpretation.startNodeId
+      let startNode = gameTree.get(startNodeId)
+      let pl = startNode?.data?.PL?.[0]
+      if (pl !== 'B' && pl !== 'W') {
+        warnings.push(diagnostic('PLAYER_TO_MOVE_INFERRED'))
+      }
     }
   }
 

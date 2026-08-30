@@ -210,6 +210,19 @@ export default class TsumegoSolver extends Component {
       }
     }
 
+    // Other point - incorrect. For point-selection with unknown player, do not
+    // invent a stone color.
+    if (interpretation.playerToMove == null) {
+      this.setState({
+        phase: 'failed',
+        feedback: t('Incorrect'),
+        explorationBoard: null,
+        explorationPlayer: null,
+      })
+      if (vertexString != null) sound.playPachi()
+      return
+    }
+
     // Other legal point - incorrect
     this.startFailedExploration(vertex)
   }
@@ -435,15 +448,27 @@ export default class TsumegoSolver extends Component {
     } else if (problem != null) {
       playerToMove = problem.playerToMove
     }
-    let fallbackSign = playerToMove === 'W' ? -1 : 1
     let board =
       this.state.explorationBoard ||
       cloneExplorationBoard(
         gametree.getBoard(gameTree, this.state.displayNodeId),
       )
     let node = gameTree.get(this.state.displayNodeId)
-    let sign =
-      this.state.explorationPlayer ?? getExplorationPlayer(node, fallbackSign)
+    let sign
+    if (this.state.explorationPlayer != null) {
+      sign = this.state.explorationPlayer
+    } else if (
+      interpretation != null &&
+      interpretation.kind === 'point-selection' &&
+      playerToMove == null
+    ) {
+      // Do not invent a color for point-selection with unknown player
+      sign = getExplorationPlayer(node, null)
+      if (sign == null) return
+    } else {
+      let fallbackSign = playerToMove === 'W' ? -1 : 1
+      sign = getExplorationPlayer(node, fallbackSign)
+    }
     let nextBoard = applyExplorationMove(board, sign, vertex)
     if (nextBoard == null) return
     sound.playPachi()
