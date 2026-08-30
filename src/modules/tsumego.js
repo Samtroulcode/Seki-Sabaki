@@ -1028,13 +1028,14 @@ function inferPointSelectionPlayerToMove(tree, decisionPoint) {
 }
 
 // Analyzes point-selection candidates when no move-sequence problem exists.
-// Returns {startNodeId, acceptedPoints, playerToMove} or null when no valid candidate.
+// Returns {startNodeId, acceptedPoints, answerGroups, playerToMove} or null when no valid candidate.
 function analyzePointSelection(tree, options = {}) {
   let {allowTeFallback = false} = options || {}
   let dimensions = getBoardDimensions(tree)
   if (dimensions == null) return null
   let points = new Map() // key: vertex string, value: vertex string
   let decisionPoints = new Map() // key: decisionPoint id, value: decisionPoint
+  let answerGroups = [] // {nodeId, points: [...]}
 
   for (let node of tree.listNodes()) {
     if (node.data == null || node.data.L == null) continue
@@ -1045,12 +1046,21 @@ function analyzePointSelection(tree, options = {}) {
     if (!hasPositive && allowTeFallback && hasTeMarker(node)) hasPositive = true
     if (!hasPositive) continue
 
+    let validPoints = []
+    let seenInGroup = new Set()
     for (let value of node.data.L) {
       if (typeof value !== 'string') continue
       let vertex = parseVertex(value)
       if (!isVertexOnBoard(vertex, dimensions)) continue
       let key = `${vertex[0]},${vertex[1]}`
+      if (seenInGroup.has(key)) continue
+      seenInGroup.add(key)
+      validPoints.push(value)
       if (!points.has(key)) points.set(key, value)
+    }
+
+    if (validPoints.length > 0) {
+      answerGroups.push({nodeId: node.id, points: validPoints})
     }
 
     let decisionPoint = getPointSelectionDecisionPoint(tree, node)
@@ -1064,7 +1074,12 @@ function analyzePointSelection(tree, options = {}) {
   let decisionPoint = [...decisionPoints.values()][0]
   let acceptedPoints = [...points.values()]
   let playerToMove = inferPointSelectionPlayerToMove(tree, decisionPoint)
-  return {startNodeId: decisionPoint.id, acceptedPoints, playerToMove}
+  return {
+    startNodeId: decisionPoint.id,
+    acceptedPoints,
+    answerGroups,
+    playerToMove,
+  }
 }
 
 // Higher-level interpretation that distinguishes move-sequence and
@@ -1072,7 +1087,7 @@ function analyzePointSelection(tree, options = {}) {
 //
 // Returns:
 // - {kind: 'move-sequence', problem} when a playable move-sequence is found
-// - {kind: 'point-selection', startNodeId, acceptedPoints, playerToMove} when
+// - {kind: 'point-selection', startNodeId, acceptedPoints, answerGroups, playerToMove} when
 //   L-based point-selection is detected
 // - {kind: 'unsupported'} otherwise
 export function interpretProblem(tree, options = {}) {
@@ -1087,6 +1102,7 @@ export function interpretProblem(tree, options = {}) {
       kind: 'point-selection',
       startNodeId: pointSelection.startNodeId,
       acceptedPoints: pointSelection.acceptedPoints,
+      answerGroups: pointSelection.answerGroups,
       playerToMove: pointSelection.playerToMove,
     }
   }

@@ -55,6 +55,7 @@ export default class TsumegoSolver extends Component {
         showGameGraph: false,
         explorationBoard: null,
         explorationPlayer: null,
+        highlightVertices: [],
       }
     }
     return {
@@ -66,6 +67,7 @@ export default class TsumegoSolver extends Component {
       showGameGraph: false,
       explorationBoard: null,
       explorationPlayer: null,
+      highlightVertices: [],
     }
   }
 
@@ -135,13 +137,27 @@ export default class TsumegoSolver extends Component {
     let isAccepted = interpretation.acceptedPoints.includes(vertexString)
 
     if (isAccepted) {
+      // Find the answer group containing the selected point
+      let answerGroup = null
+      if (interpretation.answerGroups != null) {
+        for (let group of interpretation.answerGroups) {
+          if (group.points.includes(vertexString)) {
+            answerGroup = group
+            break
+          }
+        }
+      }
+      let displayNodeId =
+        answerGroup != null ? answerGroup.nodeId : interpretation.startNodeId
       sound.playPachi()
       this.setState({
         phase: 'solved',
+        displayNodeId,
         feedback: t('Solved') || 'Solved',
         showGameGraph: true,
         explorationBoard: null,
         explorationPlayer: null,
+        highlightVertices: [vertex],
       })
       this.props.onSolved?.()
       this.startAutoNext()
@@ -440,6 +456,32 @@ export default class TsumegoSolver extends Component {
     })
   }
 
+  handleSolverWheel = (evt) => {
+    if (this.state.phase !== 'solved') return
+    // Avoid double navigation when wheel originates over GameGraph
+    let target = evt.target
+    while (target != null) {
+      if (target.id === 'graph') return
+      target = target.parentElement
+    }
+    let setting = window.sabaki.setting.get('game.navigation_sensitivity')
+    let sensitivity = typeof setting === 'number' ? setting : 40
+    this.residueDeltaY = (this.residueDeltaY || 0) + evt.deltaY
+    if (Math.abs(this.residueDeltaY) < sensitivity) return
+    evt.preventDefault()
+    let step = Math.sign(this.residueDeltaY)
+    this.residueDeltaY = 0
+    this.cancelAutoNext()
+    let next = this.props.gameTree.navigate(this.state.displayNodeId, step, {})
+    if (next == null) return
+    this.setState({
+      displayNodeId: next.id,
+      explorationBoard: null,
+      explorationPlayer: null,
+      highlightVertices: [],
+    })
+  }
+
   handleExplorationVertex(vertex) {
     let {gameTree, problem, interpretation} = this.props
     let playerToMove = null
@@ -490,8 +532,14 @@ export default class TsumegoSolver extends Component {
       source,
       testMode = false,
     } = this.props
-    let {displayNodeId, phase, feedback, showGameGraph, explorationBoard} =
-      this.state
+    let {
+      displayNodeId,
+      phase,
+      feedback,
+      showGameGraph,
+      explorationBoard,
+      highlightVertices,
+    } = this.state
     let solved = phase === 'solved'
     let board = explorationBoard || gametree.getBoard(gameTree, displayNodeId)
     let currentNode = gameTree.get(displayNodeId)
@@ -509,7 +557,10 @@ export default class TsumegoSolver extends Component {
 
     return h(
       'div',
-      {class: `tsumego-solver phase-${phase}`},
+      {
+        class: `tsumego-solver phase-${phase}`,
+        onWheel: this.handleSolverWheel,
+      },
       h(
         'div',
         {class: 'tsumego-solver-board'},
@@ -526,6 +577,7 @@ export default class TsumegoSolver extends Component {
           fuzzyStonePlacement: false,
           animateStonePlacement: false,
           drawLineMode: null,
+          highlightVertices: highlightVertices || [],
           onVertexClick: this.handleVertexClick,
           onLineDraw: () => {},
         }),
