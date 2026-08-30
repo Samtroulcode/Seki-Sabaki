@@ -1204,102 +1204,164 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
   }
   if (questionNode == null) return null
 
-  // Find structurally related answer candidates
+  // Find structurally related answer candidates using nearest-answer strategy
+  // Traverse outward from question anchor, first frontier with viable answer evidence wins
   let questionDecisionPoint = isPositionNode(questionNode)
     ? questionNode
     : tree.root
-  // For Good/Bad, answer is child of question move node
-  let answerCandidates = []
-  let stack = []
-  if (type.judgementType === 'good-bad') {
-    stack = [...questionNode.children]
-  } else {
-    stack = [...questionDecisionPoint.children]
-  }
+  let startNodes =
+    type.judgementType === 'good-bad' ? [questionNode] : [questionDecisionPoint]
+  // BFS by depth/frontier
+  let frontier = [...startNodes.flatMap((n) => n.children)]
   let visited = new Set()
-  while (stack.length) {
-    let node = stack.pop()
-    if (visited.has(node.id)) continue
-    visited.add(node.id)
-    // For judgement, answer may be reliable without generic Correct marker when semantics are unambiguous
-    // Check for positive marker OR unambiguous answer semantics
-    let hasPositive = hasPositiveResultMarker(node)
-    if (!hasPositive && allowTeFallback && hasTeMarker(node)) hasPositive = true
-    // Also consider nodes with unambiguous answer semantics as candidates, even without Correct
-    let hasAnswerSemantics = false
-    if (node.data != null && node.data.C != null) {
-      for (let value of node.data.C) {
-        if (typeof value !== 'string') continue
-        let matches = 0
-        for (let choice of type.choices) {
-          let re = type.answerRes[choice]
-          if (re.test(value)) matches++
+  let depth = 1
+  let answerCandidates = []
+  while (frontier.length > 0) {
+    let nextFrontier = []
+    let viableAtThisDepth = []
+    for (let node of frontier) {
+      if (visited.has(node.id)) continue
+      visited.add(node.id)
+      // Check if node is viable answer (positive marker or unambiguous semantics)
+      let hasPositive = hasPositiveResultMarker(node)
+      if (!hasPositive && allowTeFallback && hasTeMarker(node))
+        hasPositive = true
+      let hasAnswerSemantics = false
+      let matchedChoice = null
+      if (node.data != null && node.data.C != null) {
+        for (let value of node.data.C) {
+          if (typeof value !== 'string') continue
+          let matches = []
+          for (let choice of type.choices) {
+            let re = type.answerRes[choice]
+            if (re.test(value)) matches.push(choice)
+          }
+          if (matches.length === 1) {
+            hasAnswerSemantics = true
+            matchedChoice = matches[0]
+            break
+          } else if (matches.length > 1) {
+            // Ambiguous at this node - fail closed
+            return null
+          }
         }
-        if (matches === 1) {
-          hasAnswerSemantics = true
-          break
+      }
+      if (hasPositive || hasAnswerSemantics) {
+        // For nodes with positive marker but no clear semantics, need to check semantics
+        if (hasPositive && !hasAnswerSemantics) {
+          // Has positive marker but no clear answer semantics - check if it has any answer semantics
+          // If it has positive marker, we should still consider it, but need to classify
+          let found = false
+          if (node.data != null && node.data.C != null) {
+            for (let value of node.data.C) {
+              if (typeof value !== 'string') continue
+              let matches = []
+              for (let choice of type.choices) {
+                let re = type.answerRes[choice]
+                if (re.test(value)) matches.push(choice)
+              }
+              if (matches.length === 1) {
+                viableAtThisDepth.push({node, choice: matches[0]})
+                found = true
+                break
+              } else if (matches.length > 1) {
+                return null
+              }
+            }
+          }
+          if (!found) {
+            // Positive marker but no answer semantics - not viable for this judgement type
+            // Don't add to viable, but continue to next frontier
+          }
+        } else {
+          viableAtThisDepth.push({node, choice: matchedChoice})
+        }
+      }
+      // Add children to next frontier, but treat descriptive nodes as transparent
+      for (let child of node.children) {
+        if (!visited.has(child.id)) nextFrontier.push(child)
+      }
+      // Also handle descriptive nodes: if node is not position-defining, its children are at same depth
+      // For now, we treat all children as next depth; descriptive nodes will be handled by not being position nodes
+      // But we need to handle the case where a descriptive node is between question and answer
+      // For simplicity, we add children to nextFrontier regardless
+    }
+    if (viableAtThisDepth.length > 0) {
+      // Found viable answers at this depth - resolve only this frontier
+      let choices = new Set(viableAtThisDepth.map((a) => a.choice))
+      if (choices.size !== 1) return null
+      let answer = viableAtThisDepth[0]
+      let startNodeId = isPositionNode(questionNode)
+        ? questionNode.id
+        : questionDecisionPoint.id
+      if (type.judgementType === 'good-bad') {
+        startNodeId = questionNode.id
+      }
+      return {
+        judgementType: type.judgementType,
+        startNodeId,
+        answerNodeId: answer.node.id,
+        choices: type.choices,
+        correctChoice: answer.choice,
+      }
+    }
+    frontier = nextFrontier
+    depth++
+    // Also check if questionNode itself is viable (for self-answer)
+    if (depth === 1 && frontier.length === 0) {
+      let hasPositive = hasPositiveResultMarker(questionNode)
+      if (!hasPositive && allowTeFallback && hasTeMarker(questionNode))
+        hasPositive = true
+      let hasAnswerSemantics = false
+      let matchedChoice = null
+      if (questionNode.data != null && questionNode.data.C != null) {
+        for (let value of questionNode.data.C) {
+          if (typeof value !== 'string') continue
+          let matches = []
+          for (let choice of type.choices) {
+            let re = type.answerRes[choice]
+            if (re.test(value)) matches.push(choice)
+          }
+          if (matches.length === 1) {
+            hasAnswerSemantics = true
+            matchedChoice = matches[0]
+            break
+          } else if (matches.length > 1) {
+            return null
+          }
+        }
+      }
+      if (hasPositive || hasAnswerSemantics) {
+        // Check if it has answer semantics
+        if (questionNode.data != null && questionNode.data.C != null) {
+          for (let value of questionNode.data.C) {
+            if (typeof value !== 'string') continue
+            let matches = []
+            for (let choice of type.choices) {
+              let re = type.answerRes[choice]
+              if (re.test(value)) matches.push(choice)
+            }
+            if (matches.length === 1) {
+              let startNodeId = isPositionNode(questionNode)
+                ? questionNode.id
+                : questionDecisionPoint.id
+              if (type.judgementType === 'good-bad') {
+                startNodeId = questionNode.id
+              }
+              return {
+                judgementType: type.judgementType,
+                startNodeId,
+                answerNodeId: questionNode.id,
+                choices: type.choices,
+                correctChoice: matches[0],
+              }
+            }
+          }
         }
       }
     }
-    if (hasPositive || hasAnswerSemantics) answerCandidates.push(node)
-    for (let child of node.children) stack.push(child)
   }
-  if (answerCandidates.length === 0) {
-    let hasPositive = hasPositiveResultMarker(questionNode)
-    if (!hasPositive && allowTeFallback && hasTeMarker(questionNode))
-      hasPositive = true
-    let hasAnswerSemantics = false
-    if (questionNode.data != null && questionNode.data.C != null) {
-      for (let value of questionNode.data.C) {
-        if (typeof value !== 'string') continue
-        let matches = 0
-        for (let choice of type.choices) {
-          let re = type.answerRes[choice]
-          if (re.test(value)) matches++
-        }
-        if (matches === 1) hasAnswerSemantics = true
-      }
-    }
-    if (hasPositive || hasAnswerSemantics) answerCandidates.push(questionNode)
-  }
-  if (answerCandidates.length === 0) return null
-
-  // Classify answer choice
-  let validAnswers = []
-  for (let node of answerCandidates) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      let matchedChoices = []
-      for (let choice of type.choices) {
-        let re = type.answerRes[choice]
-        if (re.test(value)) matchedChoices.push(choice)
-      }
-      if (matchedChoices.length === 1) {
-        validAnswers.push({node, choice: matchedChoices[0]})
-        break
-      } else if (matchedChoices.length > 1) {
-        return null
-      }
-    }
-  }
-  if (validAnswers.length === 0) return null
-  let choices = new Set(validAnswers.map((a) => a.choice))
-  if (choices.size !== 1) return null
-  let answer = validAnswers[0]
-  let startNodeId = isPositionNode(questionNode)
-    ? questionNode.id
-    : questionDecisionPoint.id
-  // For Good/Bad, startNodeId is the question move node itself
-  if (type.judgementType === 'good-bad') {
-    startNodeId = questionNode.id
-  }
-  return {
-    judgementType: type.judgementType,
-    startNodeId,
-    answerNodeId: answer.node.id,
-    correctChoice: answer.choice,
-  }
+  return null
 }
 
 // Higher-level interpretation that distinguishes move-sequence and
@@ -1322,40 +1384,9 @@ export function interpretProblem(tree, options = {}) {
   let pointSelection = analyzePointSelection(tree, options)
   let judgement = analyzeJudgement(tree, options)
 
-  // Handle conflict: if both are plausible for same structural answer, fail closed
+  // Handle conflict: if both are independently plausible, fail closed
   if (pointSelection != null && judgement != null) {
-    // Check if they refer to same structural answer (same node or same decision point)
-    let pointSelectionNodes = new Set(
-      pointSelection.answerGroups.map((g) => g.nodeId),
-    )
-    if (pointSelectionNodes.has(judgement.answerNodeId)) {
-      // Same answer node is both point-selection and judgement - ambiguous
-      return {kind: 'unsupported'}
-    }
-    // Also check if decision points are same and answer is ambiguous
-    // For now, if both are valid but different, prefer judgement for Legal/Illegal etc.
-    // where L is explanatory, not the answer. But we already removed the guard,
-    // so point-selection would be valid for 053-style. We need to check evidence strength.
-    // For Legal/Illegal with explanatory L, the L points are not the answer, the judgement is.
-    // So we should prefer judgement when the L is explanatory.
-    // For now, if both are valid, check which has stronger evidence:
-    // - Judgement with self-identifying answer (An Illegal Move) is stronger than generic L
-    // - So prefer judgement
-    return {
-      kind: 'judgement',
-      judgementType: judgement.judgementType,
-      startNodeId: judgement.startNodeId,
-      answerNodeId: judgement.answerNodeId,
-      choices:
-        judgement.judgementType === 'alive-dead'
-          ? ['alive', 'dead']
-          : judgement.judgementType === 'legal-illegal'
-            ? ['legal', 'illegal']
-            : judgement.judgementType === 'yes-no'
-              ? ['yes', 'no']
-              : ['good', 'bad'],
-      correctChoice: judgement.correctChoice,
-    }
+    return {kind: 'unsupported'}
   }
 
   if (pointSelection != null) {
@@ -1369,18 +1400,12 @@ export function interpretProblem(tree, options = {}) {
   }
 
   if (judgement != null) {
-    let choices = []
-    if (judgement.judgementType === 'alive-dead') choices = ['alive', 'dead']
-    else if (judgement.judgementType === 'legal-illegal')
-      choices = ['legal', 'illegal']
-    else if (judgement.judgementType === 'yes-no') choices = ['yes', 'no']
-    else if (judgement.judgementType === 'good-bad') choices = ['good', 'bad']
     return {
       kind: 'judgement',
       judgementType: judgement.judgementType,
       startNodeId: judgement.startNodeId,
       answerNodeId: judgement.answerNodeId,
-      choices,
+      choices: judgement.choices,
       correctChoice: judgement.correctChoice,
     }
   }
