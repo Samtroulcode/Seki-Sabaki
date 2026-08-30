@@ -38,6 +38,7 @@
 // classified `wrong`; variations absent from the SGF stay `absent`.
 
 import {parseVertex} from '@sabaki/sgf'
+import * as gametree from './gametree.js'
 
 // Word-boundary matching is deliberately loose: it also catches natural
 // language such as "Correct me if I'm wrong" or "Is this correct?". This is a
@@ -977,36 +978,6 @@ function isVertexOnBoard(vertex, dimensions) {
   )
 }
 
-function getStartStoneMap(tree, startNode) {
-  let path = []
-  let current = startNode
-  while (current != null) {
-    path.push(current)
-    current = current.parentId != null ? tree.get(current.parentId) : null
-  }
-  let stones = new Map()
-  for (let node of path.reverse()) {
-    if (node.data == null) continue
-    for (let [property, color] of [
-      ['AB', 'B'],
-      ['AW', 'W'],
-    ]) {
-      for (let value of node.data[property] || []) {
-        let vertex = parseVertex(value)
-        if (vertex[0] >= 0 && vertex[1] >= 0)
-          stones.set(`${vertex[0]},${vertex[1]}`, color)
-      }
-    }
-    for (let color of ['B', 'W']) {
-      let vertex =
-        node.data[color] != null ? parseVertex(node.data[color][0]) : null
-      if (vertex != null && vertex[0] >= 0 && vertex[1] >= 0)
-        stones.set(`${vertex[0]},${vertex[1]}`, color)
-    }
-  }
-  return stones
-}
-
 // Returns the decision point for a point-selection answer node.
 // Walks up to the nearest position-defining ancestor, or the root.
 function getPointSelectionDecisionPoint(tree, node) {
@@ -1122,6 +1093,7 @@ function analyzePointSelection(tree, options = {}) {
   let acceptedPoints = [...points.values()]
   let playerToMove = inferPointSelectionPlayerToMove(tree, decisionPoint)
   return {
+    kind: 'point-selection',
     startNodeId: decisionPoint.id,
     acceptedPoints,
     answerGroups,
@@ -1145,41 +1117,55 @@ function analyzeStoneSelection(tree) {
     if (questionNode != null) break
   }
   if (questionNode == null) return null
-  let startNode = isPositionNode(questionNode) ? questionNode : tree.root
-  let stones = getStartStoneMap(tree, startNode)
-  let frontier = [...startNode.children]
-  let visited = new Set()
-  while (frontier.length) {
-    let next = []
-    let answers = []
-    for (let node of frontier) {
-      if (visited.has(node.id)) continue
-      visited.add(node.id)
-      if (hasPositiveResultMarker(node) && Array.isArray(node.data?.TR)) {
-        let points = []
-        for (let value of node.data.TR) {
-          if (typeof value !== 'string') return null
-          let vertex = parseVertex(value)
-          let key = `${vertex[0]},${vertex[1]}`
-          if (!isVertexOnBoard(vertex, dimensions) || !stones.has(key))
-            return null
-          if (!points.includes(value)) points.push(value)
-        }
-        if (points.length > 0) answers.push({node, points})
+  let startNode = getPointSelectionDecisionPoint(tree, questionNode)
+  let board = gametree.getBoard(tree, startNode.id)
+  let queue = [{node: questionNode, distance: 0}]
+  let distances = new Map()
+  let nearestDistance = null
+  let answers = []
+  while (queue.length) {
+    queue.sort((a, b) => a.distance - b.distance)
+    let {node, distance} = queue.shift()
+    if (nearestDistance != null && distance > nearestDistance) break
+    if (distances.has(node.id) && distances.get(node.id) <= distance) continue
+    distances.set(node.id, distance)
+    if (hasPositiveResultMarker(node) && Array.isArray(node.data?.TR)) {
+      let points = []
+      for (let value of node.data.TR) {
+        if (typeof value !== 'string') return null
+        let vertex = parseVertex(value)
+        let key = `${vertex[0]},${vertex[1]}`
+        if (
+          !isVertexOnBoard(vertex, dimensions) ||
+          (board.get(vertex) !== 1 && board.get(vertex) !== -1)
+        )
+          return null
+        if (!points.includes(value)) points.push(value)
       }
-      for (let child of node.children) next.push(child)
+      if (points.length > 0) {
+        nearestDistance = distance
+        answers.push({node, points})
+      }
+    }
+    if (nearestDistance == null) {
+      for (let child of node.children) {
+        queue.push({
+          node: child,
+          distance: distance + (isPositionNode(child) ? 1 : 0),
+        })
+      }
     }
     if (answers.length) {
       let sets = answers.map(({points}) => new Set(points))
       let first = [...sets[0]].sort().join('|')
       if (sets.some((set) => [...set].sort().join('|') !== first)) return null
       return {
+        kind: 'stone-selection',
         startNodeId: startNode.id,
         answerNodeId: answers[0].node.id,
         acceptedVertices: answers[0].points,
       }
     }
-    frontier = next
   }
   return null
 }
@@ -1354,6 +1340,7 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
     : questionDecisionPoint.id
   if (type.judgementType === 'good-bad') startNodeId = questionNode.id
   return {
+    kind: 'judgement',
     judgementType: type.judgementType,
     startNodeId,
     answerNodeId: answer.node.id,
@@ -1399,7 +1386,9 @@ export function interpretProblem(tree, options = {}) {
     analyzePointSelection(tree, options),
     analyzeJudgement(tree, options),
     analyzeStoneSelection(tree),
-  ].filter(Boolean)
+  ]
+    .filter(Boolean)
+    .map((candidate) => ({...candidate, kind: candidate.kind}))
   if (candidates.length > 1) {
     let earliest = candidates[0]
     for (let candidate of candidates.slice(1)) {
@@ -1415,7 +1404,7 @@ export function interpretProblem(tree, options = {}) {
   }
   let candidate = candidates[0]
 
-  if (candidate?.acceptedPoints != null) {
+  if (candidate?.kind === 'point-selection') {
     return {
       kind: 'point-selection',
       startNodeId: candidate.startNodeId,
@@ -1425,7 +1414,7 @@ export function interpretProblem(tree, options = {}) {
     }
   }
 
-  if (candidate?.judgementType != null) {
+  if (candidate?.kind === 'judgement') {
     return {
       kind: 'judgement',
       judgementType: candidate.judgementType,
@@ -1436,8 +1425,8 @@ export function interpretProblem(tree, options = {}) {
     }
   }
 
-  if (candidate?.acceptedVertices != null)
-    return {kind: 'stone-selection', selectionType: 'dead-stones', ...candidate}
+  if (candidate?.kind === 'stone-selection')
+    return {selectionType: 'dead-stones', ...candidate}
 
   return {kind: 'unsupported'}
 }

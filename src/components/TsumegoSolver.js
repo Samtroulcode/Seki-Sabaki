@@ -64,19 +64,6 @@ export default class TsumegoSolver extends Component {
         selectedVertices: [],
       }
     }
-    if (interpretation != null && interpretation.kind === 'judgement') {
-      return {
-        phase: 'solving',
-        displayNodeId: interpretation.startNodeId,
-        decisionPointId: interpretation.startNodeId,
-        expectedMoveNodeId: null,
-        feedback: null,
-        showGameGraph: false,
-        explorationBoard: null,
-        explorationPlayer: null,
-        highlightVertices: [],
-      }
-    }
     return {
       phase: 'solving',
       displayNodeId: problem.startNodeId,
