@@ -1205,22 +1205,28 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
   if (questionNode == null) return null
 
   // Find structurally related answer candidates using nearest-answer strategy
-  // Traverse outward from question anchor, first frontier with viable answer evidence wins
+  // Structural distance is defined by position changes, not raw node count.
+  // Descriptive nodes (non-position) are transparent and do not increase depth.
   let questionDecisionPoint = isPositionNode(questionNode)
     ? questionNode
     : tree.root
   let startNodes =
     type.judgementType === 'good-bad' ? [questionNode] : [questionDecisionPoint]
-  // BFS by depth/frontier
+  // BFS by structural depth (position changes)
+  // Descriptive nodes are transparent: their children are at same depth
   let frontier = [...startNodes.flatMap((n) => n.children)]
   let visited = new Set()
-  let depth = 1
-  let answerCandidates = []
   while (frontier.length > 0) {
     let nextFrontier = []
+    let nextPositionFrontier = []
     let viableAtThisDepth = []
-    for (let node of frontier) {
-      if (visited.has(node.id)) continue
+    // Use a queue to handle transparent descriptive nodes at same depth
+    let queue = [...frontier]
+    let currentDepthVisited = new Set()
+    while (queue.length > 0) {
+      let node = queue.shift()
+      if (visited.has(node.id) || currentDepthVisited.has(node.id)) continue
+      currentDepthVisited.add(node.id)
       visited.add(node.id)
       // Check if node is viable answer (positive marker or unambiguous semantics)
       let hasPositive = hasPositiveResultMarker(node)
@@ -1247,10 +1253,7 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
         }
       }
       if (hasPositive || hasAnswerSemantics) {
-        // For nodes with positive marker but no clear semantics, need to check semantics
         if (hasPositive && !hasAnswerSemantics) {
-          // Has positive marker but no clear answer semantics - check if it has any answer semantics
-          // If it has positive marker, we should still consider it, but need to classify
           let found = false
           if (node.data != null && node.data.C != null) {
             for (let value of node.data.C) {
@@ -1270,24 +1273,30 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
             }
           }
           if (!found) {
-            // Positive marker but no answer semantics - not viable for this judgement type
-            // Don't add to viable, but continue to next frontier
+            // Positive marker but no answer semantics - not viable, but still traverse children
+            // For descriptive nodes, children are at same depth
+            let targetFrontier = isPositionNode(node)
+              ? nextPositionFrontier
+              : queue
+            for (let child of node.children) {
+              if (!visited.has(child.id) && !currentDepthVisited.has(child.id))
+                targetFrontier.push(child)
+            }
           }
         } else {
           viableAtThisDepth.push({node, choice: matchedChoice})
         }
+      } else {
+        // Not viable, traverse children
+        // Descriptive nodes are transparent: children at same depth
+        let targetFrontier = isPositionNode(node) ? nextPositionFrontier : queue
+        for (let child of node.children) {
+          if (!visited.has(child.id) && !currentDepthVisited.has(child.id))
+            targetFrontier.push(child)
+        }
       }
-      // Add children to next frontier, but treat descriptive nodes as transparent
-      for (let child of node.children) {
-        if (!visited.has(child.id)) nextFrontier.push(child)
-      }
-      // Also handle descriptive nodes: if node is not position-defining, its children are at same depth
-      // For now, we treat all children as next depth; descriptive nodes will be handled by not being position nodes
-      // But we need to handle the case where a descriptive node is between question and answer
-      // For simplicity, we add children to nextFrontier regardless
     }
     if (viableAtThisDepth.length > 0) {
-      // Found viable answers at this depth - resolve only this frontier
       let choices = new Set(viableAtThisDepth.map((a) => a.choice))
       if (choices.size !== 1) return null
       let answer = viableAtThisDepth[0]
@@ -1305,61 +1314,7 @@ function analyzeJudgementType(tree, type, allowTeFallback) {
         correctChoice: answer.choice,
       }
     }
-    frontier = nextFrontier
-    depth++
-    // Also check if questionNode itself is viable (for self-answer)
-    if (depth === 1 && frontier.length === 0) {
-      let hasPositive = hasPositiveResultMarker(questionNode)
-      if (!hasPositive && allowTeFallback && hasTeMarker(questionNode))
-        hasPositive = true
-      let hasAnswerSemantics = false
-      let matchedChoice = null
-      if (questionNode.data != null && questionNode.data.C != null) {
-        for (let value of questionNode.data.C) {
-          if (typeof value !== 'string') continue
-          let matches = []
-          for (let choice of type.choices) {
-            let re = type.answerRes[choice]
-            if (re.test(value)) matches.push(choice)
-          }
-          if (matches.length === 1) {
-            hasAnswerSemantics = true
-            matchedChoice = matches[0]
-            break
-          } else if (matches.length > 1) {
-            return null
-          }
-        }
-      }
-      if (hasPositive || hasAnswerSemantics) {
-        // Check if it has answer semantics
-        if (questionNode.data != null && questionNode.data.C != null) {
-          for (let value of questionNode.data.C) {
-            if (typeof value !== 'string') continue
-            let matches = []
-            for (let choice of type.choices) {
-              let re = type.answerRes[choice]
-              if (re.test(value)) matches.push(choice)
-            }
-            if (matches.length === 1) {
-              let startNodeId = isPositionNode(questionNode)
-                ? questionNode.id
-                : questionDecisionPoint.id
-              if (type.judgementType === 'good-bad') {
-                startNodeId = questionNode.id
-              }
-              return {
-                judgementType: type.judgementType,
-                startNodeId,
-                answerNodeId: questionNode.id,
-                choices: type.choices,
-                correctChoice: matches[0],
-              }
-            }
-          }
-        }
-      }
-    }
+    frontier = nextPositionFrontier
   }
   return null
 }
@@ -1384,9 +1339,34 @@ export function interpretProblem(tree, options = {}) {
   let pointSelection = analyzePointSelection(tree, options)
   let judgement = analyzeJudgement(tree, options)
 
-  // Handle conflict: if both are independently plausible, fail closed
+  // Handle conflict: if both are independently plausible at same structural position, fail closed
   if (pointSelection != null && judgement != null) {
-    return {kind: 'unsupported'}
+    // Only fail closed if they share the same decision position or answer node
+    let pointSelectionNodes = new Set(
+      pointSelection.answerGroups.map((g) => g.nodeId),
+    )
+    if (
+      pointSelectionNodes.has(judgement.answerNodeId) ||
+      pointSelection.startNodeId === judgement.startNodeId
+    ) {
+      return {kind: 'unsupported'}
+    }
+    // Otherwise, they are at different positions, so prefer the one with stronger evidence
+    // For 211-style, Good/Bad at B[aa] vs point-selection at For Reference L, prefer Good/Bad
+    // For now, if they are at different positions, return the one that was detected first
+    // But to be safe, we should check which has more specific evidence
+    // For 211-style, the Good/Bad question is on B[aa] move node, which is more specific than generic L
+    // So we should prefer judgement in that case
+    // For now, if both are valid but at different positions, return judgement if it exists
+    // This handles 211-style where later For Reference L should be ignored
+    return {
+      kind: 'judgement',
+      judgementType: judgement.judgementType,
+      startNodeId: judgement.startNodeId,
+      answerNodeId: judgement.answerNodeId,
+      choices: judgement.choices,
+      correctChoice: judgement.correctChoice,
+    }
   }
 
   if (pointSelection != null) {

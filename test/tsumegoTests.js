@@ -2739,4 +2739,135 @@ describe('interpretProblem', () => {
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'unsupported')
   })
+
+  it('keeps 046-style Alive/Dead valid', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      draft.appendNode(draft.root.id, {C: ['White is dead.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'alive-dead')
+  })
+
+  it('keeps 047/048-style point-selection as point-selection', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.appendNode(draft.root.id, {L: ['aa', 'bb'], C: ['Correct']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'point-selection')
+  })
+
+  it('keeps 053-style judgement with explanatory L as judgement', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Can Black play at 1? Is it legal?',
+      ])
+      draft.updateProperty(draft.root.id, 'LB', ['aa:1'])
+      draft.appendNode(draft.root.id, {L: ['bb'], C: ['An Illegal Move']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'legal-illegal')
+  })
+
+  it('handles 055-style negative Yes/No', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Can Black kill?'])
+      draft.appendNode(draft.root.id, {C: ['No, cannot.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'yes-no')
+    assert.strictEqual(result.correctChoice, 'no')
+  })
+
+  it('handles positive Yes/No answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Can Black live?'])
+      draft.appendNode(draft.root.id, {C: ['Yes, it can.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'yes-no')
+    assert.strictEqual(result.correctChoice, 'yes')
+  })
+
+  it('keeps 210-style Good/Bad with question on B move', () => {
+    let moveId
+    let tree = gametree.new().mutate((draft) => {
+      let move = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Is this good or bad?'],
+      })
+      moveId = move
+      draft.appendNode(move, {C: ['Good.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'good-bad')
+    assert.strictEqual(result.startNodeId, moveId)
+  })
+
+  it('keeps 211-style Good/Bad with later For Reference L', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let move = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['Is this good or bad?'],
+      })
+      let answer = draft.appendNode(move, {C: ['Bad.']})
+      let ref = draft.appendNode(answer, {AB: ['bb'], C: ['For Reference']})
+      draft.appendNode(ref, {L: ['cc'], C: ['Correct']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.judgementType, 'good-bad')
+    assert.strictEqual(result.correctChoice, 'bad')
+  })
+
+  it('treats descriptive node as transparent for nearest answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      let desc = draft.appendNode(draft.root.id, {C: ['desc']})
+      draft.appendNode(desc, {C: ['White is dead.']})
+      let otherPos = draft.appendNode(draft.root.id, {AB: ['aa']})
+      draft.appendNode(otherPos, {C: ['White is alive.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'dead')
+  })
+
+  it('does not let deeper descendant override nearest answer', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      let near = draft.appendNode(draft.root.id, {C: ['White is dead.']})
+      let deep = draft.appendNode(near, {C: ['White is alive.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'dead')
+    assert.strictEqual(result.answerNodeId, tree.root.children[0].id)
+  })
+
+  it('fails closed on conflicting choices at nearest frontier', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      draft.appendNode(draft.root.id, {C: ['White is alive.']})
+      draft.appendNode(draft.root.id, {C: ['White is dead.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('fails closed when both point-selection and judgement are plausible', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      // Both L with Correct and judgement answer at same frontier
+      draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
+      draft.appendNode(draft.root.id, {C: ['White is dead.']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
 })
