@@ -35,6 +35,15 @@ export default class TsumegoSolver extends Component {
     this.cancelAutoNext()
   }
 
+  componentDidUpdate(previousProps) {
+    if (this.props.autoNext === previousProps.autoNext) return
+    if (this.props.autoNext) {
+      if (this.state.phase === 'solved') this.startAutoNext()
+    } else {
+      this.cancelAutoNext()
+    }
+  }
+
   getInitialState({problem}) {
     return {
       phase: 'solving',

@@ -513,6 +513,71 @@ test.describe('Tsumego workspace', () => {
     }
   })
 
+  test('disabling auto-next during the solved delay prevents navigation', async ({
+    page,
+  }) => {
+    let root = setupTwoProblemLibrary()
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').first().click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+
+      await page.locator('.tsumego-auto-next input').check()
+      await dispatchVertex(page, 2, 2)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+      // Turn auto-next off before the 800 ms delay expires.
+      await page.waitForTimeout(300)
+      await page.locator('.tsumego-auto-next input').uncheck()
+
+      // Wait longer than the delay and confirm no advance happened.
+      await page.waitForTimeout(1200)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+        'Problem 1 / 2',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('enabling auto-next while already solved schedules navigation', async ({
+    page,
+  }) => {
+    let root = setupTwoProblemLibrary()
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').first().click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+
+      // Solve without auto-next, then enable it while solved.
+      await dispatchVertex(page, 2, 2)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await page.locator('.tsumego-auto-next input').check()
+
+      // The 800 ms timer should now fire and advance to the next problem.
+      await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+        'Problem 2 / 2',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
   test('remembers the last opened built-in collection', async ({page}) => {
     await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
     await expect(page.locator('#tsumego-dashboard')).toBeVisible()
