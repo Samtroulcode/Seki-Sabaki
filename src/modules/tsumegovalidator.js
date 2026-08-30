@@ -9,7 +9,7 @@
 // conventions).
 
 import * as sgfFileFormat from './fileformats/sgf.js'
-import {analyzeProblem} from './tsumego.js'
+import {interpretProblem} from './tsumego.js'
 
 const MESSAGES = {
   NO_GAME_TREE: 'No SGF game tree was found.',
@@ -36,9 +36,9 @@ function hasMoveNode(tree) {
   return false
 }
 
-// Validates an already-parsed GameTree. Returns `{valid, problem, errors,
-// warnings}` where `valid` mirrors `analyzeProblem` exactly: a problem the
-// engine accepts is never declared invalid.
+// Validates an already-parsed GameTree. Returns `{valid, problem,
+// interpretation, errors, warnings}` where `valid` mirrors `interpretProblem`
+// exactly: a problem the engine accepts is never declared invalid.
 export function validateTsumegoTree(gameTree, options = {}) {
   let {allowTeFallback = true, allowMainLineFallback = true} = options
   let errors = []
@@ -48,20 +48,24 @@ export function validateTsumegoTree(gameTree, options = {}) {
     return {
       valid: false,
       problem: null,
+      interpretation: {kind: 'unsupported'},
       errors: [diagnostic('NO_GAME_TREE')],
       warnings,
     }
   }
 
-  let hasMoves = hasMoveNode(gameTree)
-  if (!hasMoves) errors.push(diagnostic('NO_MOVES'))
-
-  let problem = analyzeProblem(gameTree, {
+  let interpretation = interpretProblem(gameTree, {
     allowTeFallback,
     allowMainLineFallback,
   })
-  if (problem == null) {
-    if (hasMoves) errors.push(diagnostic('NO_PLAYABLE_SOLUTION'))
+  let valid = interpretation.kind !== 'unsupported'
+  let problem =
+    interpretation.kind === 'move-sequence' ? interpretation.problem : null
+
+  if (!valid) {
+    let hasMoves = hasMoveNode(gameTree)
+    if (!hasMoves) errors.push(diagnostic('NO_MOVES'))
+    else errors.push(diagnostic('NO_PLAYABLE_SOLUTION'))
   } else {
     let statement = gameTree.root.data?.C?.[0]
     if (statement == null || String(statement).trim() === '') {
@@ -69,19 +73,23 @@ export function validateTsumegoTree(gameTree, options = {}) {
     }
 
     // PL is only meaningful on the position the engine picked as the start.
-    let startNode = gameTree.get(problem.startNodeId)
+    let startNodeId =
+      interpretation.kind === 'move-sequence'
+        ? interpretation.problem.startNodeId
+        : interpretation.startNodeId
+    let startNode = gameTree.get(startNodeId)
     let pl = startNode?.data?.PL?.[0]
     if (pl !== 'B' && pl !== 'W') {
       warnings.push(diagnostic('PLAYER_TO_MOVE_INFERRED'))
     }
   }
 
-  return {valid: problem != null, problem, errors, warnings}
+  return {valid, problem, interpretation, errors, warnings}
 }
 
 // Parses SGF content with the same parser the Tsumego panel uses and validates
 // the first game tree, mirroring the reader's `trees[0]` behavior. Returns
-// `{valid, gameTree, problem, errors, warnings}`.
+// `{valid, gameTree, problem, interpretation, errors, warnings}`.
 export function validateTsumegoContent(content, options = {}) {
   let warnings = []
 
@@ -93,6 +101,7 @@ export function validateTsumegoContent(content, options = {}) {
       valid: false,
       gameTree: null,
       problem: null,
+      interpretation: {kind: 'unsupported'},
       errors: [diagnostic('INVALID_SGF')],
       warnings,
     }
@@ -103,6 +112,7 @@ export function validateTsumegoContent(content, options = {}) {
       valid: false,
       gameTree: null,
       problem: null,
+      interpretation: {kind: 'unsupported'},
       errors: [diagnostic('NO_GAME_TREE')],
       warnings,
     }
@@ -116,6 +126,7 @@ export function validateTsumegoContent(content, options = {}) {
     valid: result.valid,
     gameTree,
     problem: result.problem,
+    interpretation: result.interpretation,
     errors: result.errors,
     warnings: [...warnings, ...result.warnings],
   }

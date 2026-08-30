@@ -2295,6 +2295,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.deepStrictEqual(
       new Set(result.acceptedPoints),
       new Set(['dj', 'dk', 'cj', 'ck']),
@@ -2310,6 +2311,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.deepStrictEqual(result.acceptedPoints, ['dj'])
   })
 
@@ -2321,6 +2323,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.deepStrictEqual(result.acceptedPoints, ['dj'])
   })
 
@@ -2332,6 +2335,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.deepStrictEqual(result.acceptedPoints, ['aa'])
   })
 
@@ -2372,7 +2376,10 @@ describe('interpretProblem', () => {
       draft.updateProperty(draft.root.id, 'PL', ['W'])
       draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
     })
-    assert.strictEqual(interpretProblem(treePl).playerToMove, 'W')
+    let resultPl = interpretProblem(treePl)
+    assert.strictEqual(resultPl.kind, 'point-selection')
+    assert.strictEqual(resultPl.startNodeId, treePl.root.id)
+    assert.strictEqual(resultPl.playerToMove, 'W')
 
     // Consistent move color
     let treeMoves = gametree.new().mutate((draft) => {
@@ -2380,7 +2387,10 @@ describe('interpretProblem', () => {
       draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong']})
       draft.appendNode(draft.root.id, {B: ['cc'], C: ['Wrong']})
     })
-    assert.strictEqual(interpretProblem(treeMoves).playerToMove, 'B')
+    let resultMoves = interpretProblem(treeMoves)
+    assert.strictEqual(resultMoves.kind, 'point-selection')
+    assert.strictEqual(resultMoves.startNodeId, treeMoves.root.id)
+    assert.strictEqual(resultMoves.playerToMove, 'B')
 
     // Inconsistent move colors -> null
     let treeMixed = gametree.new().mutate((draft) => {
@@ -2388,7 +2398,10 @@ describe('interpretProblem', () => {
       draft.appendNode(draft.root.id, {B: ['bb'], C: ['Wrong']})
       draft.appendNode(draft.root.id, {W: ['cc'], C: ['Wrong']})
     })
-    assert.strictEqual(interpretProblem(treeMixed).playerToMove, null)
+    let resultMixed = interpretProblem(treeMixed)
+    assert.strictEqual(resultMixed.kind, 'point-selection')
+    assert.strictEqual(resultMixed.startNodeId, treeMixed.root.id)
+    assert.strictEqual(resultMixed.playerToMove, null)
   })
 
   it('returns null color when no structured color evidence exists', () => {
@@ -2398,6 +2411,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.strictEqual(result.playerToMove, null)
   })
 
@@ -2410,6 +2424,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.strictEqual(result.playerToMove, 'B')
   })
 
@@ -2422,6 +2437,7 @@ describe('interpretProblem', () => {
 
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'point-selection')
+    assert.strictEqual(result.startNodeId, tree.root.id)
     assert.strictEqual(result.playerToMove, null)
   })
 
@@ -2432,6 +2448,7 @@ describe('interpretProblem', () => {
     })
     let resultMissing = interpretProblem(treeMissing)
     assert.strictEqual(resultMissing.kind, 'point-selection')
+    assert.strictEqual(resultMissing.startNodeId, treeMissing.root.id)
     assert.deepStrictEqual(resultMissing.acceptedPoints, ['ss'])
 
     // Valid SZ 9x9 -> correct bounds
@@ -2441,6 +2458,7 @@ describe('interpretProblem', () => {
     })
     let resultValid = interpretProblem(treeValid)
     assert.strictEqual(resultValid.kind, 'point-selection')
+    assert.strictEqual(resultValid.startNodeId, treeValid.root.id)
     assert.deepStrictEqual(
       new Set(resultValid.acceptedPoints),
       new Set(['aa', 'ii']),
@@ -2453,6 +2471,7 @@ describe('interpretProblem', () => {
     })
     let resultRect = interpretProblem(treeRect)
     assert.strictEqual(resultRect.kind, 'point-selection')
+    assert.strictEqual(resultRect.startNodeId, treeRect.root.id)
     // 9x13: width 9 (aa-ii), height 13 (aa-am), so ai (0,8) valid, ii (8,8) valid
     assert.deepStrictEqual(
       new Set(resultRect.acceptedPoints),
@@ -2471,5 +2490,17 @@ describe('interpretProblem', () => {
       draft.appendNode(draft.root.id, {L: ['aa'], C: ['Correct']})
     })
     assert.strictEqual(interpretProblem(treeZero).kind, 'unsupported')
+  })
+
+  it('fails closed when L answers belong to different decision positions', () => {
+    let tree = gametree.new().mutate((draft) => {
+      let setup1 = draft.appendNode(draft.root.id, {AB: ['aa']})
+      draft.appendNode(setup1, {L: ['bb'], C: ['Correct']})
+      let setup2 = draft.appendNode(draft.root.id, {AB: ['cc']})
+      draft.appendNode(setup2, {L: ['dd'], C: ['Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
   })
 })

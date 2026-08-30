@@ -44,7 +44,19 @@ export default class TsumegoSolver extends Component {
     }
   }
 
-  getInitialState({problem}) {
+  getInitialState({problem, interpretation}) {
+    if (interpretation != null && interpretation.kind === 'point-selection') {
+      return {
+        phase: 'solving',
+        displayNodeId: interpretation.startNodeId,
+        decisionPointId: interpretation.startNodeId,
+        expectedMoveNodeId: null,
+        feedback: null,
+        showGameGraph: false,
+        explorationBoard: null,
+        explorationPlayer: null,
+      }
+    }
     return {
       phase: 'solving',
       displayNodeId: problem.startNodeId,
@@ -65,7 +77,12 @@ export default class TsumegoSolver extends Component {
       return
     }
 
-    let {gameTree, problem} = this.props
+    let {gameTree, problem, interpretation} = this.props
+    if (interpretation != null && interpretation.kind === 'point-selection') {
+      this.handlePointSelectionVertex(evt.vertex)
+      return
+    }
+
     let expectedMoveNode = gameTree.get(this.state.expectedMoveNodeId)
     let result = resolveMove(
       gameTree,
@@ -110,6 +127,91 @@ export default class TsumegoSolver extends Component {
       this.props.onSolved?.()
       this.startAutoNext()
     }
+  }
+
+  handlePointSelectionVertex(vertex) {
+    let {gameTree, interpretation} = this.props
+    let vertexString = stringifyVertex(vertex)
+    let isAccepted = interpretation.acceptedPoints.includes(vertexString)
+
+    if (isAccepted) {
+      sound.playPachi()
+      this.setState({
+        phase: 'solved',
+        feedback: t('Solved') || 'Solved',
+        showGameGraph: true,
+        explorationBoard: null,
+        explorationPlayer: null,
+      })
+      this.props.onSolved?.()
+      this.startAutoNext()
+      return
+    }
+
+    // Check if the clicked point corresponds to an explicit wrong B/W variation
+    let decisionPoint = gameTree.get(interpretation.startNodeId)
+    if (decisionPoint != null) {
+      let depth = 0
+      let stack = [{node: gameTree.root, depth: 0}]
+      while (stack.length) {
+        let {node, depth: currentDepth} = stack.pop()
+        if (node.id === decisionPoint.id) {
+          depth = currentDepth
+          break
+        }
+        for (let child of node.children)
+          stack.push({node: child, depth: currentDepth + 1})
+      }
+      // Use the same helper as playerToMove inference for consistency
+      let candidates = []
+      // Inline getDecisionPointCandidates logic to avoid import
+      let candidateStack = decisionPoint.children
+        .map((child) => ({node: child, depth: depth + 1}))
+        .reverse()
+      while (candidateStack.length) {
+        let candidate = candidateStack.pop()
+        if (
+          candidate.node.data != null &&
+          (candidate.node.data.B != null || candidate.node.data.W != null)
+        ) {
+          candidates.push(candidate.node)
+        } else if (
+          candidate.node.data == null ||
+          (candidate.node.data.AB == null &&
+            candidate.node.data.AW == null &&
+            candidate.node.data.AE == null &&
+            candidate.node.data.PL == null)
+        ) {
+          for (let child of [...candidate.node.children].reverse()) {
+            candidateStack.push({node: child, depth: candidate.depth + 1})
+          }
+        }
+      }
+
+      let matching = candidates.filter((node) => {
+        let color = node.data.B != null ? 'B' : 'W'
+        let values = node.data[color]
+        if (!Array.isArray(values) || values.length === 0) return false
+        return values[0] === vertexString
+      })
+
+      if (matching.length > 0) {
+        // Found a matching wrong variation - try to play its refutation
+        let wrongNode = matching[0]
+        let refutation = advanceRefutation(gameTree, wrongNode)
+        if (refutation != null && refutation.automaticMoves.length > 0) {
+          this.startRefutationSequence(wrongNode)
+          return
+        }
+        // No refutation or refutation has no moves - fall through to failed exploration
+        // But we should still show the wrong move
+        this.startFailedExplorationFromNode(wrongNode)
+        return
+      }
+    }
+
+    // Other legal point - incorrect
+    this.startFailedExploration(vertex)
   }
 
   startAutoSequence(advanced) {
@@ -227,12 +329,19 @@ export default class TsumegoSolver extends Component {
   }
 
   startFailedExploration(vertex) {
-    let {gameTree, problem} = this.props
+    let {gameTree, problem, interpretation} = this.props
+    let playerToMove = null
+    if (interpretation != null && interpretation.kind === 'point-selection') {
+      playerToMove = interpretation.playerToMove
+    } else if (problem != null) {
+      playerToMove = problem.playerToMove
+    }
+    let fallbackSign = playerToMove === 'W' ? -1 : 1
     let board = cloneExplorationBoard(
       gametree.getBoard(gameTree, this.state.displayNodeId),
     )
     let node = gameTree.get(this.state.displayNodeId)
-    let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+    let sign = getExplorationPlayer(node, fallbackSign)
     let movedBoard = applyExplorationMove(board, sign, vertex)
     let nextBoard = movedBoard || board
     if (movedBoard != null) sound.playPachi()
@@ -245,12 +354,19 @@ export default class TsumegoSolver extends Component {
   }
 
   startFailedExplorationFromNode(wrongMoveNode) {
-    let {gameTree, problem} = this.props
+    let {gameTree, problem, interpretation} = this.props
+    let playerToMove = null
+    if (interpretation != null && interpretation.kind === 'point-selection') {
+      playerToMove = interpretation.playerToMove
+    } else if (problem != null) {
+      playerToMove = problem.playerToMove
+    }
+    let fallbackSign = playerToMove === 'W' ? -1 : 1
     let board = cloneExplorationBoard(
       gametree.getBoard(gameTree, wrongMoveNode.id),
     )
     let node = gameTree.get(wrongMoveNode.id)
-    let sign = getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+    let sign = getExplorationPlayer(node, fallbackSign)
     // The wrong move is already on the board at wrongMoveNode; sign is the
     // player to move from that position.
     sound.playPachi()
@@ -312,7 +428,14 @@ export default class TsumegoSolver extends Component {
   }
 
   handleExplorationVertex(vertex) {
-    let {gameTree, problem} = this.props
+    let {gameTree, problem, interpretation} = this.props
+    let playerToMove = null
+    if (interpretation != null && interpretation.kind === 'point-selection') {
+      playerToMove = interpretation.playerToMove
+    } else if (problem != null) {
+      playerToMove = problem.playerToMove
+    }
+    let fallbackSign = playerToMove === 'W' ? -1 : 1
     let board =
       this.state.explorationBoard ||
       cloneExplorationBoard(
@@ -320,8 +443,7 @@ export default class TsumegoSolver extends Component {
       )
     let node = gameTree.get(this.state.displayNodeId)
     let sign =
-      this.state.explorationPlayer ??
-      getExplorationPlayer(node, problem.playerToMove === 'B' ? 1 : -1)
+      this.state.explorationPlayer ?? getExplorationPlayer(node, fallbackSign)
     let nextBoard = applyExplorationMove(board, sign, vertex)
     if (nextBoard == null) return
     sound.playPachi()
@@ -336,6 +458,7 @@ export default class TsumegoSolver extends Component {
     let {
       gameTree,
       problem,
+      interpretation,
       problemIndex,
       problemCount,
       relativePath,
@@ -352,6 +475,12 @@ export default class TsumegoSolver extends Component {
     let currentThemeId = window.sabaki.setting.get('theme.current')
     let graphGridSize = window.sabaki.setting.get('graph.grid_size')
     let graphNodeSize = window.sabaki.setting.get('graph.node_size')
+    let playerToMove = null
+    if (interpretation != null && interpretation.kind === 'point-selection') {
+      playerToMove = interpretation.playerToMove
+    } else if (problem != null) {
+      playerToMove = problem.playerToMove
+    }
 
     return h(
       'div',
@@ -397,13 +526,12 @@ export default class TsumegoSolver extends Component {
             {class: 'tsumego-source-label'},
             source === 'builtin' ? t('Built-in') : t('My Library'),
           ),
-        h(
-          'p',
-          {class: 'tsumego-player-to-move'},
-          problem.playerToMove === 'B'
-            ? t('Black to play')
-            : t('White to play'),
-        ),
+        playerToMove != null &&
+          h(
+            'p',
+            {class: 'tsumego-player-to-move'},
+            playerToMove === 'B' ? t('Black to play') : t('White to play'),
+          ),
         this.props.initialComment &&
           h('p', {class: 'tsumego-initial-comment'}, this.props.initialComment),
         feedback != null &&

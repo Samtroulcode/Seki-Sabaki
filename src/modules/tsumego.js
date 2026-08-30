@@ -1028,7 +1028,7 @@ function inferPointSelectionPlayerToMove(tree, decisionPoint) {
 }
 
 // Analyzes point-selection candidates when no move-sequence problem exists.
-// Returns {acceptedPoints, playerToMove} or null when no valid candidate.
+// Returns {startNodeId, acceptedPoints, playerToMove} or null when no valid candidate.
 function analyzePointSelection(tree, options = {}) {
   let {allowTeFallback = false} = options || {}
   let dimensions = getBoardDimensions(tree)
@@ -1059,14 +1059,12 @@ function analyzePointSelection(tree, options = {}) {
   }
 
   if (points.size === 0) return null
+  if (decisionPoints.size !== 1) return null
 
+  let decisionPoint = [...decisionPoints.values()][0]
   let acceptedPoints = [...points.values()]
-  let playerToMove = null
-  if (decisionPoints.size === 1) {
-    let decisionPoint = [...decisionPoints.values()][0]
-    playerToMove = inferPointSelectionPlayerToMove(tree, decisionPoint)
-  }
-  return {acceptedPoints, playerToMove}
+  let playerToMove = inferPointSelectionPlayerToMove(tree, decisionPoint)
+  return {startNodeId: decisionPoint.id, acceptedPoints, playerToMove}
 }
 
 // Higher-level interpretation that distinguishes move-sequence and
@@ -1074,8 +1072,8 @@ function analyzePointSelection(tree, options = {}) {
 //
 // Returns:
 // - {kind: 'move-sequence', problem} when a playable move-sequence is found
-// - {kind: 'point-selection', acceptedPoints, playerToMove} when L-based
-//   point-selection is detected
+// - {kind: 'point-selection', startNodeId, acceptedPoints, playerToMove} when
+//   L-based point-selection is detected
 // - {kind: 'unsupported'} otherwise
 export function interpretProblem(tree, options = {}) {
   let problem = analyzeProblem(tree, options)
@@ -1087,6 +1085,7 @@ export function interpretProblem(tree, options = {}) {
   if (pointSelection != null) {
     return {
       kind: 'point-selection',
+      startNodeId: pointSelection.startNodeId,
       acceptedPoints: pointSelection.acceptedPoints,
       playerToMove: pointSelection.playerToMove,
     }

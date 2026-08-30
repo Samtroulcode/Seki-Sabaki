@@ -47,6 +47,7 @@ export default class TsumegoPanel extends Component {
       content: null,
       gameTree: null,
       problem: null,
+      interpretation: null,
       progress: {},
       dirTotals: {},
       autoNext: false,
@@ -150,6 +151,7 @@ export default class TsumegoPanel extends Component {
       content: null,
       gameTree: null,
       problem: null,
+      interpretation: null,
     })
     await this.refresh(source, relativePath)
 
@@ -321,6 +323,7 @@ export default class TsumegoPanel extends Component {
       content: null,
       gameTree: null,
       problem: null,
+      interpretation: null,
     })
     await this.refresh(source, currentPath)
   }
@@ -362,6 +365,7 @@ export default class TsumegoPanel extends Component {
 
       let gameTree = validation.gameTree
       let problem = validation.problem
+      let interpretation = validation.interpretation
 
       let problemEntries = this.state.entries
         .filter((candidate) => candidate.type === 'file')
@@ -379,6 +383,7 @@ export default class TsumegoPanel extends Component {
         content: result.content,
         gameTree,
         problem,
+        interpretation,
       })
     } catch (err) {
       if (problemLoadId !== this.problemLoadId) return
@@ -691,6 +696,7 @@ export default class TsumegoPanel extends Component {
   renderProblem() {
     let {
       problem,
+      interpretation,
       problemIndex,
       problemCount,
       relativePath,
@@ -703,6 +709,7 @@ export default class TsumegoPanel extends Component {
       key: relativePath,
       gameTree,
       problem,
+      interpretation,
       problemIndex,
       problemCount,
       relativePath,
