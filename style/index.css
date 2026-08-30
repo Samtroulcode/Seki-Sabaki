@@ -1858,6 +1858,13 @@ button.ui-button.app-sidebar-button:active:not(:disabled) {
 .tsumego-solver-navigation button:disabled {
   opacity: 0.45;
 }
+.tsumego-solver-navigation .tsumego-auto-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  user-select: none;
+}
 .tsumego-creator {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);

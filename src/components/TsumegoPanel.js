@@ -49,6 +49,7 @@ export default class TsumegoPanel extends Component {
       problem: null,
       progress: {},
       dirTotals: {},
+      autoNext: false,
     }
     this.refreshId = 0
     this.problemLoadId = 0
@@ -187,6 +188,10 @@ export default class TsumegoPanel extends Component {
       progress: {...prev.progress, [key]: {completed: true, completedAt}},
     }))
     markTsumegoProblemCompleted(source, relativePath).catch(() => {})
+  }
+
+  handleAutoNextChange(autoNext) {
+    this.setState({autoNext})
   }
 
   isProblemCompleted(source, relativePath) {
@@ -684,8 +689,15 @@ export default class TsumegoPanel extends Component {
   }
 
   renderProblem() {
-    let {problem, problemIndex, problemCount, relativePath, source, gameTree} =
-      this.state
+    let {
+      problem,
+      problemIndex,
+      problemCount,
+      relativePath,
+      source,
+      gameTree,
+      autoNext,
+    } = this.state
     let initialComment = gametree.getRootProperty(gameTree, 'C', '') || ''
     return h(TsumegoSolver, {
       key: relativePath,
@@ -695,11 +707,13 @@ export default class TsumegoPanel extends Component {
       problemCount,
       relativePath,
       source,
+      autoNext,
       initialComment,
       onBack: () => this.handleBack(),
       onPrevious: () => this.handleAdjacentProblem(-1),
       onNext: () => this.handleAdjacentProblem(1),
       onSolved: () => this.handleProblemSolved(),
+      onAutoNextChange: (value) => this.handleAutoNextChange(value),
     })
   }
 

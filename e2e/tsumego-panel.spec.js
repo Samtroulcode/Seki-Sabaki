@@ -345,6 +345,11 @@ test.describe('Tsumego workspace', () => {
     await page.getByRole('button', {name: 'Retry', exact: true}).click()
     await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
     await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+
+    // The strongest proof: the first correct move is accepted again from the
+    // original starting position.
+    await dispatchVertex(page, 17, 18)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-waiting/)
   })
 
   test('an SGF-present wrong branch plays its refutation before Incorrect', async ({
@@ -397,6 +402,115 @@ test.describe('Tsumego workspace', () => {
     await page.getByRole('button', {name: /Collection/}).click()
     await expect(page.locator('.tsumego-browser')).toBeVisible()
     expect(existsSync(progressPath)).toBe(false)
+  })
+
+  test('auto-next disabled keeps the solved problem open', async ({page}) => {
+    await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+    await page.locator('.tsumego-entry-directory').first().click()
+    await openGggEasy01(page)
+    await solveGggEasy01(page)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+    // Wait longer than the auto-next delay to confirm no advance happens.
+    await page.waitForTimeout(1200)
+    await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+    await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+      'Problem 1 / 140',
+    )
+  })
+
+  test('auto-next enabled advances after the delay', async ({page}) => {
+    let root = setupTwoProblemLibrary()
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').first().click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+        'Problem 1 / 2',
+      )
+
+      await page.locator('.tsumego-auto-next input').check()
+      await dispatchVertex(page, 2, 2)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+      // After 800 ms the next problem should open automatically.
+      await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+        'Problem 2 / 2',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('auto-next does not advance from the final problem', async ({page}) => {
+    let root = setupTwoProblemLibrary()
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      let files = await page.locator('.tsumego-entry-file').all()
+      expect(files.length).toBeGreaterThanOrEqual(2)
+      await files[1].click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+        'Problem 2 / 2',
+      )
+
+      await page.locator('.tsumego-auto-next input').check()
+      await dispatchVertex(page, 4, 4)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+      // Wait longer than the auto-next delay; the last problem must stay open.
+      await page.waitForTimeout(1200)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solver-sidebar h2')).toContainText(
+        'Problem 2 / 2',
+      )
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
+
+  test('manual navigation cancels a pending auto-next', async ({page}) => {
+    let root = setupTwoProblemLibrary()
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').first().click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+
+      await page.locator('.tsumego-auto-next input').check()
+      await dispatchVertex(page, 2, 2)
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+
+      // Click Collection before the 800 ms auto-next delay expires.
+      await page.getByRole('button', {name: /Collection/}).click()
+      await expect(page.locator('.tsumego-browser')).toBeVisible()
+
+      // Wait longer than the delay and confirm the cancelled advance did not fire.
+      await page.waitForTimeout(1200)
+      await expect(page.locator('.tsumego-browser')).toBeVisible()
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
   })
 
   test('remembers the last opened built-in collection', async ({page}) => {
@@ -762,4 +876,19 @@ async function waitForProgressEntry(electronApp, key) {
     })
     .toBeTruthy()
   return JSON.parse(readFileSync(filePath, 'utf8')).problems[key]
+}
+
+function setupTwoProblemLibrary() {
+  let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-autonext-e2e-'))
+  let tsumego = path.join(root, 'Tsumego', 'User Set')
+  mkdirSync(tsumego, {recursive: true})
+  writeFileSync(
+    path.join(tsumego, '001.sgf'),
+    '(;GM[1]SZ[9]PL[B]C[Black to play.]AB[aa][bb](;B[cc]C[Correct];W[dd]))',
+  )
+  writeFileSync(
+    path.join(tsumego, '002.sgf'),
+    '(;GM[1]SZ[9]PL[B]C[Black to play.]AB[gg][hh](;B[ee]C[Correct];W[ff]))',
+  )
+  return root
 }

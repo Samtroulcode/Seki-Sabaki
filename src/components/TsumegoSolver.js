@@ -19,6 +19,7 @@ import Goban from './Goban.js'
 
 const t = i18n.context('TsumegoSolver')
 const AUTO_REPLY_DELAY = 500
+const AUTO_NEXT_DELAY = 800
 
 export default class TsumegoSolver extends Component {
   constructor(props) {
@@ -26,10 +27,12 @@ export default class TsumegoSolver extends Component {
     this.state = this.getInitialState(props)
     this.autoSequenceId = 0
     this.autoTimer = null
+    this.autoNextTimer = null
   }
 
   componentWillUnmount() {
     this.cancelAutoSequence()
+    this.cancelAutoNext()
   }
 
   getInitialState({problem}) {
@@ -96,6 +99,7 @@ export default class TsumegoSolver extends Component {
       this.startAutoSequence(advanced)
     } else if (advanced.solved) {
       this.props.onSolved?.()
+      this.startAutoNext()
     }
   }
 
@@ -113,7 +117,10 @@ export default class TsumegoSolver extends Component {
           phase: advanced.solved ? 'solved' : 'solving',
           showGameGraph: advanced.solved,
         })
-        if (advanced.solved) this.props.onSolved?.()
+        if (advanced.solved) {
+          this.props.onSolved?.()
+          this.startAutoNext()
+        }
         return
       }
 
@@ -193,6 +200,23 @@ export default class TsumegoSolver extends Component {
     this.autoSequenceId += 1
   }
 
+  cancelAutoNext() {
+    if (this.autoNextTimer != null) {
+      clearTimeout(this.autoNextTimer)
+      this.autoNextTimer = null
+    }
+  }
+
+  startAutoNext() {
+    this.cancelAutoNext()
+    if (this.props.autoNext !== true) return
+    if (this.props.problemIndex >= this.props.problemCount - 1) return
+    this.autoNextTimer = setTimeout(() => {
+      this.autoNextTimer = null
+      this.props.onNext?.()
+    }, AUTO_NEXT_DELAY)
+  }
+
   startFailedExploration(vertex) {
     let {gameTree, problem} = this.props
     let board = cloneExplorationBoard(
@@ -232,28 +256,33 @@ export default class TsumegoSolver extends Component {
 
   handleRetry = () => {
     this.cancelAutoSequence()
+    this.cancelAutoNext()
     // Always restore the original problem state (full reset)
     this.setState(this.getInitialState(this.props))
   }
 
   handleBack = () => {
     this.cancelAutoSequence()
+    this.cancelAutoNext()
     this.props.onBack()
   }
 
   handlePrevious = () => {
     this.cancelAutoSequence()
+    this.cancelAutoNext()
     this.props.onPrevious()
   }
 
   handleNext = () => {
     this.cancelAutoSequence()
+    this.cancelAutoNext()
     this.props.onNext()
   }
 
   handleGraphNodeClick = (evt) => {
     if (evt.button !== 0 || evt.treePosition == null) return
     this.cancelAutoSequence()
+    this.cancelAutoNext()
     this.setState({
       displayNodeId: evt.treePosition,
       explorationBoard: null,
@@ -263,6 +292,7 @@ export default class TsumegoSolver extends Component {
 
   handleGraphWheel = (step) => {
     this.cancelAutoSequence()
+    this.cancelAutoNext()
     let next = this.props.gameTree.navigate(this.state.displayNodeId, step, {})
     if (next == null) return
     this.setState({
@@ -430,6 +460,19 @@ export default class TsumegoSolver extends Component {
             'button',
             {type: 'button', onClick: this.handleRetry},
             solved ? t('Retry Problem') : t('Retry'),
+          ),
+        !testMode &&
+          problemCount > 1 &&
+          h(
+            'label',
+            {class: 'tsumego-auto-next'},
+            h('input', {
+              type: 'checkbox',
+              checked: this.props.autoNext === true,
+              onChange: (evt) =>
+                this.props.onAutoNextChange?.(evt.target.checked),
+            }),
+            t('Auto next'),
           ),
       ),
     )
