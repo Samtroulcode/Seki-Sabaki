@@ -1189,12 +1189,12 @@ function parseScoreAnswer(text) {
   }))
   let blackValues = [
     ...text.matchAll(
-      /\bblack(?:'s)?\s+(?:territory|total|score)\s+(?:amounts\s+to|comes\s+to|=|is|has)\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
+      /\bblack(?:'s)?\s+(?:(?:territory|total|score)\s+(?:amounts\s+to|comes\s+to|=|is|has)\s+)?(?<!wins by )([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
     ),
   ].map((m) => +m[1])
   let whiteValues = [
     ...text.matchAll(
-      /\bwhite(?:'s)?\s+(?:territory|total|score)\s+(?:amounts\s+to|comes\s+to|=|is|has)\s+([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
+      /\bwhite(?:'s)?\s+(?:(?:territory|total|score)\s+(?:amounts\s+to|comes\s+to|=|is|has)\s+)?(?<!wins by )([0-9]+(?:\.[0-9]+)?)\s+points?\b/gi,
     ),
   ].map((m) => +m[1])
   let bothValues = [
@@ -1251,6 +1251,10 @@ function analyzeScore(tree) {
       ),
     )
   if (question == null) return null
+  let questionText = (question.data?.C || []).join(' ')
+  let answerMode = /who\s+wins?|by\s+how\s+many/i.test(questionText)
+    ? 'winner-margin'
+    : 'totals'
   let start = getPositionAncestor(tree, question)
   let queue = question.children.map((node) => ({
     node,
@@ -1267,7 +1271,7 @@ function analyzeScore(tree) {
     let parsed = hasPositiveResultMarker(item.node)
       ? parseScoreAnswer((item.node.data?.C || []).join(' '))
       : null
-    if (parsed)
+    if (parsed && (answerMode === 'winner-margin' || parsed.totals != null))
       answers.push({...parsed, node: item.node, distance: item.distance})
     else
       for (let child of item.node.children)
@@ -1279,22 +1283,24 @@ function analyzeScore(tree) {
   if (!answers.length) return null
   let min = Math.min(...answers.map((answer) => answer.distance))
   answers = answers.filter((answer) => answer.distance === min)
-  let signature = (answer) =>
-    `${answer.result.winner}:${answer.result.margin}:${JSON.stringify(answer.totals)}`
-  if (new Set(answers.map(signature)).size !== 1) return null
+  let signatures = new Set(
+    answers.map((answer) => `${answer.result.winner}:${answer.result.margin}`),
+  )
+  if (signatures.size !== 1) return null
+  let totals = answers
+    .filter((answer) => answer.totals != null)
+    .map((answer) => answer.totals)
+  if (new Set(totals.map((value) => `${value.B}:${value.W}`)).size > 1)
+    return null
   answers.sort((a, b) => String(a.node.id).localeCompare(String(b.node.id)))
   let answer = answers[0]
   return {
     kind: 'score',
-    answerMode: /who\s+wins?|by\s+how\s+many/i.test(
-      (question.data?.C || []).join(' '),
-    )
-      ? 'winner-margin'
-      : 'totals',
+    answerMode,
     startNodeId: start.id,
     answerNodeId: answer.node.id,
     result: answer.result,
-    totals: answer.totals,
+    totals: totals[0] || null,
   }
 }
 

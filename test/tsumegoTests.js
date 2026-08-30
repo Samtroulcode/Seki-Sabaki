@@ -3151,4 +3151,86 @@ describe('interpretProblem', () => {
     })
     assert.strictEqual(interpretProblem(unrelated).kind, 'unsupported')
   })
+
+  it('keeps optional totals when equivalent winner answers are nearest', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Who wins and by how many points?',
+      ])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Black wins by 2 points.'],
+      })
+      draft.appendNode(draft.root.id, {
+        C: [
+          'Correct',
+          'Black 38 points. White 36 points. Black wins by 2 points.',
+        ],
+      })
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'score')
+    assert.deepStrictEqual(result.totals, {B: 38, W: 36})
+  })
+
+  it('rejects conflicting nearest winner answers and totals', () => {
+    let winnerTree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Who wins and by how many points?',
+      ])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Black wins by 2 points.'],
+      })
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'White wins by 2 points.'],
+      })
+    })
+    assert.strictEqual(interpretProblem(winnerTree).kind, 'unsupported')
+
+    let totalsTree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Determine the score.'])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Black 28 points. White 28 points.'],
+      })
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Black 29 points. White 28 points.'],
+      })
+    })
+    assert.strictEqual(interpretProblem(totalsTree).kind, 'unsupported')
+  })
+
+  it('requires totals for totals-mode answers', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['What is the score?'])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Black wins by 2 points.'],
+      })
+    })
+    assert.strictEqual(interpretProblem(tree).kind, 'unsupported')
+  })
+
+  it('supports fractional winner margins and jigo', () => {
+    let white = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Who wins and by how many points?',
+      ])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'White wins by 0.5 points.'],
+      })
+    })
+    assert.deepStrictEqual(interpretProblem(white).result, {
+      winner: 'W',
+      margin: 0.5,
+    })
+
+    let jigo = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Determine the score.'])
+      draft.appendNode(draft.root.id, {
+        C: ['Correct', 'Jigo. Both Black and White have 28 points.'],
+      })
+    })
+    assert.deepStrictEqual(interpretProblem(jigo).result, {
+      winner: 'draw',
+      margin: 0,
+    })
+  })
 })
