@@ -1033,25 +1033,6 @@ function analyzePointSelection(tree, options = {}) {
   let {allowTeFallback = false} = options || {}
   let dimensions = getBoardDimensions(tree)
   if (dimensions == null) return null
-
-  // If the tree has a Legal/Illegal question, don't treat explanatory L as point-selection
-  let hasLegalIllegalQuestion = false
-  for (let node of tree.listNodes()) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      let hasLegal = /\blegal\b/i.test(value)
-      let hasIllegal = /\billegal\b/i.test(value)
-      let hasQuestion = /\?/.test(value) || /\bcan\b.*\bplay\b/i.test(value)
-      if ((hasLegal || hasIllegal) && hasQuestion) {
-        hasLegalIllegalQuestion = true
-        break
-      }
-    }
-    if (hasLegalIllegalQuestion) break
-  }
-  if (hasLegalIllegalQuestion) return null
-
   let points = new Map() // key: vertex string, value: vertex string
   let decisionPoints = new Map() // key: decisionPoint id, value: decisionPoint
   let answerGroups = [] // {nodeId, points: [...]}
@@ -1102,92 +1083,202 @@ function analyzePointSelection(tree, options = {}) {
 }
 
 // Judgement detection for Alive/Dead, Legal/Illegal, Yes/No, Good/Bad problems.
-// Returns {judgementType, startNodeId, answerNodeId, correctChoice} or null.
+// Shared pipeline: find question → classify domain → find answer candidates → classify answer → resolve ambiguity.
 function analyzeJudgement(tree, options = {}) {
   let {allowTeFallback = false} = options || {}
 
-  // Try each judgement type in order; Alive/Dead has highest priority for backward compat
-  let result = null
-  result = analyzeAliveDeadJudgement(tree, allowTeFallback)
-  if (result != null) return result
-  result = analyzeLegalIllegalJudgement(tree, allowTeFallback)
-  if (result != null) return result
-  result = analyzeYesNoJudgement(tree, allowTeFallback)
-  if (result != null) return result
-  result = analyzeGoodBadJudgement(tree, allowTeFallback)
-  if (result != null) return result
+  const JUDGEMENT_TYPES = [
+    {
+      judgementType: 'alive-dead',
+      questionRe:
+        /\balive\b[^.!?]*\bor\b[^.!?]*\bdead\b|\bdead\b[^.!?]*\bor\b[^.!?]*\balive\b/i,
+      answerRes: {alive: /\balive\b/i, dead: /\bdead\b/i},
+      choices: ['alive', 'dead'],
+      isQuestionNode: (node) => true, // any position node
+    },
+    {
+      judgementType: 'legal-illegal',
+      questionRe: /\blegal\b/i, // will check more strictly below
+      answerRes: {legal: /\blegal\b/i, illegal: /\billegal\b/i},
+      choices: ['legal', 'illegal'],
+      isQuestionNode: (node) => true,
+      // Custom question check for Legal/Illegal
+      isQuestion: (value) => {
+        let hasLegal = /\blegal\b/i.test(value)
+        let hasIllegal = /\billegal\b/i.test(value)
+        let hasQuestion = /\?/.test(value) || /\bcan\b.*\bplay\b/i.test(value)
+        return (hasLegal || hasIllegal) && hasQuestion
+      },
+    },
+    {
+      judgementType: 'yes-no',
+      questionRe: /\bcan\b|\bcould\b|\bdoes\b|\bis\b/i,
+      answerRes: {
+        yes: /\byes\b/i,
+        no: /\bno\b|\bcannot\b|\bcan\s+not\b|\bnot\b|\bunable\b|\bimpossible\b/i,
+      },
+      choices: ['yes', 'no'],
+      isQuestionNode: (node) => true,
+      isQuestion: (value) =>
+        /\?/.test(value) && /\bcan\b|\bcould\b|\bdoes\b|\bis\b/i.test(value),
+    },
+    {
+      judgementType: 'good-bad',
+      questionRe:
+        /\bgood\b[^.!?]*\bor\b[^.!?]*\bbad\b|\bbad\b[^.!?]*\bor\b[^.!?]*\bgood\b/i,
+      answerRes: {good: /\bgood\b/i, bad: /\bbad\b/i},
+      choices: ['good', 'bad'],
+      isQuestionNode: (node) =>
+        node.data != null && (node.data.B != null || node.data.W != null),
+    },
+  ]
+
+  for (let type of JUDGEMENT_TYPES) {
+    let result = analyzeJudgementType(tree, type, allowTeFallback)
+    if (result != null) return result
+  }
   return null
 }
 
-function findQuestionNode(tree, questionRe) {
-  let candidates = [tree.root]
-  for (let node of tree.listNodes()) {
-    if (node !== tree.root && isPositionNode(node)) candidates.push(node)
+function analyzeJudgementType(tree, type, allowTeFallback) {
+  // Find question node
+  let questionNode = null
+  let candidates = []
+  // For Good/Bad, prioritize move nodes over root
+  if (type.judgementType === 'good-bad') {
+    for (let node of tree.listNodes()) {
+      if (node.data != null && (node.data.B != null || node.data.W != null)) {
+        candidates.push(node)
+      }
+    }
+    // Also check position nodes as fallback (but not root first)
+    for (let node of tree.listNodes()) {
+      if (
+        node !== tree.root &&
+        isPositionNode(node) &&
+        type.isQuestionNode(node) &&
+        !candidates.includes(node)
+      ) {
+        candidates.push(node)
+      }
+    }
+    if (!candidates.includes(tree.root) && type.isQuestionNode(tree.root)) {
+      candidates.push(tree.root)
+    }
+  } else {
+    candidates = [tree.root]
+    for (let node of tree.listNodes()) {
+      if (
+        node !== tree.root &&
+        isPositionNode(node) &&
+        type.isQuestionNode(node)
+      ) {
+        candidates.push(node)
+      } else if (
+        type.judgementType === 'good-bad' &&
+        node.data != null &&
+        (node.data.B != null || node.data.W != null)
+      ) {
+        // For Good/Bad, question is on move node, not necessarily position node
+        if (!candidates.includes(node)) candidates.push(node)
+      }
+    }
   }
+
   for (let node of candidates) {
     if (node.data == null || node.data.C == null) continue
     for (let value of node.data.C) {
       if (typeof value !== 'string') continue
-      if (questionRe.test(value)) return node
+      let isQuestion = false
+      if (type.isQuestion != null) {
+        isQuestion = type.isQuestion(value)
+      } else {
+        isQuestion = type.questionRe.test(value)
+      }
+      if (isQuestion) {
+        questionNode = node
+        break
+      }
     }
+    if (questionNode != null) break
   }
-  return null
-}
+  if (questionNode == null) return null
 
-function findAnswerCandidates(tree, questionNode, allowTeFallback) {
+  // Find structurally related answer candidates
   let questionDecisionPoint = isPositionNode(questionNode)
     ? questionNode
     : tree.root
+  // For Good/Bad, answer is child of question move node
   let answerCandidates = []
-  let stack = [...questionDecisionPoint.children]
+  let stack = []
+  if (type.judgementType === 'good-bad') {
+    stack = [...questionNode.children]
+  } else {
+    stack = [...questionDecisionPoint.children]
+  }
   let visited = new Set()
   while (stack.length) {
     let node = stack.pop()
     if (visited.has(node.id)) continue
     visited.add(node.id)
+    // For judgement, answer may be reliable without generic Correct marker when semantics are unambiguous
+    // Check for positive marker OR unambiguous answer semantics
     let hasPositive = hasPositiveResultMarker(node)
     if (!hasPositive && allowTeFallback && hasTeMarker(node)) hasPositive = true
-    if (hasPositive) answerCandidates.push(node)
+    // Also consider nodes with unambiguous answer semantics as candidates, even without Correct
+    let hasAnswerSemantics = false
+    if (node.data != null && node.data.C != null) {
+      for (let value of node.data.C) {
+        if (typeof value !== 'string') continue
+        let matches = 0
+        for (let choice of type.choices) {
+          let re = type.answerRes[choice]
+          if (re.test(value)) matches++
+        }
+        if (matches === 1) {
+          hasAnswerSemantics = true
+          break
+        }
+      }
+    }
+    if (hasPositive || hasAnswerSemantics) answerCandidates.push(node)
     for (let child of node.children) stack.push(child)
   }
   if (answerCandidates.length === 0) {
     let hasPositive = hasPositiveResultMarker(questionNode)
     if (!hasPositive && allowTeFallback && hasTeMarker(questionNode))
       hasPositive = true
-    if (hasPositive) answerCandidates.push(questionNode)
+    let hasAnswerSemantics = false
+    if (questionNode.data != null && questionNode.data.C != null) {
+      for (let value of questionNode.data.C) {
+        if (typeof value !== 'string') continue
+        let matches = 0
+        for (let choice of type.choices) {
+          let re = type.answerRes[choice]
+          if (re.test(value)) matches++
+        }
+        if (matches === 1) hasAnswerSemantics = true
+      }
+    }
+    if (hasPositive || hasAnswerSemantics) answerCandidates.push(questionNode)
   }
-  return {questionDecisionPoint, answerCandidates}
-}
-
-function analyzeAliveDeadJudgement(tree, allowTeFallback) {
-  const QUESTION_RE =
-    /\balive\b[^.!?]*\bor\b[^.!?]*\bdead\b|\bdead\b[^.!?]*\bor\b[^.!?]*\balive\b/i
-  let questionNode = findQuestionNode(tree, QUESTION_RE)
-  if (questionNode == null) return null
-
-  let {questionDecisionPoint, answerCandidates} = findAnswerCandidates(
-    tree,
-    questionNode,
-    allowTeFallback,
-  )
   if (answerCandidates.length === 0) return null
 
-  const ALIVE_RE = /\balive\b/i
-  const DEAD_RE = /\bdead\b/i
+  // Classify answer choice
   let validAnswers = []
   for (let node of answerCandidates) {
     if (node.data == null || node.data.C == null) continue
     for (let value of node.data.C) {
       if (typeof value !== 'string') continue
-      let hasAlive = ALIVE_RE.test(value)
-      let hasDead = DEAD_RE.test(value)
-      if (hasAlive && !hasDead) {
-        validAnswers.push({node, choice: 'alive'})
+      let matchedChoices = []
+      for (let choice of type.choices) {
+        let re = type.answerRes[choice]
+        if (re.test(value)) matchedChoices.push(choice)
+      }
+      if (matchedChoices.length === 1) {
+        validAnswers.push({node, choice: matchedChoices[0]})
         break
-      } else if (!hasAlive && hasDead) {
-        validAnswers.push({node, choice: 'dead'})
-        break
-      } else if (hasAlive && hasDead) {
+      } else if (matchedChoices.length > 1) {
         return null
       }
     }
@@ -1199,223 +1290,13 @@ function analyzeAliveDeadJudgement(tree, allowTeFallback) {
   let startNodeId = isPositionNode(questionNode)
     ? questionNode.id
     : questionDecisionPoint.id
-  return {
-    judgementType: 'alive-dead',
-    startNodeId,
-    answerNodeId: answer.node.id,
-    correctChoice: answer.choice,
-  }
-}
-
-function analyzeLegalIllegalJudgement(tree, allowTeFallback) {
-  const QUESTION_RE =
-    /\blegal\b[^.!?]*\bmove\b|\bcan\b[^.!?]*\bplay\b[^.!?]*\b1\b/i
-  // More specific: Legal move? Can Black play at 1?
-  const LEGAL_QUESTION_RE = /\blegal\b/i
-  const ILLEGAL_QUESTION_RE = /\billegal\b/i
-  // Check for Legal/Illegal question
-  let questionNode = null
-  let candidates = [tree.root]
-  for (let node of tree.listNodes()) {
-    if (node !== tree.root && isPositionNode(node)) candidates.push(node)
-  }
-  for (let node of candidates) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      // Must contain legal/illegal and question form
-      let hasLegal = /\blegal\b/i.test(value)
-      let hasIllegal = /\billegal\b/i.test(value)
-      let hasQuestion = /\?/.test(value) || /\bcan\b.*\bplay\b/i.test(value)
-      if ((hasLegal || hasIllegal) && hasQuestion) {
-        questionNode = node
-        break
-      }
-    }
-    if (questionNode != null) break
-  }
-  if (questionNode == null) return null
-
-  let {questionDecisionPoint, answerCandidates} = findAnswerCandidates(
-    tree,
-    questionNode,
-    allowTeFallback,
-  )
-  if (answerCandidates.length === 0) return null
-
-  const LEGAL_RE = /\blegal\b/i
-  const ILLEGAL_RE = /\billegal\b/i
-  let validAnswers = []
-  for (let node of answerCandidates) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      let hasLegal = LEGAL_RE.test(value)
-      let hasIllegal = ILLEGAL_RE.test(value)
-      // Need to distinguish: "Illegal Move" vs "Legal Move"
-      // Check for "illegal" first (more specific)
-      if (hasIllegal && !hasLegal) {
-        validAnswers.push({node, choice: 'illegal'})
-        break
-      } else if (!hasIllegal && hasLegal) {
-        validAnswers.push({node, choice: 'legal'})
-        break
-      } else if (hasIllegal && hasLegal) {
-        // If both appear, check which is more prominent
-        // For now, fail closed if both appear
-        return null
-      }
-    }
-  }
-  if (validAnswers.length === 0) return null
-  let choices = new Set(validAnswers.map((a) => a.choice))
-  if (choices.size !== 1) return null
-  let answer = validAnswers[0]
-  let startNodeId = isPositionNode(questionNode)
-    ? questionNode.id
-    : questionDecisionPoint.id
-  return {
-    judgementType: 'legal-illegal',
-    startNodeId,
-    answerNodeId: answer.node.id,
-    correctChoice: answer.choice,
-  }
-}
-
-function analyzeYesNoJudgement(tree, allowTeFallback) {
-  // Yes/No for Can...? questions
-  const QUESTION_RE = /\bcan\b|\bcould\b|\bdoes\b|\bis\b/i
-  let questionNode = null
-  let candidates = [tree.root]
-  for (let node of tree.listNodes()) {
-    if (node !== tree.root && isPositionNode(node)) candidates.push(node)
-  }
-  for (let node of candidates) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      let hasQuestion = /\?/.test(value) && QUESTION_RE.test(value)
-      if (hasQuestion) {
-        questionNode = node
-        break
-      }
-    }
-    if (questionNode != null) break
-  }
-  if (questionNode == null) return null
-
-  let {questionDecisionPoint, answerCandidates} = findAnswerCandidates(
-    tree,
-    questionNode,
-    allowTeFallback,
-  )
-  if (answerCandidates.length === 0) return null
-
-  // For Yes/No, the answer text should unambiguously indicate yes or no
-  const YES_RE = /\byes\b/i
-  const NO_RE = /\bno\b/i
-  const NEGATIVE_RE =
-    /\bcannot\b|\bcan\s+not\b|\bnot\b|\bno\b|\bunable\b|\bimpossible\b/i
-  const POSITIVE_RE = /\bcan\b|\byes\b|\bpossible\b/i
-  let validAnswers = []
-  for (let node of answerCandidates) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      let hasYes = YES_RE.test(value)
-      let hasNo = NO_RE.test(value)
-      if (hasYes && hasNo) return null
-      let hasNegative = NEGATIVE_RE.test(value)
-      let hasPositive = POSITIVE_RE.test(value) && !hasNegative
-      if (hasNegative && !hasPositive) {
-        validAnswers.push({node, choice: 'no'})
-        break
-      } else if (!hasNegative && hasPositive) {
-        validAnswers.push({node, choice: 'yes'})
-        break
-      } else if (hasNegative && hasPositive) {
-        return null
-      }
-    }
-  }
-  if (validAnswers.length === 0) return null
-  let choices = new Set(validAnswers.map((a) => a.choice))
-  if (choices.size !== 1) return null
-  let answer = validAnswers[0]
-  let startNodeId = isPositionNode(questionNode)
-    ? questionNode.id
-    : questionDecisionPoint.id
-  return {
-    judgementType: 'yes-no',
-    startNodeId,
-    answerNodeId: answer.node.id,
-    correctChoice: answer.choice,
-  }
-}
-
-function analyzeGoodBadJudgement(tree, allowTeFallback) {
-  // Good/Bad: question is on a B/W move node, like B[ha] with "Is this a good or a bad move?"
-  const QUESTION_RE =
-    /\bgood\b[^.!?]*\bor\b[^.!?]*\bbad\b|\bbad\b[^.!?]*\bor\b[^.!?]*\bgood\b/i
-  let questionNode = null
-  // For Good/Bad, the question is on a move node (B[ha] or W[ha])
-  for (let node of tree.listNodes()) {
-    if (node.data == null || node.data.C == null) continue
-    if (node.data.B == null && node.data.W == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      if (QUESTION_RE.test(value)) {
-        questionNode = node
-        break
-      }
-    }
-    if (questionNode != null) break
-  }
-  if (questionNode == null) return null
-
-  // For Good/Bad, the answer is a child of the question move node
-  let answerCandidates = []
-  let stack = [...questionNode.children]
-  let visited = new Set()
-  while (stack.length) {
-    let node = stack.pop()
-    if (visited.has(node.id)) continue
-    visited.add(node.id)
-    let hasPositive = hasPositiveResultMarker(node)
-    if (!hasPositive && allowTeFallback && hasTeMarker(node)) hasPositive = true
-    if (hasPositive) answerCandidates.push(node)
-    for (let child of node.children) stack.push(child)
-  }
-  if (answerCandidates.length === 0) return null
-
-  const GOOD_RE = /\bgood\b/i
-  const BAD_RE = /\bbad\b/i
-  let validAnswers = []
-  for (let node of answerCandidates) {
-    if (node.data == null || node.data.C == null) continue
-    for (let value of node.data.C) {
-      if (typeof value !== 'string') continue
-      let hasGood = GOOD_RE.test(value)
-      let hasBad = BAD_RE.test(value)
-      if (hasGood && !hasBad) {
-        validAnswers.push({node, choice: 'good'})
-        break
-      } else if (!hasGood && hasBad) {
-        validAnswers.push({node, choice: 'bad'})
-        break
-      } else if (hasGood && hasBad) {
-        return null
-      }
-    }
-  }
-  if (validAnswers.length === 0) return null
-  let choices = new Set(validAnswers.map((a) => a.choice))
-  if (choices.size !== 1) return null
-  let answer = validAnswers[0]
   // For Good/Bad, startNodeId is the question move node itself
+  if (type.judgementType === 'good-bad') {
+    startNodeId = questionNode.id
+  }
   return {
-    judgementType: 'good-bad',
-    startNodeId: questionNode.id,
+    judgementType: type.judgementType,
+    startNodeId,
     answerNodeId: answer.node.id,
     correctChoice: answer.choice,
   }
@@ -1428,8 +1309,8 @@ function analyzeGoodBadJudgement(tree, allowTeFallback) {
 // - {kind: 'move-sequence', problem} when a playable move-sequence is found
 // - {kind: 'point-selection', startNodeId, acceptedPoints, answerGroups, playerToMove} when
 //   L-based point-selection is detected
-// - {kind: 'judgement', judgementType: 'alive-dead', startNodeId, answerNodeId, choices, correctChoice} when
-//   Alive/Dead judgement is detected
+// - {kind: 'judgement', judgementType, startNodeId, answerNodeId, choices, correctChoice} when
+//   judgement is detected
 // - {kind: 'unsupported'} otherwise
 export function interpretProblem(tree, options = {}) {
   let problem = analyzeProblem(tree, options)
@@ -1437,7 +1318,46 @@ export function interpretProblem(tree, options = {}) {
     return {kind: 'move-sequence', problem}
   }
 
+  // Compute point-selection and judgement independently for conflict handling
   let pointSelection = analyzePointSelection(tree, options)
+  let judgement = analyzeJudgement(tree, options)
+
+  // Handle conflict: if both are plausible for same structural answer, fail closed
+  if (pointSelection != null && judgement != null) {
+    // Check if they refer to same structural answer (same node or same decision point)
+    let pointSelectionNodes = new Set(
+      pointSelection.answerGroups.map((g) => g.nodeId),
+    )
+    if (pointSelectionNodes.has(judgement.answerNodeId)) {
+      // Same answer node is both point-selection and judgement - ambiguous
+      return {kind: 'unsupported'}
+    }
+    // Also check if decision points are same and answer is ambiguous
+    // For now, if both are valid but different, prefer judgement for Legal/Illegal etc.
+    // where L is explanatory, not the answer. But we already removed the guard,
+    // so point-selection would be valid for 053-style. We need to check evidence strength.
+    // For Legal/Illegal with explanatory L, the L points are not the answer, the judgement is.
+    // So we should prefer judgement when the L is explanatory.
+    // For now, if both are valid, check which has stronger evidence:
+    // - Judgement with self-identifying answer (An Illegal Move) is stronger than generic L
+    // - So prefer judgement
+    return {
+      kind: 'judgement',
+      judgementType: judgement.judgementType,
+      startNodeId: judgement.startNodeId,
+      answerNodeId: judgement.answerNodeId,
+      choices:
+        judgement.judgementType === 'alive-dead'
+          ? ['alive', 'dead']
+          : judgement.judgementType === 'legal-illegal'
+            ? ['legal', 'illegal']
+            : judgement.judgementType === 'yes-no'
+              ? ['yes', 'no']
+              : ['good', 'bad'],
+      correctChoice: judgement.correctChoice,
+    }
+  }
+
   if (pointSelection != null) {
     return {
       kind: 'point-selection',
@@ -1448,7 +1368,6 @@ export function interpretProblem(tree, options = {}) {
     }
   }
 
-  let judgement = analyzeJudgement(tree, options)
   if (judgement != null) {
     let choices = []
     if (judgement.judgementType === 'alive-dead') choices = ['alive', 'dead']

@@ -2628,7 +2628,7 @@ describe('interpretProblem', () => {
       ])
       draft.updateProperty(draft.root.id, 'LB', ['aa:1'])
       let answer = draft.appendNode(draft.root.id, {
-        C: ['An Illegal Move\nBlack 1 cannot be played. Correct'],
+        C: ['An Illegal Move\nBlack 1 cannot be played.'],
         L: ['bb', 'cc'],
       })
     })
@@ -2644,7 +2644,7 @@ describe('interpretProblem', () => {
   it('detects 054-style single candidate Legal/Illegal', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.updateProperty(draft.root.id, 'C', ['Is this a legal move?'])
-      draft.appendNode(draft.root.id, {C: ['This is legal. Correct']})
+      draft.appendNode(draft.root.id, {C: ['This is legal.']})
     })
 
     let result = interpretProblem(tree)
@@ -2659,7 +2659,7 @@ describe('interpretProblem', () => {
         'Problem 55. Can Black remove the white stones?',
       ])
       draft.appendNode(draft.root.id, {
-        C: ['The White stones cannot be taken. Correct'],
+        C: ['The White stones cannot be taken.'],
       })
     })
 
@@ -2673,7 +2673,7 @@ describe('interpretProblem', () => {
     let tree = gametree.new().mutate((draft) => {
       draft.updateProperty(draft.root.id, 'C', ['Can Black win?'])
       draft.appendNode(draft.root.id, {
-        C: ['Yes, but also no. Correct'],
+        C: ['Yes, but also no.'],
       })
     })
 
@@ -2690,7 +2690,7 @@ describe('interpretProblem', () => {
         B: ['ha'],
         C: ['Black has taken a stone with 1. Is this a good or a bad move?'],
       })
-      draft.appendNode(move, {C: ['Black 1 is Bad. Correct']})
+      draft.appendNode(move, {C: ['Black 1 is Bad']})
     })
 
     let result = interpretProblem(tree)
@@ -2698,8 +2698,16 @@ describe('interpretProblem', () => {
     assert.strictEqual(result.judgementType, 'good-bad')
     assert.strictEqual(result.correctChoice, 'bad')
     // startNodeId must be the B move/question node
-    let moveNode = tree.root.children[0]
-    assert.strictEqual(result.startNodeId, moveNode.id)
+    let moveNode = tree.get(result.startNodeId)
+    assert(
+      moveNode != null,
+      `moveNode should not be null, startNodeId=${result.startNodeId}`,
+    )
+    assert(
+      moveNode.data != null && moveNode.data.B != null,
+      `moveNode should have B, got ${JSON.stringify(moveNode.data)}`,
+    )
+    assert.strictEqual(moveNode.data.B[0], 'ha')
   })
 
   it('detects Good answer variant', () => {
@@ -2709,7 +2717,7 @@ describe('interpretProblem', () => {
         B: ['aa'],
         C: ['Is this good or bad?'],
       })
-      draft.appendNode(move, {C: ['This is good. Correct']})
+      draft.appendNode(move, {C: ['This is good.']})
     })
 
     let result = interpretProblem(tree)
@@ -2725,7 +2733,7 @@ describe('interpretProblem', () => {
         B: ['aa'],
         C: ['Is this good or bad?'],
       })
-      draft.appendNode(move, {C: ['Good and bad. Correct']})
+      draft.appendNode(move, {C: ['Good and bad.']})
     })
 
     let result = interpretProblem(tree)
