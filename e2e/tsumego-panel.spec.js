@@ -1212,6 +1212,56 @@ test.describe('Tsumego workspace', () => {
       rmSync(root, {recursive: true, force: true})
     }
   })
+
+  test('dead-stone selection is an explicit multi-stone answer', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-059-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '059.sgf'),
+      '(;GM[1]SZ[9]AB[aa][bb]AW[cc]C[Dead stones. Which ones are they?](;TR[aa][cc]C[Correct Answer]))',
+    )
+
+    try {
+      await page.evaluate(
+        async (libraryRoot) =>
+          window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(
+        page.getByRole('button', {name: 'Check answer'}),
+      ).toBeVisible()
+
+      // Empty intersections do not create stones.
+      await dispatchVertex(page, 4, 4)
+      await page.getByRole('button', {name: 'Check answer'}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-failed/)
+      await page.getByRole('button', {name: 'Retry', exact: true}).click()
+
+      // Black and White occupied stones can both be selected.
+      await dispatchVertex(page, 0, 0)
+      await dispatchVertex(page, 2, 2)
+      await page.getByRole('button', {name: 'Check answer'}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solution')).toContainText(
+        'Correct Answer',
+      )
+
+      await page
+        .getByRole('button', {name: 'Retry Problem', exact: true})
+        .click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
 })
 
 async function dispatchVertex(page, x, y) {

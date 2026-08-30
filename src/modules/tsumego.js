@@ -977,6 +977,36 @@ function isVertexOnBoard(vertex, dimensions) {
   )
 }
 
+function getStartStoneMap(tree, startNode) {
+  let path = []
+  let current = startNode
+  while (current != null) {
+    path.push(current)
+    current = current.parentId != null ? tree.get(current.parentId) : null
+  }
+  let stones = new Map()
+  for (let node of path.reverse()) {
+    if (node.data == null) continue
+    for (let [property, color] of [
+      ['AB', 'B'],
+      ['AW', 'W'],
+    ]) {
+      for (let value of node.data[property] || []) {
+        let vertex = parseVertex(value)
+        if (vertex[0] >= 0 && vertex[1] >= 0)
+          stones.set(`${vertex[0]},${vertex[1]}`, color)
+      }
+    }
+    for (let color of ['B', 'W']) {
+      let vertex =
+        node.data[color] != null ? parseVertex(node.data[color][0]) : null
+      if (vertex != null && vertex[0] >= 0 && vertex[1] >= 0)
+        stones.set(`${vertex[0]},${vertex[1]}`, color)
+    }
+  }
+  return stones
+}
+
 // Returns the decision point for a point-selection answer node.
 // Walks up to the nearest position-defining ancestor, or the root.
 function getPointSelectionDecisionPoint(tree, node) {
@@ -1097,6 +1127,61 @@ function analyzePointSelection(tree, options = {}) {
     answerGroups,
     playerToMove,
   }
+}
+
+function analyzeStoneSelection(tree) {
+  let dimensions = getBoardDimensions(tree)
+  if (dimensions == null) return null
+  let questionRe =
+    /\bdead\s+stones?\b[\s\S]*\bwhich\s+ones?\s+are\s+they\b|\bwhich\s+stones?\s+are\s+dead\b|\bidentify\s+the\s+dead\s+stones?\b|\bselect\s+the\s+dead\s+stones?\b/i
+  let questionNode = null
+  for (let node of tree.listNodes()) {
+    for (let value of node.data?.C || []) {
+      if (typeof value === 'string' && questionRe.test(value)) {
+        questionNode = node
+        break
+      }
+    }
+    if (questionNode != null) break
+  }
+  if (questionNode == null) return null
+  let startNode = isPositionNode(questionNode) ? questionNode : tree.root
+  let stones = getStartStoneMap(tree, startNode)
+  let frontier = [...startNode.children]
+  let visited = new Set()
+  while (frontier.length) {
+    let next = []
+    let answers = []
+    for (let node of frontier) {
+      if (visited.has(node.id)) continue
+      visited.add(node.id)
+      if (hasPositiveResultMarker(node) && Array.isArray(node.data?.TR)) {
+        let points = []
+        for (let value of node.data.TR) {
+          if (typeof value !== 'string') return null
+          let vertex = parseVertex(value)
+          let key = `${vertex[0]},${vertex[1]}`
+          if (!isVertexOnBoard(vertex, dimensions) || !stones.has(key))
+            return null
+          if (!points.includes(value)) points.push(value)
+        }
+        if (points.length > 0) answers.push({node, points})
+      }
+      for (let child of node.children) next.push(child)
+    }
+    if (answers.length) {
+      let sets = answers.map(({points}) => new Set(points))
+      let first = [...sets[0]].sort().join('|')
+      if (sets.some((set) => [...set].sort().join('|') !== first)) return null
+      return {
+        startNodeId: startNode.id,
+        answerNodeId: answers[0].node.id,
+        acceptedVertices: answers[0].points,
+      }
+    }
+    frontier = next
+  }
+  return null
 }
 
 // Judgement detection for Alive/Dead, Legal/Illegal, Yes/No, Good/Bad problems.
@@ -1309,59 +1394,50 @@ export function interpretProblem(tree, options = {}) {
     return {kind: 'move-sequence', problem}
   }
 
-  // Compute non-move interpretations independently
-  let pointSelection = analyzePointSelection(tree, options)
-  let judgement = analyzeJudgement(tree, options)
-
-  // Arbitrate by structural problem anchor: earlier startNodeId wins
-  if (pointSelection != null && judgement != null) {
-    let order = compareProblemAnchors(
-      tree,
-      pointSelection.startNodeId,
-      judgement.startNodeId,
-    )
-    if (order === -1) {
-      return {
-        kind: 'point-selection',
-        startNodeId: pointSelection.startNodeId,
-        acceptedPoints: pointSelection.acceptedPoints,
-        answerGroups: pointSelection.answerGroups,
-        playerToMove: pointSelection.playerToMove,
-      }
+  // Compute non-move interpretations independently and arbitrate structurally.
+  let candidates = [
+    analyzePointSelection(tree, options),
+    analyzeJudgement(tree, options),
+    analyzeStoneSelection(tree),
+  ].filter(Boolean)
+  if (candidates.length > 1) {
+    let earliest = candidates[0]
+    for (let candidate of candidates.slice(1)) {
+      let order = compareProblemAnchors(
+        tree,
+        earliest.startNodeId,
+        candidate.startNodeId,
+      )
+      if (order === null || order === 0) return {kind: 'unsupported'}
+      if (order === 1) earliest = candidate
     }
-    if (order === 1) {
-      return {
-        kind: 'judgement',
-        judgementType: judgement.judgementType,
-        startNodeId: judgement.startNodeId,
-        answerNodeId: judgement.answerNodeId,
-        choices: judgement.choices,
-        correctChoice: judgement.correctChoice,
-      }
-    }
-    return {kind: 'unsupported'}
+    candidates = [earliest]
   }
+  let candidate = candidates[0]
 
-  if (pointSelection != null) {
+  if (candidate?.acceptedPoints != null) {
     return {
       kind: 'point-selection',
-      startNodeId: pointSelection.startNodeId,
-      acceptedPoints: pointSelection.acceptedPoints,
-      answerGroups: pointSelection.answerGroups,
-      playerToMove: pointSelection.playerToMove,
+      startNodeId: candidate.startNodeId,
+      acceptedPoints: candidate.acceptedPoints,
+      answerGroups: candidate.answerGroups,
+      playerToMove: candidate.playerToMove,
     }
   }
 
-  if (judgement != null) {
+  if (candidate?.judgementType != null) {
     return {
       kind: 'judgement',
-      judgementType: judgement.judgementType,
-      startNodeId: judgement.startNodeId,
-      answerNodeId: judgement.answerNodeId,
-      choices: judgement.choices,
-      correctChoice: judgement.correctChoice,
+      judgementType: candidate.judgementType,
+      startNodeId: candidate.startNodeId,
+      answerNodeId: candidate.answerNodeId,
+      choices: candidate.choices,
+      correctChoice: candidate.correctChoice,
     }
   }
+
+  if (candidate?.acceptedVertices != null)
+    return {kind: 'stone-selection', selectionType: 'dead-stones', ...candidate}
 
   return {kind: 'unsupported'}
 }

@@ -2924,4 +2924,40 @@ describe('interpretProblem', () => {
     let result = interpretProblem(tree)
     assert.strictEqual(result.kind, 'unsupported')
   })
+
+  it('detects dead-stone selection from occupied TR answer markup', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Dead stones. Which ones are they?',
+      ])
+      draft.updateProperty(draft.root.id, 'AB', ['aa'])
+      draft.updateProperty(draft.root.id, 'AW', ['bb'])
+      draft.appendNode(draft.root.id, {
+        TR: ['aa', 'bb'],
+        C: ['Correct Answer'],
+      })
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'stone-selection')
+    assert.strictEqual(result.selectionType, 'dead-stones')
+    assert.deepStrictEqual(result.acceptedVertices, ['aa', 'bb'])
+    assert.strictEqual(result.answerNodeId, tree.root.children[0].id)
+  })
+
+  it('rejects TR answers that include empty or invalid points', () => {
+    let empty = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Which stones are dead?'])
+      draft.updateProperty(draft.root.id, 'AB', ['aa'])
+      draft.appendNode(draft.root.id, {TR: ['aa', 'bb'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(empty).kind, 'unsupported')
+
+    let invalid = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'SZ', ['9'])
+      draft.updateProperty(draft.root.id, 'C', ['Identify the dead stones.'])
+      draft.updateProperty(draft.root.id, 'AB', ['aa'])
+      draft.appendNode(draft.root.id, {TR: ['zz'], C: ['Correct']})
+    })
+    assert.strictEqual(interpretProblem(invalid).kind, 'unsupported')
+  })
 })

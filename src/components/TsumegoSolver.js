@@ -45,7 +45,12 @@ export default class TsumegoSolver extends Component {
   }
 
   getInitialState({problem, interpretation}) {
-    if (interpretation != null && interpretation.kind === 'point-selection') {
+    if (
+      interpretation != null &&
+      (interpretation.kind === 'point-selection' ||
+        interpretation.kind === 'judgement' ||
+        interpretation.kind === 'stone-selection')
+    ) {
       return {
         phase: 'solving',
         displayNodeId: interpretation.startNodeId,
@@ -56,6 +61,7 @@ export default class TsumegoSolver extends Component {
         explorationBoard: null,
         explorationPlayer: null,
         highlightVertices: [],
+        selectedVertices: [],
       }
     }
     if (interpretation != null && interpretation.kind === 'judgement') {
@@ -81,12 +87,18 @@ export default class TsumegoSolver extends Component {
       explorationBoard: null,
       explorationPlayer: null,
       highlightVertices: [],
+      selectedVertices: [],
     }
   }
 
   handleVertexClick = (evt) => {
     if (evt.vertex == null) return
     if (this.state.phase === 'waiting') return
+    if (
+      this.props.interpretation?.kind === 'stone-selection' &&
+      this.state.phase !== 'solving'
+    )
+      return
     if (this.state.phase !== 'solving') {
       this.handleExplorationVertex(evt.vertex)
       return
@@ -99,6 +111,10 @@ export default class TsumegoSolver extends Component {
     }
     if (interpretation != null && interpretation.kind === 'judgement') {
       // Judgement problems do not use board clicks as answers; Goban is read-only while solving
+      return
+    }
+    if (interpretation != null && interpretation.kind === 'stone-selection') {
+      this.handleStoneSelectionVertex(evt.vertex)
       return
     }
 
@@ -286,6 +302,55 @@ export default class TsumegoSolver extends Component {
         explorationBoard: null,
         explorationPlayer: null,
         highlightVertices: [],
+      })
+    }
+  }
+
+  handleStoneSelectionVertex(vertex) {
+    let board = gametree.getBoard(this.props.gameTree, this.state.displayNodeId)
+    if (board.get(vertex) === 0) return
+    let selected = this.state.selectedVertices || []
+    let exists = selected.some(
+      (point) => point[0] === vertex[0] && point[1] === vertex[1],
+    )
+    let next = exists
+      ? selected.filter(
+          (point) => point[0] !== vertex[0] || point[1] !== vertex[1],
+        )
+      : [...selected, vertex]
+    this.setState({selectedVertices: next, highlightVertices: next})
+  }
+
+  handleStoneSelectionCheck = () => {
+    if (this.state.phase !== 'solving') return
+    let {interpretation} = this.props
+    if (interpretation == null || interpretation.kind !== 'stone-selection')
+      return
+    let selected = new Set(
+      (this.state.selectedVertices || []).map((point) =>
+        stringifyVertex(point),
+      ),
+    )
+    let accepted = new Set(interpretation.acceptedVertices)
+    let correct =
+      selected.size === accepted.size &&
+      [...selected].every((point) => accepted.has(point))
+    if (correct) {
+      this.setState({
+        phase: 'solved',
+        displayNodeId: interpretation.answerNodeId,
+        feedback: t('Solved') || 'Solved',
+        showGameGraph: true,
+        selectedVertices: [],
+        highlightVertices: [],
+      })
+      this.props.onSolved?.()
+      this.startAutoNext()
+    } else {
+      this.setState({
+        phase: 'failed',
+        feedback: t('Incorrect'),
+        highlightVertices: this.state.selectedVertices || [],
       })
     }
   }
@@ -586,6 +651,7 @@ export default class TsumegoSolver extends Component {
       showGameGraph,
       explorationBoard,
       highlightVertices,
+      selectedVertices,
     } = this.state
     let solved = phase === 'solved'
     let board = explorationBoard || gametree.getBoard(gameTree, displayNodeId)
@@ -692,6 +758,14 @@ export default class TsumegoSolver extends Component {
                 ),
               ),
             ),
+          ),
+        interpretation != null &&
+          interpretation.kind === 'stone-selection' &&
+          phase === 'solving' &&
+          h(
+            'button',
+            {type: 'button', onClick: this.handleStoneSelectionCheck},
+            t('Check answer'),
           ),
         feedback != null &&
           h(
