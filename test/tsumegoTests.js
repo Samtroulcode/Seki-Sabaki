@@ -2561,4 +2561,63 @@ describe('interpretProblem', () => {
     assert.strictEqual(result.kind, 'judgement')
     assert.strictEqual(result.correctChoice, 'dead')
   })
+
+  it('accepts Alive or Dead question form', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Alive or Dead?'])
+      draft.appendNode(draft.root.id, {C: ['White is dead. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'dead')
+  })
+
+  it('accepts Is this group alive or dead question form', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', ['Is this group alive or dead?'])
+      draft.appendNode(draft.root.id, {C: ['Black is alive. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'alive')
+  })
+
+  it('accepts longer 046-style question prose', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Problem 46. White to play. What about the white group on the left side, is it alive or dead? Black to play and win.',
+      ])
+      draft.appendNode(draft.root.id, {C: ['White is dead. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'judgement')
+    assert.strictEqual(result.correctChoice, 'dead')
+  })
+
+  it('rejects declarative alive not dead as question', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'This group is alive, not dead.',
+      ])
+      draft.appendNode(draft.root.id, {C: ['White is dead. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
+
+  it('rejects generic alive can become dead prose as question', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Alive groups can become dead after a mistake.',
+      ])
+      draft.appendNode(draft.root.id, {C: ['White is dead. Correct']})
+    })
+
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'unsupported')
+  })
 })

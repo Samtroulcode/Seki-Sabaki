@@ -1096,7 +1096,8 @@ function analyzeJudgement(tree, options = {}) {
   for (let node of tree.listNodes()) {
     if (node !== tree.root && isPositionNode(node)) candidates.push(node)
   }
-  const ALIVE_DEAD_QUESTION_RE = /\balive\b.*\bdead\b|\bdead\b.*\balive\b/i
+  const ALIVE_DEAD_QUESTION_RE =
+    /\balive\b[^.!?]*\bor\b[^.!?]*\bdead\b|\bdead\b[^.!?]*\bor\b[^.!?]*\balive\b/i
   for (let node of candidates) {
     if (node.data == null || node.data.C == null) continue
     for (let value of node.data.C) {

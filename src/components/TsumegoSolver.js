@@ -98,8 +98,7 @@ export default class TsumegoSolver extends Component {
       return
     }
     if (interpretation != null && interpretation.kind === 'judgement') {
-      // Judgement problems do not use board clicks as answers
-      this.handleExplorationVertex(evt.vertex)
+      // Judgement problems do not use board clicks as answers; Goban is read-only while solving
       return
     }
 
