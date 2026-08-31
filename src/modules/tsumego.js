@@ -1307,7 +1307,7 @@ function analyzeScore(tree) {
 
 function analyzeScenarioComparison(tree) {
   let questionRe =
-    /black\s+(?:to\s+play\s+and\s+)?white\s+to\s+play[\s\S]*black[\s\S]*first[\s\S]*white[\s\S]*first|what\s+happens[\s\S]*black\s+(?:moves|plays)\s+first[\s\S]*white[\s\S]*(?:moves|plays)?\s*first|compare[\s\S]*black[\s\S]*first[\s\S]*white[\s\S]*first|black[\s\S]*first[\s\S]*white[\s\S]*first/i
+    /(?:black\s+to\s+play\s+and\s+white\s+to\s+play|what\s+happens|compare)[\s\S]*black[\s\S]*first[\s\S]*white[\s\S]*first/i
   let question = tree
     .listNodes()
     .find((node) =>
@@ -1318,10 +1318,11 @@ function analyzeScenarioComparison(tree) {
   if (question == null) return null
   let start = getPositionAncestor(tree, question)
   let roots = {B: [], W: []}
-  let stack = [...question.children]
+  let stack = question.children.map((node) => ({node, labels: [], path: []}))
   let visited = new Set()
   while (stack.length) {
-    let node = stack.shift()
+    let item = stack.shift()
+    let node = item.node
     if (visited.has(node.id)) continue
     visited.add(node.id)
     let color =
@@ -1331,18 +1332,30 @@ function analyzeScenarioComparison(tree) {
           ? 'W'
           : null
     let text = (node.data?.C || []).join(' ')
-    let labelled =
+    let blackLabel =
       /if\s+black\s+(?:plays?|moves?)\s+first|black\s+plays?\s+first/i.test(
         text,
       )
-        ? 'B'
-        : /if\s+white\s+(?:plays?|moves?)\s+first|white\s+plays?\s+first/i.test(
-              text,
-            )
-          ? 'W'
-          : null
-    if (color != null && labelled === color) roots[color].push(node)
-    if (color == null) stack.push(...node.children)
+    let whiteLabel =
+      /if\s+white\s+(?:plays?|moves?)\s+first|white\s+plays?\s+first/i.test(
+        text,
+      )
+    let labels = [...item.labels]
+    if (blackLabel) labels.push('B')
+    if (whiteLabel) labels.push('W')
+    if (labels.includes('B') && labels.includes('W')) return null
+    if (color != null) {
+      if (labels.length && labels[labels.length - 1] !== color) return null
+      if (labels.length) roots[color].push({node, prefix: item.path})
+    }
+    if (color == null)
+      stack.push(
+        ...node.children.map((child) => ({
+          node: child,
+          labels,
+          path: [...item.path, node.id],
+        })),
+      )
   }
   if (roots.B.length !== 1 || roots.W.length !== 1) return null
   let scenarios = []
@@ -1350,9 +1363,10 @@ function analyzeScenarioComparison(tree) {
     ['B', 'black-first'],
     ['W', 'white-first'],
   ]) {
-    let root = roots[color][0]
+    let root = roots[color][0].node
     let node = root
-    let nodeIds = []
+    let nodeIds = [...roots[color][0].prefix]
+    let displayNodeId = null
     while (node != null) {
       if (node.children.length > 1) return null
       if (node.data?.B != null || node.data?.W != null) {
@@ -1360,13 +1374,14 @@ function analyzeScenarioComparison(tree) {
         if ((node.data.B != null ? 'B' : 'W') !== color) return null
       }
       nodeIds.push(node.id)
+      if (isPositionNode(node)) displayNodeId = node.id
       node = node.children[0]
     }
     scenarios.push({
       id,
       player: color,
       nodeIds,
-      displayNodeId: nodeIds[nodeIds.length - 1],
+      displayNodeId,
     })
   }
   return {

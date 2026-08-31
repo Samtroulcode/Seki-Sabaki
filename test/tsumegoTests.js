@@ -3263,8 +3263,8 @@ describe('interpretProblem', () => {
       ['black-first', 'white-first'],
     )
     assert.strictEqual(
-      result.scenarios[0].displayNodeId,
-      tree.root.children[0].children[0].id,
+      tree.get(result.scenarios[0].displayNodeId).data.B[0],
+      'bb',
     )
     assert.strictEqual(
       result.scenarios[1].displayNodeId,
@@ -3293,5 +3293,56 @@ describe('interpretProblem', () => {
       draft.appendNode(draft.root.id, {W: ['cc'], C: ['If White Plays First']})
     })
     assert.strictEqual(interpretProblem(alternating).kind, 'unsupported')
+  })
+
+  it('accepts scenario labels on descriptive prefixes and preserves them', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Compare Black first with White first.',
+      ])
+      let blackPrefix = draft.appendNode(draft.root.id, {
+        C: ['If Black Plays First'],
+      })
+      let black = draft.appendNode(blackPrefix, {B: ['aa'], C: ['Black one']})
+      draft.appendNode(black, {B: ['bb'], C: ['Black two']})
+      let whitePrefix = draft.appendNode(draft.root.id, {
+        C: ['If White Plays First'],
+      })
+      let white = draft.appendNode(whitePrefix, {W: ['cc'], C: ['White one']})
+      draft.appendNode(white, {W: ['dd'], C: ['White two']})
+    })
+    let result = interpretProblem(tree)
+    assert.strictEqual(result.kind, 'scenario-comparison')
+    assert(result.scenarios[0].nodeIds.includes(tree.root.children[0].id))
+    assert.strictEqual(
+      tree.get(result.scenarios[0].displayNodeId).data.B[0],
+      'bb',
+    )
+  })
+
+  it('fails closed for mismatched or conflicting scenario labels', () => {
+    let mismatch = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Compare Black first with White first.',
+      ])
+      let prefix = draft.appendNode(draft.root.id, {
+        C: ['If Black Plays First'],
+      })
+      draft.appendNode(prefix, {W: ['aa']})
+      draft.appendNode(draft.root.id, {W: ['bb'], C: ['If White Plays First']})
+    })
+    assert.strictEqual(interpretProblem(mismatch).kind, 'unsupported')
+
+    let conflict = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Compare Black first with White first.',
+      ])
+      let prefix = draft.appendNode(draft.root.id, {
+        C: ['If Black Plays First; If White Plays First'],
+      })
+      draft.appendNode(prefix, {B: ['aa']})
+      draft.appendNode(draft.root.id, {W: ['bb'], C: ['If White Plays First']})
+    })
+    assert.strictEqual(interpretProblem(conflict).kind, 'unsupported')
   })
 })
