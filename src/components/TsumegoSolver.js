@@ -66,6 +66,7 @@ export default class TsumegoSolver extends Component {
         explorationPlayer: null,
         highlightVertices: [],
         selectedVertices: [],
+        activeScenarioId: null,
       }
     }
     return {
@@ -86,7 +87,9 @@ export default class TsumegoSolver extends Component {
     if (evt.vertex == null) return
     if (this.state.phase === 'waiting') return
     if (
-      ['stone-selection', 'score'].includes(this.props.interpretation?.kind) &&
+      ['stone-selection', 'score', 'scenario-comparison'].includes(
+        this.props.interpretation?.kind,
+      ) &&
       this.state.phase !== 'solving'
     )
       return
@@ -108,7 +111,12 @@ export default class TsumegoSolver extends Component {
       this.handleStoneSelectionVertex(evt.vertex)
       return
     }
-    if (interpretation != null && interpretation.kind === 'score') return
+    if (
+      interpretation != null &&
+      (interpretation.kind === 'score' ||
+        interpretation.kind === 'scenario-comparison')
+    )
+      return
 
     let expectedMoveNode = gameTree.get(this.state.expectedMoveNodeId)
     let result = resolveMove(
@@ -347,20 +355,35 @@ export default class TsumegoSolver extends Component {
     }
   }
 
-  handleScoreReveal = () => {
+  handleReveal = () => {
     if (
       this.state.phase !== 'solving' ||
-      this.props.interpretation?.kind !== 'score' ||
       this.props.interpretation?.interaction !== 'reveal'
     )
       return
     this.setState({
       phase: 'solved',
-      displayNodeId: this.props.interpretation.answerNodeId,
+      displayNodeId:
+        this.props.interpretation.kind === 'scenario-comparison'
+          ? this.props.interpretation.scenarios[0].displayNodeId
+          : this.props.interpretation.answerNodeId,
       feedback: null,
       showGameGraph: true,
+      activeScenarioId:
+        this.props.interpretation.kind === 'scenario-comparison'
+          ? this.props.interpretation.scenarios[0].id
+          : null,
     })
     this.props.onSolved?.()
+  }
+
+  handleScenarioSelect = (scenario) => {
+    if (this.state.phase !== 'solved') return
+    this.cancelAutoNext()
+    this.setState({
+      activeScenarioId: scenario.id,
+      displayNodeId: scenario.displayNodeId,
+    })
   }
 
   startAutoSequence(advanced) {
@@ -665,6 +688,18 @@ export default class TsumegoSolver extends Component {
     let board = explorationBoard || gametree.getBoard(gameTree, displayNodeId)
     let currentNode = gameTree.get(displayNodeId)
     let currentComment = currentNode?.data?.C?.[0] || ''
+    let scenario =
+      interpretation?.kind === 'scenario-comparison'
+        ? interpretation.scenarios.find(
+            (item) => item.id === this.state.activeScenarioId,
+          ) || interpretation.scenarios[0]
+        : null
+    let scenarioComments = scenario
+      ? scenario.nodeIds
+          .map((id) => gameTree.get(id)?.data?.C || [])
+          .flat()
+          .filter(Boolean)
+      : []
     let filename = splitRelativePath(relativePath).pop() || ''
     let currentThemeId = window.sabaki.setting.get('theme.current')
     let graphGridSize = window.sabaki.setting.get('graph.grid_size')
@@ -786,7 +821,26 @@ export default class TsumegoSolver extends Component {
             'div',
             {class: 'tsumego-solution'},
             h('h3', {}, t('Solution')),
-            currentComment && h('p', {}, currentComment),
+            scenario
+              ? h(
+                  'div',
+                  {class: 'tsumego-scenario-selector'},
+                  interpretation.scenarios.map((item) =>
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        'aria-pressed': item.id === scenario.id,
+                        onClick: () => this.handleScenarioSelect(item),
+                      },
+                      item.id === 'black-first'
+                        ? t('Black plays first')
+                        : t('White plays first'),
+                    ),
+                  ),
+                )
+              : currentComment && h('p', {}, currentComment),
+            scenario && scenarioComments.map((comment) => h('p', {}, comment)),
             h(
               'div',
               {class: 'tsumego-solver-graph'},
@@ -839,12 +893,11 @@ export default class TsumegoSolver extends Component {
             {type: 'button', onClick: this.handleRetry},
             solved ? t('Retry Problem') : t('Retry'),
           ),
-        interpretation?.kind === 'score' &&
-          interpretation.interaction === 'reveal' &&
+        interpretation?.interaction === 'reveal' &&
           phase === 'solving' &&
           h(
             'button',
-            {type: 'button', onClick: this.handleScoreReveal},
+            {type: 'button', onClick: this.handleReveal},
             t('Show solution'),
           ),
         !testMode &&

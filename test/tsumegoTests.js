@@ -3235,4 +3235,63 @@ describe('interpretProblem', () => {
       margin: 0,
     })
   })
+
+  it('detects first-player scenario comparison with same-color branches', () => {
+    let tree = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Black to play and White to play. What happens if Black moves first? White first?',
+      ])
+      let black = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['If Black Plays First'],
+      })
+      draft.appendNode(black, {B: ['bb'], C: ['Black continuation']})
+      let white = draft.appendNode(draft.root.id, {
+        W: ['cc'],
+        C: ['If White Plays First'],
+      })
+      draft.appendNode(white, {W: ['dd'], C: ['White continuation']})
+    })
+    let result = interpretProblem(tree, {
+      allowTeFallback: true,
+      allowMainLineFallback: true,
+    })
+    assert.strictEqual(result.kind, 'scenario-comparison')
+    assert.strictEqual(result.interaction, 'reveal')
+    assert.deepStrictEqual(
+      result.scenarios.map((s) => s.id),
+      ['black-first', 'white-first'],
+    )
+    assert.strictEqual(
+      result.scenarios[0].displayNodeId,
+      tree.root.children[0].children[0].id,
+    )
+    assert.strictEqual(
+      result.scenarios[1].displayNodeId,
+      tree.root.children[1].children[0].id,
+    )
+  })
+
+  it('rejects incomplete or alternating scenario branches', () => {
+    let missing = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Compare Black first with White first.',
+      ])
+      draft.appendNode(draft.root.id, {B: ['aa'], C: ['If Black Plays First']})
+    })
+    assert.strictEqual(interpretProblem(missing).kind, 'unsupported')
+
+    let alternating = gametree.new().mutate((draft) => {
+      draft.updateProperty(draft.root.id, 'C', [
+        'Compare Black first with White first.',
+      ])
+      let black = draft.appendNode(draft.root.id, {
+        B: ['aa'],
+        C: ['If Black Plays First'],
+      })
+      draft.appendNode(black, {W: ['bb']})
+      draft.appendNode(draft.root.id, {W: ['cc'], C: ['If White Plays First']})
+    })
+    assert.strictEqual(interpretProblem(alternating).kind, 'unsupported')
+  })
 })

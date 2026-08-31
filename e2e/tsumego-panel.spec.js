@@ -1313,6 +1313,56 @@ test.describe('Tsumego workspace', () => {
       rmSync(root, {recursive: true, force: true})
     }
   })
+
+  test('scenario comparison reveals and switches pedagogical branches', async ({
+    page,
+  }) => {
+    let root = mkdtempSync(path.join(tmpdir(), 'seki-tsumego-scenario-e2e-'))
+    let tsumego = path.join(root, 'Tsumego', 'User Set')
+    mkdirSync(tsumego, {recursive: true})
+    writeFileSync(
+      path.join(tsumego, '168.sgf'),
+      '(;GM[1]SZ[9]C[Black to play and White to play. What happens if Black moves first? White first?](;B[aa]C[If Black Plays First. Black line one.];B[bb]C[Black line two.])(;W[cc]C[If White Plays First. White line one.];W[dd]C[White line two.]))',
+    )
+    try {
+      await page.evaluate(
+        (libraryRoot) => window.sabaki.setting.set('library.root', libraryRoot),
+        root,
+      )
+      await page.getByRole('button', {name: 'Tsumego', exact: true}).click()
+      await page.getByRole('tab', {name: 'My Library'}).click()
+      await page.locator('.tsumego-entry-directory').click()
+      await page.locator('.tsumego-entry-file').click()
+      await expect(
+        page.getByRole('button', {name: 'Show solution'}),
+      ).toBeVisible()
+      await page
+        .locator('.tsumego-solver-board .shudan-vertex[data-x="0"][data-y="0"]')
+        .click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
+      await page.getByRole('button', {name: 'Show solution'}).click()
+      await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solution')).toContainText(
+        'Black line two.',
+      )
+      await page.getByRole('button', {name: 'White plays first'}).click()
+      await expect(page.locator('.tsumego-solution')).toContainText(
+        'White line two.',
+      )
+      await page.getByRole('button', {name: 'Black plays first'}).click()
+      await expect(page.locator('.tsumego-solution')).toContainText(
+        'Black line one.',
+      )
+      await page
+        .getByRole('button', {name: 'Retry Problem', exact: true})
+        .click()
+      await expect(
+        page.getByRole('button', {name: 'Show solution'}),
+      ).toBeVisible()
+    } finally {
+      rmSync(root, {recursive: true, force: true})
+    }
+  })
 })
 
 async function dispatchVertex(page, x, y) {

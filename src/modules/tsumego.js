@@ -1305,6 +1305,79 @@ function analyzeScore(tree) {
   }
 }
 
+function analyzeScenarioComparison(tree) {
+  let questionRe =
+    /black\s+(?:to\s+play\s+and\s+)?white\s+to\s+play[\s\S]*black[\s\S]*first[\s\S]*white[\s\S]*first|what\s+happens[\s\S]*black\s+(?:moves|plays)\s+first[\s\S]*white[\s\S]*(?:moves|plays)?\s*first|compare[\s\S]*black[\s\S]*first[\s\S]*white[\s\S]*first|black[\s\S]*first[\s\S]*white[\s\S]*first/i
+  let question = tree
+    .listNodes()
+    .find((node) =>
+      (node.data?.C || []).some(
+        (value) => typeof value === 'string' && questionRe.test(value),
+      ),
+    )
+  if (question == null) return null
+  let start = getPositionAncestor(tree, question)
+  let roots = {B: [], W: []}
+  let stack = [...question.children]
+  let visited = new Set()
+  while (stack.length) {
+    let node = stack.shift()
+    if (visited.has(node.id)) continue
+    visited.add(node.id)
+    let color =
+      node.data?.B != null && node.data?.W == null
+        ? 'B'
+        : node.data?.W != null && node.data?.B == null
+          ? 'W'
+          : null
+    let text = (node.data?.C || []).join(' ')
+    let labelled =
+      /if\s+black\s+(?:plays?|moves?)\s+first|black\s+plays?\s+first/i.test(
+        text,
+      )
+        ? 'B'
+        : /if\s+white\s+(?:plays?|moves?)\s+first|white\s+plays?\s+first/i.test(
+              text,
+            )
+          ? 'W'
+          : null
+    if (color != null && labelled === color) roots[color].push(node)
+    if (color == null) stack.push(...node.children)
+  }
+  if (roots.B.length !== 1 || roots.W.length !== 1) return null
+  let scenarios = []
+  for (let [color, id] of [
+    ['B', 'black-first'],
+    ['W', 'white-first'],
+  ]) {
+    let root = roots[color][0]
+    let node = root
+    let nodeIds = []
+    while (node != null) {
+      if (node.children.length > 1) return null
+      if (node.data?.B != null || node.data?.W != null) {
+        if (node.data.B != null && node.data.W != null) return null
+        if ((node.data.B != null ? 'B' : 'W') !== color) return null
+      }
+      nodeIds.push(node.id)
+      node = node.children[0]
+    }
+    scenarios.push({
+      id,
+      player: color,
+      nodeIds,
+      displayNodeId: nodeIds[nodeIds.length - 1],
+    })
+  }
+  return {
+    kind: 'scenario-comparison',
+    interaction: 'reveal',
+    comparisonType: 'first-player',
+    startNodeId: start.id,
+    scenarios,
+  }
+}
+
 // Judgement detection for Alive/Dead, Legal/Illegal, Yes/No, Good/Bad problems.
 // Shared pipeline: find question → classify domain → find answer candidates → classify answer → resolve ambiguity.
 function analyzeJudgement(tree, options = {}) {
@@ -1522,6 +1595,7 @@ export function interpretProblem(tree, options = {}) {
     analyzeJudgement(tree, options),
     analyzeStoneSelection(tree),
     analyzeScore(tree),
+    analyzeScenarioComparison(tree),
   ].filter(Boolean)
   if (candidates.length > 1) {
     let earliest = candidates.filter((candidate) =>
