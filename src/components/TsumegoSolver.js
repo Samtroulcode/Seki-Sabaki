@@ -50,10 +50,9 @@ export default class TsumegoSolver extends Component {
   getInitialState({problem, interpretation}) {
     if (
       interpretation != null &&
-      (interpretation.kind === 'point-selection' ||
-        interpretation.kind === 'judgement' ||
-        interpretation.kind === 'stone-selection' ||
-        interpretation.kind === 'score')
+      interpretation.kind !== 'move-sequence' &&
+      interpretation.kind !== 'unsupported' &&
+      interpretation.startNodeId != null
     ) {
       return {
         phase: 'solving',

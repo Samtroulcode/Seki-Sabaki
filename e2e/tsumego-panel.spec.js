@@ -1333,6 +1333,11 @@ test.describe('Tsumego workspace', () => {
       await page.getByRole('tab', {name: 'My Library'}).click()
       await page.locator('.tsumego-entry-directory').click()
       await page.locator('.tsumego-entry-file').click()
+      await expect(page.locator('.tsumego-solver')).toBeVisible()
+      await expect(page.locator('.tsumego-initial-comment')).toContainText(
+        'Black to play and White to play',
+      )
+      await expect(page.locator('.tsumego-solver-board #goban')).toBeVisible()
       await expect(
         page.getByRole('button', {name: 'Show solution'}),
       ).toBeVisible()
@@ -1342,6 +1347,7 @@ test.describe('Tsumego workspace', () => {
       await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solving/)
       await page.getByRole('button', {name: 'Show solution'}).click()
       await expect(page.locator('.tsumego-solver')).toHaveClass(/phase-solved/)
+      await expect(page.locator('.tsumego-solver-feedback')).toHaveCount(0)
       await expect(page.locator('.tsumego-solution')).toContainText(
         'Black line two.',
       )
